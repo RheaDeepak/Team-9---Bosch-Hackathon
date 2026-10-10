@@ -186,5 +186,42 @@ class ControlPlaneContractTests(unittest.TestCase):
         self.assertIsNotNone(result["first_healthy_seconds"])
 
 
+class HistoryTests(unittest.TestCase):
+    """guard.history: the 'normal' side of the charts, sampled like the live guard."""
+
+    def history(self, spans, **kw):
+        with patch.object(guard, "fetch_spans", return_value=spans):
+            return guard.history(["cart"], **kw)
+
+    def test_samples_every_step_with_negative_times_oldest_first(self):
+        rows = self.history({}, seconds=20, step_s=5)
+        self.assertEqual([r["t"] for r in rows], [-20, -15, -10, -5, 0])
+        self.assertEqual(rows[0]["services"]["cart"]["n"], 0)
+        self.assertIsNone(rows[0]["services"]["cart"]["p95_ms"])
+
+    def test_each_point_only_counts_spans_inside_its_own_window(self):
+        now = time.time()
+        old = {i: span("cart", now - 75, 500.0) for i in range(10)}               # a slow burst 75 s ago
+        fresh = {100 + i: span("cart", now - 2, 5.0) for i in range(10)}
+        rows = {r["t"]: r["services"]["cart"] for r in self.history({**old, **fresh}, seconds=90, step_s=30, window_s=30)}
+        self.assertEqual(rows[0]["p95_ms"], 5.0)                                  # the last 30 s: only the fast spans
+        self.assertEqual(rows[-60]["p95_ms"], 500.0)                               # 60 s ago: the slow burst
+        self.assertEqual(rows[-30]["n"], 0)                                        # a quiet window: no data, not zero latency
+
+    def test_grafana_and_jaeger_traffic_is_left_out_like_in_live_metrics(self):
+        now = time.time()
+        spans = {i: span("frontend-proxy", now - 1, 5000.0, url="http://localhost:8080/grafana/api/ds/query") for i in range(10)}
+        with patch.object(guard, "fetch_spans", return_value=spans):
+            rows = guard.history(["frontend-proxy"], seconds=0)
+        self.assertEqual(rows[0]["services"]["frontend-proxy"]["n"], 0)
+
+    def test_live_metrics_and_history_agree_on_one_window(self):
+        spans = {i: span("cart", time.time() - 1, float(i + 1), status=2 if i < 3 else 0) for i in range(10)}
+        with patch.object(guard, "fetch_spans", return_value=spans):
+            live = guard.live_metrics(["cart"])["cart"]
+            past = guard.history(["cart"], seconds=0)[0]["services"]["cart"]
+        self.assertEqual(live, past)
+
+
 if __name__ == "__main__":
     unittest.main()

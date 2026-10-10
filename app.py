@@ -54,7 +54,7 @@ WORKER = None
 def _blank():
     return {"phase": "idle", "running": False, "plan": None, "source": None, "note": None, "validation": None,
             "approved_at": None, "fault_started_ts": None, "ended_ts": None, "rollback_at_s": None,
-            "watch": {}, "samples": [], "probes": [], "events": [], "result": None, "refused": None}
+            "watch": {}, "normal": None, "samples": [], "probes": [], "events": [], "result": None, "refused": None}
 
 
 STATE = {**_blank(), "startup_note": None}
@@ -90,6 +90,11 @@ def _on_watch(info):
         STATE["watch"] = info
 
 
+def _on_normal(samples):
+    with LOCK:
+        STATE["normal"] = samples
+
+
 def _on_sample(phase, t, metrics_, containers, breaches):
     with LOCK:
         STATE["samples"].append({
@@ -116,7 +121,7 @@ def _worker(plan, source, validation):
     threading.Thread(target=_probe_loop, args=(probes_done,), daemon=True).start()
     try:
         result = exp.execute(plan, source, validation, emit=_log, on_phase=_on_phase, on_sample=_on_sample,
-                             on_watch=_on_watch, stop=STOP)
+                             on_watch=_on_watch, stop=STOP, on_normal=_on_normal)
         with LOCK:
             STATE["ended_ts"] = time.time()
             if "refused" in result:
