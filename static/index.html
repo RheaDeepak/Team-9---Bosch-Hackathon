@@ -1236,7 +1236,9 @@ function analysisTick(st) {                               // called by poll(): f
   analysisWas = !!a.running;
   syncAnalysisControls();
   if (a.running) {
-    $('afeedBox').classList.remove('hide'); if (was === false) { $('afeedBox').open = true; aFeed.reset(); announce('Analysis started. Its steps stream into the analysis activity feed.'); }
+    $('afeedBox').classList.remove('hide');
+    if (was !== true) $('afeedBox').open = true;           // also when the page (re)loads mid-analysis
+    if (was === false) { aFeed.reset(); announce('Analysis started. Its steps stream into the analysis activity feed.'); }
     aFeed.poll();
     if (mainFeed.mode !== 'planning' && !mainFeed.viewRun) mainFeed.poll();
   } else if (was) {                                        // just finished: one last poll of each feed, then fresh findings
