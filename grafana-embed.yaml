@@ -1,0 +1,10 @@
+# Compose override for the OpenTelemetry Demo: lets Grafana panels be embedded in iframes (the Chaos Copilot UI).
+# Passed with an extra -f flag, so the demo repository itself is never modified.
+#
+# It only drops Grafana's `X-Frame-Options: deny`. Anonymous access is already enabled by the demo's own
+# grafana.ini ([auth.anonymous] enabled = true), so it is left as is. The environment variable below takes
+# precedence over [security] allow_embedding in that file, and is merged with the demo's GF_INSTALL_PLUGINS.
+services:
+  grafana:
+    environment:
+      - GF_SECURITY_ALLOW_EMBEDDING=true

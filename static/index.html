@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0e15">
+<title>Chaos Copilot</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23121723'/%3E%3Cpath d='M5 17h5l3-9 5 16 3-9h6' fill='none' stroke='%236b97ff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ================= Design tokens ================= */
+:root {
+  color-scheme: dark;
+  /* surfaces, darkest to lightest */
+  --bg:#0b0e15; --well:#090c12; --surface:#121723; --surface-2:#192033; --surface-3:#222b42;
+  --line:#222a3c; --line-2:#313c56;
+  /* text */
+  --text:#e9ecf3; --text-2:#b3bbcd; --text-3:#8d96ac;
+  /* one accent, plus status colours (each with a tinted background for pills and notices) */
+  --accent:#6b97ff; --accent-solid:#3d6be8; --accent-hover:#3158cc; --accent-soft:#15213f;
+  --ok:#46d39a; --ok-soft:#0f2f23; --go-solid:#147f52; --go-hover:#0f6a44;
+  --warn:#f6ad37; --warn-soft:#38290e;
+  --bad:#ff7673; --bad-soft:#3a1618; --bad-solid:#cf3434; --bad-hover:#b02a2a;
+  /* spacing, radius, type */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --r-sm:8px; --r-md:12px; --r-lg:14px;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  --ease:.15s ease;
+}
+* { box-sizing:border-box; }
+html { background:var(--bg); scroll-padding-top:84px; scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+body { margin:0; color:var(--text); font:14px/1.55 var(--font); -webkit-font-smoothing:antialiased; }
+button, select, input { font:inherit; color:inherit; }
+button { cursor:pointer; }
+h1, h2, h3, p { margin:0; }
+.hide { display:none !important; }
+.muted { color:var(--text-3); }
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+.num, .kpi b, table, .pill, .ring { font-variant-numeric:tabular-nums; }
+
+/* ================= Top bar and step navigation ================= */
+.topbar { position:sticky; top:0; z-index:30; background:rgba(11,14,21,.88); -webkit-backdrop-filter:saturate(1.3) blur(12px); backdrop-filter:saturate(1.3) blur(12px); border-bottom:1px solid var(--line); }
+.topbar-in { max-width:1240px; margin:0 auto; padding:10px var(--s5); display:flex; align-items:center; gap:var(--s5); }
+.brand { display:flex; align-items:center; gap:10px; flex:none; }
+.brand svg { width:30px; height:30px; flex:none; }
+.brand h1 { font-size:16px; font-weight:650; letter-spacing:-.01em; line-height:1.2; }
+.brand p { font-size:11.5px; color:var(--text-3); line-height:1.2; margin-top:2px; }
+.steps-nav { display:flex; gap:2px; overflow-x:auto; scrollbar-width:none; }
+.steps-nav::-webkit-scrollbar { display:none; }
+.steps-nav a { padding:6px 11px; border-radius:var(--r-sm); color:var(--text-2); text-decoration:none; font-size:13px; white-space:nowrap; transition:background-color var(--ease), color var(--ease); }
+.steps-nav a:hover { background:var(--surface-2); color:var(--text); }
+.steps-nav a[aria-current] { background:var(--accent-soft); color:var(--accent); }
+#phasePill { margin-left:auto; flex:none; }
+
+/* ================= Page composition ================= */
+main { max-width:1240px; margin:0 auto; padding:var(--s5) var(--s5) 140px; display:grid; gap:var(--s5); }
+#banner { order:-9; }
+/* The page re-composes around what matters now: the live view while a fault runs, the result once it is over. */
+main[data-mode="run"] #live { order:-8; } main[data-mode="run"] #grafanaSec { order:-7; }
+main[data-mode="review"] #resultPanel { order:-8; } main[data-mode="review"] #live { order:-7; } main[data-mode="review"] #grafanaSec { order:-6; }
+
+/* ================= Cards ================= */
+.card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 12px 32px -16px rgba(0,0,0,.6); min-width:0; }
+.card-head { display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:var(--s3) var(--s4); padding:18px 22px 14px; border-bottom:1px solid var(--line); }
+.card-body { padding:18px 22px 22px; }
+.card-title { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.card-title h2 { font-size:17px; font-weight:650; letter-spacing:-.01em; line-height:1.25; display:flex; align-items:center; flex-wrap:wrap; gap:var(--s2); }
+.card-actions { display:flex; align-items:center; flex-wrap:wrap; gap:var(--s2) var(--s3); }
+.eyebrow { font-size:11px; font-weight:600; letter-spacing:.09em; text-transform:uppercase; color:var(--text-3); }
+.eyebrow b { color:var(--accent); font-weight:700; margin-right:6px; }
+.card.primary { border-color:#2b3f73; background:linear-gradient(180deg,#151d34 0,var(--surface) 140px); box-shadow:inset 0 2px 0 var(--accent-solid), 0 12px 32px -16px rgba(0,0,0,.6); }
+.card.is-live { border-color:#6b2a2d; box-shadow:0 0 0 1px rgba(255,118,115,.22), 0 16px 48px -16px rgba(207,52,52,.4); }
+.sub { font-size:11.5px; font-weight:650; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin:0 0 var(--s2); }
+.block { margin-top:var(--s5); }
+.panel { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3) var(--s4); min-width:0; }
+.panel > .sub { margin-bottom:var(--s3); }
+
+/* ================= Buttons and form controls ================= */
+.btn { --b:var(--surface-2); --b-hover:var(--surface-3); --bd:var(--line-2); --bd-hover:#44527a; --fg:var(--text);
+  display:inline-flex; align-items:center; justify-content:center; gap:var(--s2); min-height:34px; padding:6px 14px; border-radius:var(--r-sm);
+  background:var(--b); border:1px solid var(--bd); color:var(--fg); font-size:13.5px; font-weight:550; line-height:1.2; text-decoration:none; white-space:nowrap;
+  transition:background-color var(--ease), border-color var(--ease), box-shadow var(--ease), transform .08s ease, opacity var(--ease); }
+.btn:hover:not(:disabled) { background:var(--b-hover); border-color:var(--bd-hover); }
+.btn:active:not(:disabled) { transform:translateY(1px); }
+.btn:disabled { opacity:.42; cursor:not-allowed; }
+.btn-sm { min-height:30px; padding:4px 11px; font-size:13px; }
+.btn-primary { --b:var(--accent-solid); --b-hover:var(--accent-hover); --bd:#5f86f5; --bd-hover:#7d9cf7; --fg:#fff; box-shadow:0 6px 16px -8px rgba(61,107,232,.8); }
+.btn-go { --b:var(--go-solid); --b-hover:var(--go-hover); --bd:#27a874; --bd-hover:#3bbd89; --fg:#fff; min-height:38px; padding:8px 20px; font-weight:650; }
+.btn-quiet-danger { --b:transparent; --b-hover:var(--bad-soft); --bd:#5c2a2d; --bd-hover:#8a3a3d; --fg:#ffa5a3; }
+select { appearance:none; -webkit-appearance:none; min-height:34px; padding:6px 32px 6px 11px; border-radius:var(--r-sm); border:1px solid var(--line-2); color:var(--text); font-size:13.5px; cursor:pointer;
+  background:var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238d96ac' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 11px center;
+  transition:border-color var(--ease), background-color var(--ease); max-width:100%; }
+select:hover { border-color:#44527a; }
+select option { background:var(--surface-2); color:var(--text); }
+.field { display:inline-flex; align-items:center; gap:var(--s2); color:var(--text-2); font-size:13px; }
+.chk { display:inline-flex; align-items:center; gap:var(--s2); cursor:pointer; min-height:34px; }
+input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent-solid); margin:0; cursor:pointer; }
+input[type=checkbox]:disabled { cursor:not-allowed; opacity:.5; } .chk:has(input:disabled) { color:var(--text-3); cursor:not-allowed; }
+
+/* ================= Pills, chips, status ================= */
+.pill { display:inline-flex; align-items:center; gap:5px; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; line-height:1.5; background:var(--surface-3); color:var(--text-2); box-shadow:inset 0 0 0 1px rgba(255,255,255,.04); white-space:nowrap; }
+.pill.ok { background:var(--ok-soft); color:var(--ok); box-shadow:inset 0 0 0 1px rgba(70,211,154,.28); }
+.pill.bad { background:var(--bad-soft); color:var(--bad); box-shadow:inset 0 0 0 1px rgba(255,118,115,.28); }
+.pill.warn { background:var(--warn-soft); color:var(--warn); box-shadow:inset 0 0 0 1px rgba(246,173,55,.28); }
+.pill.info { background:var(--accent-soft); color:var(--accent); box-shadow:inset 0 0 0 1px rgba(107,151,255,.28); }
+.chip { display:inline-block; padding:1px 10px; margin:2px 4px 2px 0; border-radius:999px; background:var(--surface-3); color:var(--text); font-size:12px; line-height:1.6; border:0; }
+.chip.target { background:var(--bad-soft); color:var(--bad); } .chip.blast { background:var(--warn-soft); color:var(--warn); }
+button.chip.link { transition:background-color var(--ease); } button.chip.link:hover { background:var(--accent-soft); color:var(--accent); }
+.spin { display:inline-block; width:12px; height:12px; border:2px solid var(--line-2); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:-2px; margin-right:6px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+.live-dot { width:8px; height:8px; border-radius:50%; background:var(--bad); display:none; animation:pulse 1.4s ease-in-out infinite; }
+.is-live .live-dot { display:inline-block; }
+
+/* ================= Notices ================= */
+#banner { display:none; padding:var(--s3) var(--s4); border-radius:var(--r-md); background:var(--bad-soft); color:#ffc4c2; border:1px solid #6b2a2d; }
+#banner.show { display:block; } #banner.note { background:var(--accent-soft); color:#bcd2ff; border-color:#27407a; }
+
+/* ================= 1. Readiness ================= */
+#readyDetails summary { display:flex; align-items:center; gap:var(--s2); cursor:pointer; color:var(--text-2); list-style:none; padding:2px 0; }
+#readyDetails summary::-webkit-details-marker { display:none; }
+#readyDetails summary::before { content:""; width:7px; height:7px; border-right:2px solid var(--text-3); border-bottom:2px solid var(--text-3); transform:rotate(-45deg); transition:transform var(--ease); margin-right:4px; }
+#readyDetails[open] summary::before { transform:rotate(45deg); }
+.checks { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr)); gap:var(--s2); margin-top:var(--s3); }
+.check { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); min-width:0; }
+.check .d { color:var(--text-3); font-size:12px; overflow-wrap:anywhere; }
+.ico { width:18px; height:18px; border-radius:50%; flex:none; display:grid; place-items:center; font-size:11px; font-weight:800; margin-top:1px; background:var(--surface-3); color:var(--text-2); }
+.ico.ok { background:var(--ok-soft); color:var(--ok); } .ico.bad { background:var(--bad-soft); color:var(--bad); } .ico.warn { background:var(--warn-soft); color:var(--warn); }
+
+/* ================= 2. Graph ================= */
+.toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s4); margin-bottom:var(--s3); }
+.toolbar .hint { margin-left:auto; color:var(--text-3); font-size:12px; }
+.gwrap { position:relative; }
+.stage { position:relative; border:1px solid var(--line); border-radius:var(--r-md); overflow:hidden; background:var(--well) radial-gradient(#1a2235 1px,transparent 1px) 0 0/22px 22px; }
+#cy { height:430px; }
+.stage-note { position:absolute; left:12px; bottom:10px; z-index:2; pointer-events:none; padding:3px 11px; border-radius:999px; background:rgba(18,23,35,.88); border:1px solid var(--line); color:var(--text-2); font-size:12px; }
+.tip { position:absolute; z-index:8; pointer-events:none; background:#0a0d13; border:1px solid var(--line-2); border-radius:10px; padding:9px 12px; font-size:12px; line-height:1.5; max-width:340px; box-shadow:0 10px 28px rgba(0,0,0,.55); }
+.detail { margin-top:var(--s3); padding:var(--s4); border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface-2); }
+.detail.muted { background:transparent; border-style:dashed; }
+.detail h3 { margin:0 0 var(--s3); font-size:16px; display:flex; flex-wrap:wrap; gap:var(--s2); align-items:center; }
+.detail .cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:var(--s3) var(--s5); }
+.detail ul { margin:var(--s1) 0 0; padding-left:0; list-style:none; } .detail li { margin:4px 0; } .detail li small { color:var(--text-3); }
+.detail ol { margin:var(--s2) 0 0; padding-left:20px; } .detail ol li { margin:3px 0; }
+.bar { height:6px; border-radius:3px; background:var(--surface-3); overflow:hidden; margin:6px 0 var(--s2); } .bar i { display:block; height:100%; border-radius:3px; }
+.legend { display:flex; flex-wrap:wrap; gap:var(--s2) var(--s5); margin-top:var(--s4); color:var(--text-3); font-size:12px; }
+.legend-group { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s1) var(--s3); }
+.legend-group > b { color:var(--text-2); font-weight:600; margin-right:2px; }
+.legend i { display:inline-block; width:20px; height:0; border-top:3px solid; vertical-align:middle; margin-right:5px; }
+.legend .dotk { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+
+/* ================= 3. Plan ================= */
+.plan-empty { padding:var(--s4) 0 var(--s2); color:var(--text-3); }
+.plan-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:var(--s5); }
+.plan-headline { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3); margin-bottom:var(--s3); }
+.plan-target { font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1.15; overflow-wrap:anywhere; }
+.facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:var(--s3); margin:0 0 var(--s4); }
+.fact { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s2) var(--s3); min-width:0; }
+.fact dt { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-3); }
+.fact dd { margin:2px 0 0; font-weight:600; overflow-wrap:anywhere; }
+.prose p { color:var(--text-2); overflow-wrap:anywhere; margin-bottom:var(--s3); } .prose .sub { margin-top:var(--s3); }
+.plan-side { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s4); align-self:start; }
+.gate { list-style:none; margin:var(--s3) 0 var(--s4); padding:0; }
+.gate li { display:flex; gap:var(--s2); margin:6px 0; font-size:13px; }
+.gate .ic { font-weight:800; width:16px; flex:none; text-align:center; } .gate .ic.ok { color:var(--ok); } .gate .ic.no { color:var(--bad); }
+.gate small { display:block; }
+.reasons { color:var(--bad); margin:6px 0 0; padding-left:18px; }
+.decision { margin-top:var(--s4); padding:var(--s4); border:1px solid var(--line); border-radius:var(--r-md); background:var(--well); display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3) var(--s4); }
+.decision .btns { display:flex; gap:var(--s2); margin-left:auto; }
+#approveHint { flex-basis:100%; font-size:12.5px; min-height:0; } #approveHint:empty { display:none; }
+
+/* ================= 4. Live ================= */
+.run-top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s4) var(--s5); margin-bottom:var(--s4); }
+.steps { display:flex; flex-wrap:wrap; gap:var(--s2); counter-reset:step; }
+.step { counter-increment:step; display:inline-flex; align-items:center; gap:7px; padding:5px 12px 5px 7px; border-radius:999px; background:var(--surface-2); border:1px solid var(--line); color:var(--text-3); font-size:12.5px; text-transform:capitalize; transition:background-color var(--ease), color var(--ease), border-color var(--ease); }
+.step::before { content:counter(step); width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:700; background:var(--surface-3); color:var(--text-2); }
+.step.done { color:var(--ok); border-color:rgba(70,211,154,.3); } .step.done::before { content:"\2713"; background:var(--ok-soft); color:var(--ok); }
+.step.now { color:#fff; background:var(--accent-soft); border-color:var(--accent-solid); } .step.now::before { background:var(--accent-solid); color:#fff; }
+.step.fail { color:var(--bad); background:var(--bad-soft); border-color:#6b2a2d; text-transform:none; } .step.fail::before { content:"!"; background:var(--bad-solid); color:#fff; }
+.kpis { display:flex; gap:var(--s3); }
+.kpi { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s2) var(--s4); min-width:120px; }
+.kpi b { display:block; font-size:24px; line-height:1.2; letter-spacing:-.01em; } .kpi span { color:var(--text-3); font-size:11.5px; text-transform:uppercase; letter-spacing:.07em; }
+.focusbar { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2); color:var(--text-2); font-size:13px; margin:0 0 var(--s3); }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--s4); } .grid2 + .grid2 { margin-top:var(--s4); }
+.chartbox { height:240px; position:relative; } .chartbox canvas { position:absolute; inset:0; }
+.probe-row { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s3); padding:var(--s2) 0; } .probe-row + .probe-row { border-top:1px solid var(--line); }
+.probe-row .pill { min-width:56px; justify-content:center; } .probe-row b { min-width:68px; }
+.strip { flex-basis:100%; display:flex; gap:2px; flex-wrap:wrap; }
+.strip i { width:6px; height:14px; border-radius:2px; background:var(--ok); } .strip i.f { background:var(--bad); }
+#events { height:190px; overflow:auto; overscroll-behavior:contain; background:var(--well); border:1px solid var(--line); border-radius:var(--r-sm); padding:var(--s2) var(--s3); margin:0; font:12px/1.55 var(--mono); color:var(--text-2); white-space:pre-wrap; overflow-wrap:anywhere; }
+
+/* ================= 5. Grafana ================= */
+.gframes { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:var(--s3); }
+.gframes iframe { width:100%; height:290px; border:1px solid var(--line); border-radius:var(--r-md); background:var(--well); }
+.note { color:var(--text-3); font-size:12px; margin-top:var(--s3); }
+
+/* ================= 6/7. Result, tables, history ================= */
+.table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:var(--r-md); }
+.table-wrap.scroll { max-height:420px; overflow-y:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th, td { text-align:left; padding:9px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+tr:last-child td { border-bottom:0; }
+th { position:sticky; top:0; background:var(--surface-2); color:var(--text-3); font-size:11px; font-weight:650; letter-spacing:.07em; text-transform:uppercase; white-space:nowrap; z-index:1; }
+tr.click { cursor:pointer; transition:background-color var(--ease); } tr.click:hover { background:var(--surface-2); } tr.click:focus-visible { outline-offset:-2px; }
+.neg { color:var(--ok); } .pos { color:var(--bad); }
+.history-more { margin-top:var(--s3); }
+.scorebar { display:flex; gap:var(--s5); align-items:center; flex-wrap:wrap; padding:var(--s4) var(--s5); margin-bottom:var(--s5); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); }
+.ring { --p:0; --c:var(--ok); width:104px; height:104px; border-radius:50%; flex:none; display:grid; place-items:center; background:conic-gradient(var(--c) calc(var(--p) * 1%), var(--surface-3) 0); }
+.ring div { width:80px; height:80px; border-radius:50%; background:var(--surface-2); display:grid; place-items:center; text-align:center; line-height:1.05; }
+.ring b { font-size:28px; } .ring small { color:var(--text-3); font-size:11px; }
+.outcome { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s3); margin-bottom:var(--s4); }
+.outcome .pill:first-child { font-size:13px; padding:3px 12px; }
+.kv { display:grid; grid-template-columns:130px minmax(0,1fr); gap:var(--s2) var(--s4); margin:0 0 var(--s2); } .kv dt { color:var(--text-3); } .kv dd { margin:0; overflow-wrap:anywhere; }
+.verdict { padding:var(--s3) var(--s4); border-radius:var(--r-md); background:var(--surface-2); border:1px solid var(--line); border-left:4px solid var(--text-3); }
+.verdict.ok { border-left-color:var(--ok); } .verdict.warn { border-left-color:var(--warn); } .verdict.bad { border-left-color:var(--bad); }
+.next { margin-top:var(--s4); padding:var(--s3) var(--s4); border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 var(--r-md) var(--r-md) 0; }
+details > summary.muted { cursor:pointer; }
+
+/* ================= Emergency stop ================= */
+#stop { position:fixed; right:var(--s5); bottom:calc(var(--s5) + env(safe-area-inset-bottom)); z-index:40; display:none; align-items:center; gap:var(--s3);
+  background:var(--bad-solid); border:2px solid #ff8a87; color:#fff; font-size:17px; font-weight:800; letter-spacing:.03em; padding:16px 30px; border-radius:var(--r-md);
+  box-shadow:0 10px 34px rgba(207,52,52,.5); transition:background-color var(--ease), transform .08s ease, box-shadow var(--ease); }
+#stop::before { content:""; width:14px; height:14px; border-radius:3px; background:#fff; flex:none; }
+#stop:hover:not(:disabled) { background:var(--bad-hover); box-shadow:0 12px 40px rgba(224,69,69,.6); } #stop:active:not(:disabled) { transform:translateY(1px); }
+#stop:focus-visible { outline:3px solid #fff; outline-offset:3px; border-radius:var(--r-md); }
+#stop.show { display:inline-flex; }
+
+/* ================= Responsive ================= */
+@media (max-width:1000px) {
+  .plan-grid { grid-template-columns:1fr; }
+  .brand p { display:none; }
+}
+@media (min-width:641px) and (max-width:1000px) {
+  .gframes { grid-template-columns:1fr 1fr; }
+  .gframes iframe:last-child { grid-column:1 / -1; }          /* two panels plus one full-width, not an orphan */
+}
+@media (max-width:860px) {
+  .grid2 { grid-template-columns:1fr; }
+  .topbar-in { flex-wrap:wrap; gap:var(--s2) var(--s4); }
+  .steps-nav { order:3; flex-basis:100%; margin:0 -6px; }
+  #phasePill { margin-left:auto; }
+  .toolbar .hint { margin-left:0; flex-basis:100%; }
+}
+@media (max-width:640px) {
+  main { padding:var(--s4) var(--s3) 120px; gap:var(--s4); }
+  .topbar-in { padding:var(--s2) var(--s3); }
+  .card-head { padding:var(--s4) var(--s4) var(--s3); } .card-body { padding:var(--s4); }
+  .card-actions { width:100%; } .card-actions select { flex:1 1 180px; }
+  .kv { grid-template-columns:1fr; gap:0; } .kv dd { margin-bottom:var(--s2); }
+  .kpis { width:100%; } .kpi { flex:1; min-width:0; }
+  .plan-target { font-size:22px; }
+  .decision .btns { margin-left:0; width:100%; } .decision .btns .btn { flex:1; }
+  .scorebar { padding:var(--s4); }
+  th, td { padding:8px 10px; }
+  #stop { left:var(--s3); right:var(--s3); bottom:calc(var(--s3) + env(safe-area-inset-bottom)); justify-content:center; padding:15px 20px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  html { scroll-behavior:auto; }
+  *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#192033"/><path d="M5 17h5l3-9 5 16 3-9h6" fill="none" stroke="#6b97ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><h1>Chaos Copilot</h1><p>AI proposes. Policy decides. You approve.</p></div>
+    </div>
+    <nav class="steps-nav" aria-label="Steps">
+      <a href="#readiness" data-for="readiness">Readiness</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a>
+      <a href="#live" data-for="live">Live</a><a href="#grafanaSec" data-for="grafanaSec">Grafana</a><a href="#resultPanel" data-for="resultPanel">Result</a><a href="#historySec" data-for="historySec">History</a>
+    </nav>
+    <span id="phasePill" class="pill" role="status">idle</span>
+  </div>
+</header>
+<button id="stop" type="button" aria-label="Emergency stop: abort the experiment and roll the fault back">STOP EXPERIMENT</button>
+<main data-mode="idle">
+  <div id="banner" role="alert"></div>
+
+  <section id="readiness" class="card">
+    <header class="card-head">
+      <div class="card-title"><span class="eyebrow"><b>01</b>Check</span><h2>Readiness <span id="readyPill" class="pill" role="status">checking</span></h2></div>
+      <div class="card-actions"><button id="refreshReady" class="btn btn-sm" type="button">Refresh</button></div>
+    </header>
+    <div class="card-body">
+      <details id="readyDetails" open><summary id="readySummary">Checking…</summary><div id="checks" class="checks"></div></details>
+    </div>
+  </section>
+
+  <section id="graphSec" class="card">
+    <header class="card-head">
+      <div class="card-title"><span class="eyebrow"><b>02</b>Understand</span><h2>Dependency graph</h2></div>
+    </header>
+    <div class="card-body">
+      <div class="toolbar">
+        <label class="field">Journey <select id="journeySel"><option value="">none</option></select></label>
+        <label class="chk"><input type="checkbox" id="checkoutPath"> Checkout path</label>
+        <button id="fitGraph" class="btn btn-sm" type="button">Fit</button>
+        <span class="hint">Click a service to inspect it · hover an edge for details · scroll to zoom · drag to pan</span>
+      </div>
+      <div class="gwrap">
+        <div class="stage"><div id="cy"><p class="muted" style="padding:16px">Loading graph…</p></div><span class="stage-note" id="graphInfo"></span></div>
+        <div id="edgeTip" class="tip hide"></div>
+      </div>
+      <div id="nodeDetail" class="detail muted">Select a service to see its role, health, safety status and dependencies.</div>
+      <div id="journeyDetail" class="detail hide"></div>
+      <div class="legend">
+        <div class="legend-group"><b>Edges</b><span><i style="border-color:#5b8cff"></i>sync call</span><span><i style="border-color:#e0589a"></i>async (Kafka)</span><span><i style="border-color:#2fbf9b"></i>database / cache</span><span><i style="border-color:#8d96ac;border-top-style:dashed"></i>config (hidden)</span><span>width = call volume</span></div>
+        <div class="legend-group"><b>Nodes</b><span>height = fan-in</span><span>rounded = service</span><span>barrel = data store</span><span style="color:#e8c14a">&#128274; protected, never a target</span></div>
+        <div class="legend-group"><b>Status</b><span><span class="dotk" style="background:#f0524f"></span>container down</span><span><span class="dotk" style="background:#e5484d"></span>target</span><span><span class="dotk" style="background:#c8761e"></span>blast radius</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="planSec" class="card primary">
+    <header class="card-head">
+      <div class="card-title"><span class="eyebrow"><b>03</b>Decide</span><h2>Experiment plan</h2></div>
+      <div class="card-actions">
+        <label class="field"><span class="sr">Learning goal (optional)</span><select id="goalSel"><option value="">No preference: let the AI explore</option></select></label>
+        <button id="propose" class="btn btn-primary" type="button">Propose experiment</button>
+      </div>
+    </header>
+    <div class="card-body">
+      <div id="plan" aria-live="polite"><p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p></div>
+      <div id="decision" class="decision hide">
+        <label class="chk"><input type="checkbox" id="reviewed" disabled> I reviewed the hypothesis and blast radius</label>
+        <div class="btns"><button id="reject" class="btn btn-quiet-danger" type="button" disabled>Reject</button><button id="approve" class="btn btn-go" type="button" disabled>Approve and run</button></div>
+        <span id="approveHint" class="muted" aria-live="polite"></span>
+      </div>
+    </div>
+  </section>
+
+  <section id="live" class="card hide">
+    <header class="card-head">
+      <div class="card-title"><span class="eyebrow"><b>04</b>Observe</span><h2><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
+      <div class="card-actions"><span id="faultPill" class="pill warn"></span></div>
+    </header>
+    <div class="card-body">
+      <div class="run-top">
+        <div id="steps" class="steps"></div>
+        <div class="kpis"><div class="kpi"><span>Elapsed</span><b id="elapsed">0s</b></div><div class="kpi"><span>Active fault</span><b id="fault" style="font-size:15px;line-height:1.5">-</b></div></div>
+      </div>
+      <div class="focusbar">Baseline and abort threshold (dashed) for <label class="field"><span class="sr">Service for baseline lines</span><select id="focus"></select></label></div>
+      <div class="grid2">
+        <div class="panel"><h3 class="sub">p95 latency (ms)</h3><div class="chartbox"><canvas id="chartP95" role="img" aria-label="p95 latency over time for the target and the services that depend on it"></canvas></div></div>
+        <div class="panel"><h3 class="sub">Error rate (%)</h3><div class="chartbox"><canvas id="chartErr" role="img" aria-label="Error rate over time for the target and the services that depend on it"></canvas></div></div>
+      </div>
+      <div class="grid2">
+        <div class="panel"><h3 class="sub">Shop probes <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(synthetic user requests, display only)</span></h3><div id="probes"></div></div>
+        <div class="panel"><h3 class="sub">Event log</h3><pre id="events" role="log" aria-live="off" tabindex="0"></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="grafanaSec" class="card">
+    <header class="card-head">
+      <div class="card-title"><span class="eyebrow"><b>05</b>Correlate</span><h2>Grafana: Spanmetrics <span id="gRange" class="pill info"></span></h2></div>
+      <div class="card-actions">
+        <label class="field">Service <select id="gService"></select></label>
+        <a id="gLink" class="btn btn-sm" href="#" target="_blank" rel="noopener">Open full dashboard in Grafana<span class="sr"> (opens in a new tab)</span></a>
+      </div>
+    </header>
+    <div class="card-body">
+      <div id="gWarn" class="hide" style="margin-bottom:12px;color:var(--warn)"></div>
+      <div class="gframes">
+        <iframe id="g_requests" title="Requests Rate by Span Name"></iframe>
+        <iframe id="g_errors" title="Error Rate by Span Name"></iframe>
+        <iframe id="g_duration" title="Average Duration by Span Name"></iframe>
+      </div>
+      <p class="note">Annotation lines mark when the fault was injected and when rollback completed. During a run the range starts 2 minutes before injection; saved results show their whole window.</p>
+    </div>
+  </section>
+
+  <section id="resultPanel" class="card hide">
+    <header class="card-head">
+      <div class="card-title"><span class="eyebrow"><b>06</b>Learn</span><h2>Result</h2></div>
+      <div class="card-actions"><span id="resultNote" class="muted"></span></div>
+    </header>
+    <div class="card-body"><div id="result"></div></div>
+  </section>
+
+  <section id="historySec" class="card">
+    <header class="card-head">
+      <div class="card-title"><span class="eyebrow"><b>07</b>Review</span><h2>History</h2></div>
+      <div class="card-actions"><button id="refreshHistory" class="btn btn-sm" type="button">Refresh</button></div>
+    </header>
+    <div class="card-body"><div id="history" class="muted">Loading…</div></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = (x, d = 1) => x == null ? '-' : Number(x).toFixed(d);
+const COLORS = ['#5b8cff', '#f6ad37', '#46d39a', '#e0589a', '#a78bfa', '#22c7d6', '#ff8f6b', '#c4d84a'];
+if (window.Chart && Chart.defaults) Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+const STEPS = ['injecting', 'monitoring', 'rolling_back', 'recovering', 'analyzing', 'done'];
+let status = null, readiness = null, graph = null, cy = null, charts = {}, chartSig = '', viewingId = null, lastDone = null;
+let gcfg = null, gKey = '', gSel = '', gCtx = '', viewedResult = null;
+
+async function api(path, post, payload) {
+  const r = await fetch(path, post ? { method: 'POST', headers: { 'X-Chaos-UI': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}) } : {});
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.detail || r.statusText);
+  return body;
+}
+function banner(msg, note) { const b = $('banner'); b.textContent = msg || ''; b.className = msg ? 'show' + (note ? ' note' : '') : ''; }
+async function act(path, label, body) { try { banner(''); return await api(path, true, body); } catch (e) { banner(`${label} failed: ${e.message}`); } }
+
+/* ---------- 1. readiness ---------- */
+let lastReadyState = '';
+async function loadReadiness() {
+  $('readyPill').textContent = 'checking'; $('readyPill').className = 'pill';
+  try { readiness = await api('/api/readiness'); } catch (e) { readiness = { ready: false, checks: [{ name: 'Backend', ok: false, detail: e.message }] }; }
+  const passed = readiness.checks.filter(c => c.ok).length, blocking = readiness.checks.filter(c => !c.ok && !c.optional).length;
+  $('checks').innerHTML = readiness.checks.map(c => {
+    const kind = c.ok ? 'ok' : c.optional ? 'warn' : 'bad', glyph = c.ok ? '&#10003;' : c.optional ? '!' : '&#10005;';
+    return `<div class="check"><span class="ico ${kind}" aria-hidden="true">${glyph}</span><div><b>${esc(c.name)}</b>${c.optional ? ' <span class="muted">(optional)</span>' : ''}<span class="sr">: ${c.ok ? 'passed' : c.optional ? 'warning' : 'failed'}</span><div class="d">${esc(c.detail)}</div></div></div>`;
+  }).join('');
+  $('readySummary').textContent = `${passed} of ${readiness.checks.length} checks passed${blocking ? `, ${blocking} blocking` : ''}`;
+  const state = readiness.ready ? 'ready' : 'blocked';
+  const busy = !!(status && status.running);                         // while a fault runs, "not ready" is expected, not an alarm
+  if (state !== lastReadyState) { $('readyDetails').open = !readiness.ready && !busy; lastReadyState = state; }   // folds away once everything is fine
+  const embed = readiness.checks.find(c => c.name === 'Grafana embedding enabled');
+  $('gWarn').textContent = embed && !embed.ok ? 'Grafana panels will stay blank: ' + embed.detail + ' (see README).' : '';
+  $('gWarn').classList.toggle('hide', !(embed && !embed.ok));
+  $('readyPill').textContent = busy ? 'experiment running' : readiness.ready ? 'ready' : 'not ready';
+  $('readyPill').className = 'pill ' + (busy ? 'warn' : readiness.ready ? 'ok' : 'bad');
+  renderPlan();
+}
+
+/* ---------- 2. graph ---------- */
+const EDGE_COLOR = { sync: '#5b8cff', async: '#e0589a', data: '#2fbf9b' };
+const edgeKind = e => e.mode === 'async' ? 'async' : ['database', 'cache'].includes(e.type) ? 'data' : 'sync';
+const X_GAP = 200, Y_GAP = 62;                         // layout units; loadGraph rescales x to the real width
+const xGapFor = (width, columns) => Math.max(150, Math.min(230, (width - 170) / Math.max(1, columns - 1)));
+let info = {}, selNode = null, lastHealth = 0;
+
+/* Left-to-right layers by call depth (callers left of what they call), data stores in the last column,
+   barycenter sweeps to keep edge crossings low. Returns {pos: {node: {x, y}}, layers}. */
+function layerGraph(nodes, edges, nodeInfo) {
+  const out = {}, inc = {};
+  nodes.forEach(n => { out[n] = []; inc[n] = []; });
+  edges.forEach(e => { out[e.parent].push(e.child); inc[e.child].push(e.parent); });
+  const depth = {}, visiting = new Set();
+  const dfs = n => {                                   // longest path from a source; a cycle is cut where it closes
+    if (n in depth) return depth[n];
+    if (visiting.has(n)) return -1;
+    visiting.add(n);
+    depth[n] = Math.max(0, ...inc[n].map(p => dfs(p) + 1));
+    visiting.delete(n);
+    return depth[n];
+  };
+  nodes.forEach(dfs);
+  const store = n => ['datastore', 'control plane'].includes((nodeInfo[n] || {}).role);   // shared infrastructure: last column
+  const lastService = Math.max(0, ...nodes.filter(n => !store(n)).map(n => depth[n]));
+  nodes.filter(store).forEach(n => { depth[n] = Math.max(lastService + 1, depth[n]); });
+  const layers = [];
+  nodes.slice().sort().forEach(n => (layers[depth[n]] = layers[depth[n]] || []).push(n));
+  for (let i = 0; i < layers.length; i++) layers[i] = layers[i] || [];
+  const rank = {};
+  const reindex = l => l.forEach((n, i) => { rank[n] = l.length > 1 ? i / (l.length - 1) : 0.5; });
+  layers.forEach(reindex);
+  for (let pass = 0; pass < 16; pass++) {
+    const down = pass % 2 === 0, order = layers.map((_, i) => down ? i : layers.length - 1 - i);
+    order.forEach(li => {
+      const l = layers[li], bary = new Map(l.map(n => {
+        const nb = (down ? inc[n] : out[n]).filter(m => depth[m] !== depth[n]);
+        return [n, nb.length ? nb.reduce((sum, m) => sum + rank[m], 0) / nb.length : rank[n]];
+      }));
+      l.sort((a, b) => bary.get(a) - bary.get(b) || a.localeCompare(b));
+      reindex(l);
+    });
+  }
+  // Refine: hill-climb adjacent swaps on the real edge crossing count, restarting from perturbed copies of the best order.
+  const place = ls => { const p = {}; ls.forEach((l, li) => l.forEach((n, i) => { p[n] = { x: li, y: i - (l.length - 1) / 2 }; })); return p; };
+  const orient = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const crossings = ls => {
+    const p = place(ls); let count = 0;
+    for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
+      const [a, b] = [edges[i].parent, edges[i].child], [c, d] = [edges[j].parent, edges[j].child];
+      if (a === c || a === d || b === c || b === d) continue;
+      if (orient(p[a], p[b], p[c]) * orient(p[a], p[b], p[d]) < 0 && orient(p[c], p[d], p[a]) * orient(p[c], p[d], p[b]) < 0) count++;
+    }
+    return count;
+  };
+  const climb = ls => {
+    let best = crossings(ls), improved = true;
+    while (improved) {
+      improved = false;
+      for (const l of ls) for (let i = 0; i + 1 < l.length; i++) {
+        [l[i], l[i + 1]] = [l[i + 1], l[i]];
+        const c = crossings(ls);
+        if (c < best) { best = c; improved = true; } else [l[i], l[i + 1]] = [l[i + 1], l[i]];
+      }
+    }
+    return best;
+  };
+  let bestLayers = layers.map(l => l.slice()), bestCount = climb(bestLayers), seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;     // fixed seed: the same graph always lays out the same way
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const cand = bestLayers.map(l => l.slice());
+    cand.forEach(l => { for (let i = l.length - 1; i > 0; i--) if (rnd() < 0.5) { const j = Math.floor(rnd() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; } });
+    const c = climb(cand);
+    if (c < bestCount) { bestCount = c; bestLayers = cand; }
+  }
+  const pos = {};
+  bestLayers.forEach((l, li) => l.forEach((n, i) => { pos[n] = { x: li * X_GAP, y: (i - (l.length - 1) / 2) * Y_GAP }; }));
+  return { pos, layers: bestLayers, crossings: bestCount };
+}
+
+const isDown = n => { const h = (info[n] || {}).health; return !!h && h !== 'running' && h !== 'unknown'; };
+const nodeLabel = n => `${(info[n] || {}).protected ? '\u{1F512} ' : ''}${n}${isDown(n) ? ' (stopped)' : ''}`;
+const nodeClasses = n => ['role-' + String((info[n] || {}).role || 'service').replace(' ', '-'), (info[n] || {}).protected ? 'protected' : '', isDown(n) ? 'down' : ''].join(' ');
+const edgeTip = e => `<b>${esc(e.parent)} &rarr; ${esc(e.child)}</b><br>${esc(e.type || 'unknown')}${e.topic ? ' &middot; topic ' + esc(e.topic) : ''} &middot; ${e.source === 'config' ? 'config only (hidden)' : 'seen in traces'}`
+  + (e.operations && e.operations.length ? `<br>ops: ${esc(e.operations.slice(0, 5).join(', '))}${e.operations.length > 5 ? ' …' : ''}` : '')
+  + (e.avg_latency_ms != null ? `<br>avg ${num(e.avg_latency_ms)} ms` : '') + (e.call_count ? `<br>${esc(e.call_count)} calls in the sampled hour` : '');
+
+async function loadGraph() {
+  try { graph = await api('/api/graph'); } catch (e) { $('cy').innerHTML = `<p class="muted" style="padding:14px">Graph unavailable: ${esc(e.message)}</p>`; return; }
+  info = graph.nodes_info || {};
+  if (typeof cytoscape === 'undefined') { $('cy').innerHTML = '<p class="muted" style="padding:16px">The graph library could not be loaded from cdnjs.cloudflare.com. Check your connection and reload.</p>'; return; }
+  const { pos, layers } = layerGraph(graph.nodes, graph.edges, info);
+  const width = $('cy').clientWidth || 1000, k = xGapFor(width, layers.length) / X_GAP;
+  Object.values(pos).forEach(p => { p.x *= k; });
+  $('cy').textContent = '';
+  const maxFan = Math.max(1, ...Object.values(graph.fan_in)), maxCalls = Math.max(1, ...graph.edges.map(e => e.call_count || 0));
+  $('cy').style.height = Math.max(400, Math.max(...layers.map(l => l.length)) * Y_GAP + 100) + 'px';
+  const elements = graph.nodes.map(n => ({ data: { id: n, label: nodeLabel(n), fan: graph.fan_in[n] || 0 }, position: pos[n], classes: nodeClasses(n) }))
+    .concat(graph.edges.map(e => ({ data: { id: e.parent + '>' + e.child, source: e.parent, target: e.child, color: EDGE_COLOR[edgeKind(e)],
+      w: 1.3 + 2.2 * Math.log10(1 + (e.call_count || 0)) / Math.log10(1 + maxCalls), tip: edgeTip(e) }, classes: [e.source === 'config' ? 'config' : '', (info[e.child] || {}).role === 'control plane' ? 'ctl' : ''].join(' ') })));
+  cy = cytoscape({ container: $('cy'), elements, layout: { name: 'preset', padding: 30 }, wheelSensitivity: 0.3, minZoom: 0.3, maxZoom: 2.5,
+    style: [
+      { selector: 'node', style: { shape: 'round-rectangle', 'background-color': '#27324f', label: 'data(label)', color: '#eef1f8', 'font-weight': 600,
+          'font-size': `mapData(fan, 0, ${maxFan}, 11, 13)`, 'text-valign': 'center', 'text-halign': 'center', width: 'label', padding: '10px',
+          height: `mapData(fan, 0, ${maxFan}, 30, 44)`, 'border-width': 1.5, 'border-color': '#4b5d8c' } },
+      { selector: 'node.role-datastore', style: { shape: 'barrel', 'background-color': '#17503f', 'border-color': '#2fbf9b' } },
+      { selector: 'node.role-client', style: { 'background-color': '#262b38', 'border-color': '#6f7a91', 'border-style': 'dashed' } },
+      { selector: 'node.role-control-plane', style: { 'background-color': '#4a3b63', 'border-color': '#a58be0' } },
+      { selector: 'node.protected', style: { 'border-width': 4, 'border-style': 'double', 'border-color': '#e8c14a' } },
+      { selector: 'node.down', style: { 'border-width': 4, 'border-style': 'solid', 'border-color': '#f0524f' } },
+      { selector: 'node.blast', style: { 'background-color': '#c8761e', 'border-color': '#ffd27a' } },
+      { selector: 'node.target', style: { 'background-color': '#e53935', 'border-color': '#ff8b88', 'border-width': 4, 'border-style': 'solid' } },
+      { selector: 'node.sel', style: { 'border-color': '#ffffff', 'border-width': 3, 'border-style': 'solid' } },
+      { selector: 'edge', style: { width: 'data(w)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)', 'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier', opacity: 0.6, 'arrow-scale': 0.9, 'control-point-step-size': 24 } },
+      { selector: 'edge.config', style: { 'line-style': 'dashed' } },
+      { selector: 'edge.ctl', style: { opacity: 0.22 } },   // links into the flag service: quiet until you focus them
+      { selector: 'edge.hot', style: { opacity: 1, 'z-index': 10 } },
+      { selector: 'edge[step]', style: { label: 'data(step)', 'font-size': 11, color: '#ffffff', 'text-background-color': '#0b0e14',
+          'text-background-opacity': 0.9, 'text-background-padding': 3 } },
+      { selector: '.faded', style: { opacity: 0.1 } }] });
+  cy.on('tap', 'node', ev => selectNode(ev.target.id()));
+  cy.on('tap', ev => { if (ev.target === cy) selectNode(null); });
+  cy.on('mouseover', 'edge', ev => { const t = $('edgeTip'); t.innerHTML = ev.target.data('tip'); t.classList.remove('hide'); });
+  cy.on('mousemove', 'edge', ev => { const t = $('edgeTip'); t.style.left = Math.min(ev.renderedPosition.x + 14, $('cy').clientWidth - 300) + 'px'; t.style.top = ev.renderedPosition.y + 14 + 'px'; });
+  cy.on('mouseout', 'edge', () => $('edgeTip').classList.add('hide'));
+  $('journeySel').innerHTML = '<option value="">none</option>' + Object.entries(graph.flows || {}).map(([k, f]) => `<option value="${esc(k)}">${esc(k)} (${f.traces} traces)</option>`).join('');
+  $('graphInfo').textContent = `${graph.nodes.length} services, ${graph.edges.length} dependencies`;
+  if (width < 640) {                                 // phones: start readable (zoomed in at the left), pan to explore
+    const bb = cy.nodes().boundingBox(), z = 0.6;
+    cy.zoom(z); cy.pan({ x: 24 - bb.x1 * z, y: (cy.height() - bb.h * z) / 2 - bb.y1 * z });
+  }
+  highlight(); applyFocus();
+}
+
+async function refreshHealth() {                       // live container state: a stopped target turns red
+  lastHealth = Date.now();
+  try { const g = await api('/api/graph'); info = g.nodes_info || info; } catch (e) { return; }
+  if (!cy) return;
+  cy.nodes().forEach(n => { n.data('label', nodeLabel(n.id())); n.removeClass('down'); if (isDown(n.id())) n.addClass('down'); });
+  if (selNode) showNode(selNode);
+}
+
+function showNode(n) {
+  const i = info[n] || {}, b = i.baseline || {}, crit = Math.round((i.criticality || 0) * 100);
+  const calls = graph.edges.filter(e => e.parent === n), calledBy = graph.edges.filter(e => e.child === n);
+  const item = (name, e) => `<li><button type="button" class="chip link" data-node="${esc(name)}">${esc(name)}</button> <small>${esc(e.type || '')}${e.operations && e.operations.length ? ': ' + esc(e.operations.slice(0, 3).join(', ')) : ''}${e.avg_latency_ms != null ? ' &middot; ' + num(e.avg_latency_ms) + ' ms' : ''}${e.source === 'config' ? ' &middot; config' : ''}</small></li>`;
+  const none = t => `<li class="muted">${t}</li>`;
+  $('nodeDetail').classList.remove('muted');
+  $('nodeDetail').innerHTML = `<h3>${esc(n)} <span class="pill info">${esc(i.role || 'service')}</span>
+      <span class="pill ${i.health === 'running' ? 'ok' : !i.health || i.health === 'unknown' ? '' : 'bad'}">${esc(i.health || 'unknown')}</span>
+      ${i.protected ? '<span class="pill warn">protected: cannot be targeted</span>' : '<span class="pill ok">eligible target</span>'}
+      ${i.on_checkout_path ? '<span class="pill info">on the checkout path</span>' : ''}</h3>
+    <div class="cols"><div>Criticality ${crit}/100
+        <div class="bar"><i style="width:${crit}%;background:${crit >= 70 ? '#f0524f' : crit >= 40 ? '#f5a524' : '#3ecf8e'}"></i></div>
+        Depended on by ${esc(i.fan_in)} &middot; depends on ${esc(i.fan_out)}<br>
+        Baseline: ${b.req_per_s != null ? num(b.req_per_s, 2) + ' req/s' : 'no data'} &middot; p95 ${b.p95_ms != null ? num(b.p95_ms) + ' ms' : 'no data'}
+        &middot; errors ${b.error_pct != null ? num(b.error_pct) + '%' : 'no data'}${b.requests != null ? ' &middot; ' + esc(b.requests) + ' requests sampled' : ''}</div>
+      <div><b>Called by</b><ul>${calledBy.map(e => item(e.parent, e)).join('') || none('nobody: entry point')}</ul></div>
+      <div><b>Calls</b><ul>${calls.map(e => item(e.child, e)).join('') || none('nothing')}</ul></div></div>`;
+}
+function selectNode(n) {
+  selNode = n; if (!cy) return;
+  cy.nodes().removeClass('sel'); if (n) cy.getElementById(n).addClass('sel');
+  if (n) showNode(n); else { $('nodeDetail').classList.add('muted'); $('nodeDetail').textContent = 'Select a service to see its role, health, safety status and dependencies.'; }
+  applyFocus();
+}
+
+/* One focus at a time: a selected service, else a journey, else the checkout path. Everything else fades. */
+function applyFocus() {
+  if (!cy) return;
+  cy.elements().removeClass('faded hot'); cy.edges().removeData('step');
+  const jr = graph.flows && graph.flows[$('journeySel').value], steps = jr ? jr.steps : [];
+  $('journeyDetail').classList.toggle('hide', !jr || !!selNode);
+  let nodes = null, edges = null;
+  if (selNode) { const n = cy.getElementById(selNode); edges = n.connectedEdges(); nodes = edges.connectedNodes().union(n); }
+  else if (jr) {
+    const byId = {}; steps.forEach((st, i) => { const id = st.from + '>' + st.to; (byId[id] = byId[id] || []).push(i + 1); });
+    edges = cy.edges().filter(e => e.id() in byId); edges.forEach(e => e.data('step', byId[e.id()].join(',')));
+    nodes = edges.connectedNodes();
+    $('journeyDetail').innerHTML = `<b>${esc($('journeySel').value)}</b> <span class="muted">(${esc(jr.traces)} sampled traces; numbers on the edges match the steps)</span><ol>`
+      + steps.map(st => `<li>${esc(st.from)} <span class="muted">${esc(st.operation || '')}</span> &rarr; ${esc(st.to)} <small class="muted">${esc(st.protocol || '')}</small></li>`).join('') + '</ol>';
+  } else if ($('checkoutPath').checked) {
+    const set = new Set(graph.stats.checkout_path);
+    nodes = cy.nodes().filter(n => set.has(n.id())); edges = cy.edges().filter(e => set.has(e.data('source')) && set.has(e.data('target')));
+  }
+  if (nodes) { cy.elements().not(nodes.union(edges)).addClass('faded'); edges.addClass('hot'); }
+}
+function highlight() {
+  if (!cy) return;
+  cy.nodes().removeClass('target blast');
+  const p = status && status.plan, v = status && status.validation;
+  if (!p || ['idle', 'proposing'].includes(status.phase)) return;
+  (v ? v.blast_radius : []).forEach(n => cy.getElementById(n).addClass('blast'));
+  cy.getElementById(p.target).addClass('target');
+}
+
+/* ---------- 3. plan ---------- */
+let lastPlanKey = '', lastPlanHtml = '';
+const FAULTS = { container_stop: 'Container stop (docker stop, restarted on rollback)', network_delay: 'Network delay (tc netem on the target\'s egress)' };
+function magnitudeText(p) { return p.fault === 'network_delay' ? `${p.magnitude} ms added delay` : 'n/a (container is stopped)'; }
+function renderPlan() {
+  const s = status, p = s && s.plan, v = s && s.validation, running = s && s.running;
+  const proposing = !!(s && s.phase === 'proposing');
+  $('propose').disabled = !!running || proposing;
+  $('propose').innerHTML = proposing ? '<span class="spin"></span>Proposing…' : 'Propose experiment';
+  const canDecide = s && s.phase === 'proposed' && p;
+  const planKey = p ? JSON.stringify(p) : ''; if (planKey !== lastPlanKey) { lastPlanKey = planKey; $('reviewed').checked = false; }
+  const safe = !!(canDecide && v && v.valid && readiness && readiness.ready);
+  $('decision').classList.toggle('hide', !p);                // nothing to decide until there is a plan
+  $('reject').disabled = !canDecide;
+  $('reviewed').disabled = !safe;
+  $('approve').disabled = !(safe && $('reviewed').checked);
+  $('approveHint').textContent = !canDecide ? '' : !v.valid ? 'Blocked by the safety gate.' : !(readiness && readiness.ready) ? 'Readiness checks are failing.'
+    : !$('reviewed').checked ? 'Tick the box to confirm you reviewed the plan.' : '';
+  if (!p) {
+    $('plan').innerHTML = proposing ? '<p class="plan-empty"><span class="spin"></span>The planner is thinking (an LLM call, up to a minute)…</p>'
+      : '<p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p>';
+    return;
+  }
+  const faultName = p.fault === 'network_delay' ? 'Network delay' : 'Container stop';
+  const key = JSON.stringify([p, v, s.source, s.note]);
+  if (key === lastPlanHtml) return;                       // the poll runs every second: do not rebuild (and deselect) unchanged text
+  lastPlanHtml = key;
+  $('plan').innerHTML = `<div class="plan-grid">
+    <div class="plan-main">
+      <div class="plan-headline"><span class="plan-target">${esc(p.target)}</span>
+        <span class="pill ${p.fault === 'network_delay' ? 'warn' : 'bad'}">${esc(faultName)}</span>
+        <span class="pill ${s.source === 'llm' ? 'info' : 'warn'}">${s.source === 'llm' ? 'Planned by LLM' : 'FALLBACK PLAN'}</span></div>
+      <dl class="facts">
+        <div class="fact"><dt>Fault</dt><dd>${esc(FAULTS[p.fault] || p.fault)}</dd></div>
+        <div class="fact"><dt>Magnitude</dt><dd>${esc(magnitudeText(p))}</dd></div>
+        <div class="fact"><dt>Duration</dt><dd>${esc(p.duration_s)}&nbsp;s</dd></div></dl>
+      <div class="prose"><h3 class="sub">Hypothesis</h3><p>${esc(p.hypothesis)}</p><h3 class="sub">Reasoning</h3><p>${esc(p.reasoning)}</p>
+        <p class="muted">${esc(s.note)}</p></div>
+    </div>
+    <aside class="plan-side">
+      <h3 class="sub">Safety gate</h3><span class="pill ${v.valid ? 'ok' : 'bad'}">${v.valid ? 'ALL CHECKS PASSED' : 'BLOCKED'}</span>
+      <ul class="gate">${(v.checks || []).map(c => `<li><span class="ic ${c.passed ? 'ok' : 'no'}">${c.passed ? '&#10003;' : '&#10007;'}</span><span>${esc(c.name)} <small class="muted">${esc(c.detail)}</small></span></li>`).join('')}</ul>
+      ${(v.checks || []).length ? '' : v.reasons.length ? `<ul class="reasons">${v.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
+      <h3 class="sub">Blast radius</h3>
+      <div>${v.blast_radius.length ? v.blast_radius.map(n => `<span class="chip blast">${esc(n)}</span>`).join('') : '<span class="muted">none</span>'}</div>
+      <p class="muted" style="font-size:12px;margin-top:6px">Everything that depends on ${esc(p.target)}.</p>
+    </aside></div>`;
+}
+
+/* ---------- 4. live ---------- */
+function renderSteps(s) {
+  const cur = STEPS.indexOf(s.phase === 'starting' ? 'injecting' : s.phase), bad = ['refused', 'error'].includes(s.phase);
+  $('steps').innerHTML = STEPS.map((n, i) => `<span class="step ${bad ? '' : i < cur || s.phase === 'done' ? 'done' : i === cur ? 'now' : ''}">${n.replace('_', ' ')}</span>`).join('')
+    + (bad ? `<span class="step fail">${esc(s.phase)}: ${esc(s.refused)}</span>` : '');
+}
+function lineChart(id, unit) {
+  const rollback = { id: 'rollback', afterDraw(c) {
+      const x = status && status.rollback_at_s; if (x == null) return;
+      const px = c.scales.x.getPixelForValue(x), a = c.chartArea, g = c.ctx;
+      g.save(); g.strokeStyle = '#f5a524'; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(px, a.top); g.lineTo(px, a.bottom); g.stroke();
+      g.fillStyle = '#f5a524'; g.font = '11px sans-serif'; g.fillText('rollback', px + 4, a.top + 12); g.restore(); } };
+  return new Chart($(id), { type: 'line', data: { datasets: [] }, plugins: [rollback], options: { animation: false, maintainAspectRatio: false, parsing: false,
+    interaction: { mode: 'nearest', intersect: false }, elements: { point: { radius: 2 } },
+    scales: { x: { type: 'linear', title: { display: true, text: 'seconds', color: '#8d96ac' }, grid: { color: '#1d2539' }, ticks: { color: '#8d96ac' } },
+              y: { beginAtZero: true, title: { display: true, text: unit, color: '#8d96ac' }, grid: { color: '#1d2539' }, ticks: { color: '#8d96ac' } } },
+    plugins: { legend: { labels: { color: '#b3bbcd', boxWidth: 14, filter: i => !i.text.includes('~') || i.text.includes('baseline') || i.text.includes('abort') } } } } });
+}
+function renderCharts(s) {
+  if (typeof Chart === 'undefined') { if ($('chartP95')) { $('chartP95').parentElement.innerHTML = '<p class="muted">The chart library could not be loaded.</p>'; $('chartErr').parentElement.innerHTML = '<p class="muted">The chart library could not be loaded.</p>'; } return; }
+  const services = Object.keys(s.watch || {});
+  const sel = $('focus'), focus = services.includes(sel.value) ? sel.value : (services.includes(s.plan && s.plan.target) ? s.plan.target : services[0]);
+  if (sel.options.length !== services.length) sel.innerHTML = services.map(n => `<option>${esc(n)}</option>`).join('');
+  sel.value = focus;
+  const sig = [s.samples.length, services.join(), focus, s.rollback_at_s].join('|'); if (sig === chartSig) return; chartSig = sig;
+  charts.p95 = charts.p95 || lineChart('chartP95', 'ms'); charts.err = charts.err || lineChart('chartErr', '%');
+  const xmax = Math.max(10, ...(s.samples.map(x => x.t)));
+  for (const [chart, key] of [[charts.p95, 'p95_ms'], [charts.err, 'error_rate']]) {
+    const ds = services.map((n, i) => ({ label: n, borderColor: COLORS[i % COLORS.length], backgroundColor: COLORS[i % COLORS.length],
+      borderWidth: s.plan && n === s.plan.target ? 3 : 1.6, spanGaps: false,
+      data: s.samples.map(x => ({ x: x.t, y: x.services[n] ? x.services[n][key] : null })) }));
+    const w = s.watch[focus];
+    if (w) for (const [lab, val, col] of [[`${focus} baseline`, w.baseline[key], '#8d96ac'], [`${focus} abort threshold`, w.abort[key], '#f0524f']])
+      if (val != null) ds.push({ label: lab, borderColor: col, borderDash: [6, 5], borderWidth: 1.4, pointRadius: 0, data: [{ x: 0, y: val }, { x: xmax, y: val }] });
+    chart.data.datasets = ds; chart.update('none');
+  }
+}
+function renderProbes(s) {
+  const names = [...new Set(s.probes.flatMap(p => p.results.map(r => r.name)))];
+  $('probes').innerHTML = !names.length ? '<p class="muted">Waiting for the first probe…</p>' : names.map(n => {
+    const rs = s.probes.map(p => p.results.find(r => r.name === n)).filter(Boolean), last = rs[rs.length - 1], fails = rs.filter(r => !r.ok).length;
+    return `<div class="probe-row"><span class="pill ${last.ok ? 'ok' : 'bad'}">${last.ok ? 'OK' : 'FAIL'}</span><b>${esc(n)}</b>
+      <span class="muted">${esc(last.status)} &middot; ${last.ms}&nbsp;ms</span><span class="muted">${rs.length - fails} ok / ${fails} failed</span>
+      <div class="strip" aria-hidden="true">${rs.slice(-60).map(r => `<i class="${r.ok ? '' : 'f'}"></i>`).join('')}</div></div>`;
+  }).join('');
+}
+function renderEvents(s) {
+  const el = $('events'), stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+  el.textContent = s.events.map(e => `${e.ts}  ${e.msg}`).join('\n'); if (stick) el.scrollTop = el.scrollHeight;
+}
+function renderLive(s) {
+  const show = !['idle', 'proposing', 'proposed'].includes(s.phase); $('live').classList.toggle('hide', !show);
+  $('stop').classList.toggle('show', !!s.running);
+  $('live').classList.toggle('is-live', !!s.running);
+  if (!s.running) { $('stop').disabled = false; $('stop').textContent = 'STOP EXPERIMENT'; }
+  if (!show) return;
+  renderSteps(s);
+  $('elapsed').textContent = Math.round(s.elapsed_s) + 's';
+  $('fault').textContent = s.plan ? `${s.plan.fault} on ${s.plan.target}` + (s.plan.fault === 'network_delay' ? ` (${s.plan.magnitude} ms)` : '') : '-';
+  $('faultPill').textContent = s.running ? (s.phase === 'monitoring' ? 'FAULT ACTIVE' : s.phase.replace('_', ' ')) : '';
+  $('faultPill').className = 'pill ' + (s.phase === 'monitoring' ? 'bad' : 'warn') + (s.running ? '' : ' hide');
+  renderCharts(s); renderProbes(s); renderEvents(s);
+}
+
+/* ---------- 5. result ---------- */
+const verdictClass = v => v === 'held' ? 'ok' : v === 'partially held' ? 'warn' : v === 'not held' ? 'bad' : '';
+const nd = (x, d) => x == null ? '<span class="muted">no data</span>' : num(x, d);
+function scoreBlock(r) {
+  const sc = r.score; if (!sc) return '';
+  const col = sc.resilience_score >= 80 ? 'var(--ok)' : sc.resilience_score >= 60 ? 'var(--warn)' : 'var(--bad)';
+  return `<div class="scorebar"><div class="ring" style="--p:${sc.resilience_score};--c:${col}"><div><span><b>${esc(sc.resilience_score)}</b><br><small>/100</small></span></div></div>
+    <div><small class="muted">SCENARIO RESILIENCE</small><div style="font-size:18px;font-weight:600">${esc(sc.severity)} impact
+      <span class="pill ${sc.confidence.startsWith('High') ? 'ok' : sc.confidence.startsWith('Low') ? 'bad' : 'warn'}">${esc(sc.confidence)}</span></div>
+      <div class="muted">impact ${esc(sc.impact_score)}/100${sc.availability_pct != null ? ' &middot; shop probes ' + esc(sc.availability_pct) + '% available during the fault' : ''}</div>
+      ${(sc.limitations || []).map(l => `<div class="muted">&bull; ${esc(l)}</div>`).join('')}</div></div>`;
+}
+function delta(x, unit = '') { return x == null ? '<span class="muted">no data</span>' : `<span class="${x > 0 ? 'pos' : x < 0 ? 'neg' : ''}">${x > 0 ? '+' : ''}${num(x)}${unit}</span>`; }
+function renderResult(r, note) {
+  $('resultPanel').classList.toggle('hide', !r); if (!r) return;
+  const g = r.guard, p = r.plan, v = r.verdict, rec = r.recovery;
+  $('resultNote').textContent = note || '';
+  $('result').innerHTML = `
+    ${scoreBlock(r)}
+    <div class="outcome">
+      <span class="pill ${g.aborted ? 'warn' : 'ok'}">${g.aborted ? 'ABORTED' : 'COMPLETED'}</span>
+      <span>${esc(g.reason)}</span>
+      <span class="pill ${r.rollback_verified ? 'ok' : 'bad'}">rollback ${r.rollback_verified ? 'verified' : 'FAILED'}</span>
+      ${r.forced_abort_test ? '<span class="pill info">forced-abort test</span>' : ''}</div>
+    <dl class="kv"><dt>Experiment</dt><dd>${esc(p.fault)} on <b>${esc(p.target)}</b>, ${esc(magnitudeText(p))}, planned ${esc(p.duration_s)}&nbsp;s, ran ${esc(g.elapsed_s)}&nbsp;s</dd>
+    <dt>Hypothesis</dt><dd>${esc(p.hypothesis)}</dd>
+    <dt>Recovery</dt><dd>${rec.recovered
+      ? `${esc(rec.seconds)} s after rollback, measured by probes (primary). Span metrics (secondary): ${rec.metrics_confirmed ? 'confirmed after ' + esc(rec.metrics_seconds) + ' s' : rec.metrics_confirmed === false ? 'not yet back within thresholds' : 'n/a'}`
+      : `did not recover${rec.note ? ' (' + esc(rec.note) + ')' : ' (probes not healthy in time)'}`}</dd></dl>
+    <div class="block"><h3 class="sub">Impact vs baseline <span style="text-transform:none;letter-spacing:0;font-weight:400">(baseline &rarr; peak, change)</span></h3>
+      <div class="table-wrap"><table><tr><th>Service</th><th>Error rate %</th><th>p95 latency ms</th></tr>${r.impact.map(i =>
+      `<tr><td>${esc(i.service)}</td><td class="num">${nd(i.error_rate.baseline)} &rarr; ${nd(i.error_rate.peak)} (${delta(i.error_rate.change)})</td>
+       <td class="num">${nd(i.p95_ms.baseline)} &rarr; ${nd(i.p95_ms.peak)} (${delta(i.p95_ms.change)})</td></tr>`).join('')}</table></div></div>
+    <div class="block"><h3 class="sub">Amplification <span style="text-transform:none;letter-spacing:0;font-weight:400">(observed p95 increase &divide; injected delay)</span></h3>
+      ${r.amplification.length ? `<div class="table-wrap"><table><tr><th>Service</th><th>Role</th><th>p95 increase</th><th>Ratio</th></tr>${r.amplification.map(a =>
+        `<tr><td>${esc(a.service)}</td><td class="muted">${esc(a.role)}</td><td class="num">+${num(a.increase_ms)} ms</td>
+         <td class="num">&asymp;${num(a.ratio)}&times; ${a.amplified ? '<span class="pill warn">amplified</span>' : ''}</td></tr>`).join('')}</table></div>
+        ${r.amplification.some(a => a.amplified) ? '<p class="note">Above 1.5&times; the delay is paid more than once per request (several sequential calls or retries).</p>' : ''}`
+      : `<p class="muted">${p.fault === 'network_delay' ? 'no latency data for any service' : 'n/a (no injected delay)'}</p>`}</div>
+    <div class="block"><h3 class="sub">Verdict</h3>
+      <div class="verdict ${verdictClass(v.verdict)}"><span class="pill ${verdictClass(v.verdict)}">${esc(v.verdict.toUpperCase())}</span>
+        ${esc(v.explanation)} ${v.model ? `<span class="muted">(${esc(v.model)})</span>` : ''}</div>
+      ${(v.claims || []).length ? `<div class="table-wrap" style="margin-top:12px"><table><tr><th>Claim</th><th>Status</th><th>Evidence</th></tr>${v.claims.map(c =>
+        `<tr><td>${esc(c.claim)}</td><td><span class="pill ${c.status === 'supported' ? 'ok' : c.status === 'contradicted' ? 'bad' : ''}">${esc(c.status)}</span></td><td>${esc(c.evidence)}</td></tr>`).join('')}</table></div>` : ''}
+      ${v.recommendation ? `<div class="next"><h3 class="sub" style="color:var(--accent)">AI interpretation: recommended next move</h3><div>${esc(v.recommendation)}</div></div>` : ''}</div>
+    ${r.container_resources.length ? `<details class="block"><summary class="muted">Container CPU / memory (reference only)</summary><div class="table-wrap" style="margin-top:8px"><table>${r.container_resources.map(c =>
+      `<tr><td>${esc(c.container)}</td><td class="num">cpu ${num(c.cpu_percent.baseline)}% &rarr; ${num(c.cpu_percent.peak)}%</td><td class="num">mem ${num(c.memory_mb.baseline, 0)} &rarr; ${num(c.memory_mb.peak, 0)}&nbsp;MB</td></tr>`).join('')}</table></div></details>` : ''}`;
+}
+
+/* ---------- 7. history ---------- */
+let historyRows = [], historyAll = false;
+async function openResult(id) {
+  try { viewingId = id; viewedResult = await api('/api/results/' + id); renderResult(viewedResult, 'saved result ' + id);
+        updateGrafana(); $('resultPanel').scrollIntoView({ behavior: 'smooth' }); }
+  catch (e) { banner('Could not load result: ' + e.message); }
+}
+async function loadHistory() {
+  try { historyRows = await api('/api/results'); }
+  catch (e) { $('history').className = ''; $('history').innerHTML = `<p class="pos">Could not load history: ${esc(e.message)}</p>`; return; }
+  renderHistory();
+}
+function renderHistory() {
+  const rows = historyAll ? historyRows : historyRows.slice(0, 8);
+  $('history').className = '';
+  $('history').innerHTML = !historyRows.length ? '<p class="muted">No saved results yet.</p>' :
+    `<div class="table-wrap${historyAll ? ' scroll' : ''}"><table><tr><th>Started (UTC)</th><th>Experiment</th><th>Outcome</th><th>Verdict</th><th>Recovered</th><th>Rollback</th></tr>${rows.map(r =>
+      `<tr class="click" tabindex="0" data-id="${esc(r.id)}"><td>${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))}</td>
+       <td>${esc(r.fault)} on <b>${esc(r.target)}</b>${r.fault === 'network_delay' ? ` ${esc(r.magnitude)}&nbsp;ms` : ''}</td>
+       <td><span class="pill ${r.aborted ? 'warn' : 'ok'}">${r.aborted ? 'aborted' : 'completed'}</span></td>
+       <td><span class="pill ${verdictClass(r.verdict)}">${esc(r.verdict)}</span></td>
+       <td>${r.recovered ? 'yes' : 'no'}</td><td>${r.rollback_verified ? 'verified' : '<b class="pos">FAILED</b>'}</td></tr>`).join('')}</table></div>`
+    + (historyRows.length > 8 ? `<button id="historyMore" class="btn btn-sm history-more" type="button">${historyAll ? 'Show latest 8' : `Show all ${historyRows.length}`}</button>` : '');
+  document.querySelectorAll('#history tr.click').forEach(tr => {
+    tr.onclick = () => openResult(tr.dataset.id);
+    tr.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openResult(tr.dataset.id); } };
+  });
+  if ($('historyMore')) $('historyMore').onclick = () => { historyAll = !historyAll; renderHistory(); };
+}
+
+/* ---------- 5. grafana ---------- */
+async function loadGrafanaCfg() {
+  try { gcfg = await api('/api/grafana'); } catch (e) { $('grafanaSec').classList.add('hide'); return; }
+  updateGrafana();
+}
+function grafanaRange() {
+  const s = status, saved = viewedResult || (s && s.phase === 'done' && s.result);
+  if (s && s.running && s.fault_started_ts)       // live: start 2 minutes before injection, end at "now"
+    return { from: Math.round((s.fault_started_ts - gcfg.before_s) * 1000), to: 'now', label: `live: from ${gcfg.before_s / 60} min before injection` };
+  if (saved && saved.grafana_window_ms)           // finished: the whole experiment window
+    return { from: saved.grafana_window_ms[0], to: saved.grafana_window_ms[1], label: viewedResult ? 'saved result window' : 'experiment window' };
+  return { from: 'now-15m', to: 'now', label: 'last 15 minutes' };
+}
+function grafanaServices() {                       // services worth showing for the current experiment, target first
+  const s = status, saved = viewedResult || (s && s.phase === 'done' && s.result);
+  if (s && s.running && s.plan) return { target: s.plan.target, list: Object.keys(s.watch || {}) };
+  if (saved) return { target: saved.plan.target, list: saved.impact.map(i => i.service) };
+  return null;
+}
+function updateGrafana() {
+  if (!gcfg) return;
+  const ctx = grafanaServices(), sel = $('gService');
+  if ((ctx ? ctx.target : '') !== gCtx) { gCtx = ctx ? ctx.target : ''; gSel = ctx ? ctx.target : ''; }  // new experiment: focus its target
+  const opts = ctx ? [...new Set([ctx.target, ...ctx.list, 'All'])] : [''];
+  if (sel.dataset.opts !== opts.join()) { sel.dataset.opts = opts.join(); sel.innerHTML = opts.map(o => `<option value="${esc(o)}">${esc(o || 'dashboard default')}</option>`).join(''); }
+  sel.value = gSel;
+  const r = grafanaRange(), svc = gSel ? `&var-service=${gSel === 'All' ? '$__all' : encodeURIComponent(gSel)}` : '';
+  const key = r.from + '|' + r.to + '|' + gSel, q = `orgId=1&theme=dark&refresh=5s&from=${r.from}&to=${r.to}${svc}`;
+  $('gRange').textContent = r.label;
+  if (key === gKey) return;                        // only reload the iframes when the range or service actually changes
+  gKey = key;
+  for (const [k, p] of Object.entries(gcfg.panels)) $('g_' + k).src = `${gcfg.url}/d-solo/${gcfg.uid}/${gcfg.slug}?${q}&panelId=${p.id}`;
+  $('gLink').href = `${gcfg.url}/d/${gcfg.uid}/${gcfg.slug}?${q}`;
+}
+
+/* ---------- polling ---------- */
+let lastMode = 'idle';
+function setMode(s) {
+  const mode = s.running ? 'run' : ['done', 'refused', 'error'].includes(s.phase) ? 'review' : 'idle';
+  document.querySelector('main').dataset.mode = mode;
+  if (mode !== lastMode && mode !== 'idle') window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  lastMode = mode;
+}
+function syncNav() {                                      // nav links to sections that are hidden right now are hidden too
+  document.querySelectorAll('.steps-nav a').forEach(a => { const t = $(a.dataset.for); a.classList.toggle('hide', !!t && t.classList.contains('hide')); });
+}
+async function poll() {
+  try { status = await api('/api/status'); } catch (e) { banner('Backend unreachable: ' + e.message); return; }
+  if (status.startup_note) banner(status.startup_note, true); else if ($('banner').classList.contains('note')) banner('');
+  $('phasePill').textContent = status.phase.replace('_', ' ');
+  $('phasePill').className = 'pill ' + (status.running ? 'warn' : status.phase === 'done' ? 'ok' : ['refused', 'error'].includes(status.phase) ? 'bad' : status.phase === 'proposed' ? 'info' : '');
+  document.title = status.running ? `● ${status.phase.replace('_', ' ')} · Chaos Copilot` : 'Chaos Copilot';
+  renderPlan(); renderLive(status); highlight(); setMode(status); syncNav();
+  if (cy && Date.now() - lastHealth > (status.running ? 4000 : 30000)) refreshHealth();
+  if (status.running) viewedResult = null;
+  updateGrafana();
+  if (status.phase === 'done' && status.result && lastDone !== status.result.id) {
+    lastDone = status.result.id; viewingId = null; viewedResult = null; renderResult(status.result, 'this run'); updateGrafana(); loadHistory(); loadReadiness();
+  } else if (status.phase === 'refused') { renderResult(null); }
+  syncNav();
+}
+
+$('refreshReady').onclick = loadReadiness; $('refreshHistory').onclick = loadHistory;
+$('focus').onchange = () => { chartSig = ''; renderCharts(status); };
+$('gService').onchange = () => { gSel = $('gService').value; updateGrafana(); };
+$('propose').onclick = async () => { $('propose').disabled = true; chartSig = ''; viewedResult = null; renderResult(null);
+  await act('/api/propose', 'Propose', { goal: $('goalSel').value || null }); await poll(); };
+$('reviewed').onchange = renderPlan;
+$('journeySel').onchange = () => { if ($('journeySel').value) { $('checkoutPath').checked = false; } applyFocus(); };
+$('checkoutPath').onchange = () => { if ($('checkoutPath').checked) $('journeySel').value = ''; applyFocus(); };
+$('fitGraph').onclick = () => { if (cy) cy.fit(undefined, 30); };
+$('nodeDetail').onclick = ev => { const c = ev.target.closest('[data-node]'); if (c) selectNode(c.dataset.node); };
+async function loadGoals() {
+  try { const g = await api('/api/goals'); $('goalSel').innerHTML = '<option value="">no preference: let the AI explore</option>' + Object.entries(g).map(([k, label]) => `<option value="${esc(k)}">${esc(label)}</option>`).join(''); }
+  catch (e) { /* the selector simply stays at "no preference" */ }
+}
+$('approve').onclick = async () => { await act('/api/approve', 'Approve'); await poll(); };
+$('reject').onclick = async () => { await act('/api/reject', 'Reject'); await poll(); };
+$('stop').onclick = async () => {
+  $('stop').disabled = true; $('stop').textContent = 'Stopping…';
+  await act('/api/stop', 'Stop'); await poll();
+  setTimeout(() => { $('stop').disabled = false; $('stop').textContent = 'STOP EXPERIMENT'; }, 1500);   // a second press skips the recovery wait
+};
+
+loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); poll();
+if ('IntersectionObserver' in window) {                 // highlight the step you are looking at in the top navigation
+  const links = [...document.querySelectorAll('.steps-nav a')];
+  const spy = new IntersectionObserver(entries => entries.forEach(en => { if (en.isIntersecting) links.forEach(a => {
+    if (a.dataset.for === en.target.id) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current'); }); }), { rootMargin: '-90px 0px -60% 0px' });
+  document.querySelectorAll('main > section').forEach(sec => spy.observe(sec));
+}
+setInterval(poll, 1000);
+setInterval(() => { if (status && !status.running && document.visibilityState === 'visible') loadReadiness(); }, 30000);
+</script>
+</body>
+</html>

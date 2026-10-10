@@ -1,0 +1,259 @@
+{
+  "id": "20261010T110853Z",
+  "plan": {
+    "target": "cart",
+    "fault": "network_delay",
+    "magnitude": 250,
+    "duration_s": 60,
+    "hypothesis": "Adding network delay to the cart service will increase the p95 latency of the checkout and frontend services during the experiment, but error rates should remain low and service will recover immediately after the delay is removed.",
+    "reasoning": "The cart service is on the checkout path with a high fan-in (2) and fan-out (2), serving as a critical dependency for both frontend and checkout. Introducing a 250ms network delay will test how upstream callers handle latency propagation in synchronous gRPC calls."
+  },
+  "plan_source": "llm",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ]
+  },
+  "started_at": "2026-10-10T11:08:53+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: frontend-proxy p95_ms (674.4ms > 132.7ms)",
+    "elapsed_s": 7.5,
+    "peaks": {
+      "cart": {
+        "error_rate": 0.0,
+        "p95_ms": 250.8821
+      },
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 41.773802
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 674.413
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 8.640957128614158,
+        "memory_mb": 35.0703125
+      },
+      "frontend": {
+        "cpu_percent": 5.333001132502831,
+        "memory_mb": 126.98046875
+      },
+      "checkout": {
+        "cpu_percent": 0.13304,
+        "memory_mb": 11.0234375
+      },
+      "cart": {
+        "cpu_percent": 1.35226393629124,
+        "memory_mb": 52.66015625
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "cart": {
+            "n": 20,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 2.334
+          },
+          "checkout": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 63,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 40.598011
+          },
+          "frontend-proxy": {
+            "n": 80,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 287.12
+          }
+        },
+        "breaches": {
+          "frontend-proxy p95_ms": "287.1ms > 132.7ms"
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "cart": {
+            "n": 20,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 250.8821
+          },
+          "checkout": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 55,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 41.773802
+          },
+          "frontend-proxy": {
+            "n": 88,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 674.413
+          }
+        },
+        "breaches": {
+          "cart p95_ms": "250.9ms > 102.0ms",
+          "frontend-proxy p95_ms": "674.4ms > 132.7ms"
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 25.0
+  },
+  "impact": [
+    {
+      "service": "cart",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 2.017674418604651,
+        "peak": 250.8821,
+        "change": 248.86442558139535
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 41.773802,
+        "change": 8.146459342657373
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 674.413,
+        "change": 641.727393939394
+      }
+    }
+  ],
+  "amplification": [
+    {
+      "service": "frontend-proxy",
+      "increase_ms": 641.7,
+      "delay_ms": 250,
+      "ratio": 2.6
+    }
+  ],
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 8.640957128614158
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 35.0703125
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 5.333001132502831
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 126.98046875
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 0.13304
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 11.0234375
+      }
+    },
+    {
+      "container": "cart",
+      "cpu_percent": {
+        "baseline": 0.14628476840824492,
+        "peak": 1.35226393629124
+      },
+      "memory_mb": {
+        "baseline": 55.3525390625,
+        "peak": 52.66015625
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "inconclusive",
+    "explanation": "The experiment was aborted early after 7.5 seconds due to a threshold breach on the frontend-proxy p95 latency. Because the experiment was aborted before completion, the full duration of the planned network delay could not be tested, making the hypothesis neither fully held nor disproven.",
+    "model": "gemini-flash-lite-latest"
+  },
+  "grafana_window_ms": [
+    1791630414471,
+    1791630625390
+  ]
+}

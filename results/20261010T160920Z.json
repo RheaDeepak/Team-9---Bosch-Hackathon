@@ -1,0 +1,598 @@
+{
+  "id": "20261010T160920Z",
+  "plan": {
+    "target": "product-catalog",
+    "fault": "network_delay",
+    "magnitude": 250,
+    "duration_s": 60,
+    "hypothesis": "Adding a network delay to product-catalog will increase the latency (p95_ms) of dependent services like frontend, checkout, and recommendation, potentially leading to increased timeout errors if callers do not have adequate timeouts configured. Once the delay is removed, metrics will return to baseline.",
+    "reasoning": "product-catalog is on the checkout path and has a high fan-in (3) and fan-out (1), serving as a core dependency for both frontend and checkout. Introducing a network_delay fault directly tests the timeout and retry behavior of its callers as requested by the optional operator goal."
+  },
+  "plan_source": "llm",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator",
+      "recommendation"
+    ],
+    "checks": [
+      {
+        "name": "Plan is complete",
+        "passed": true,
+        "detail": "all fields present"
+      },
+      {
+        "name": "Fault type is allowed",
+        "passed": true,
+        "detail": "network_delay is on the allowlist"
+      },
+      {
+        "name": "Magnitude within cap",
+        "passed": true,
+        "detail": "250 ms delay (cap 1000 ms)"
+      },
+      {
+        "name": "Duration within cap",
+        "passed": true,
+        "detail": "60 s (cap 120 s)"
+      },
+      {
+        "name": "Target exists in the dependency map",
+        "passed": true,
+        "detail": "product-catalog is a discovered service"
+      },
+      {
+        "name": "Target is not protected",
+        "passed": true,
+        "detail": "product-catalog is not on the protected list"
+      }
+    ]
+  },
+  "started_at": "2026-10-10T16:09:20+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: product-catalog restarts (restarted (1)); checkout restarts (restarted (5))",
+    "elapsed_s": 6.8,
+    "peaks": {
+      "product-catalog": {
+        "error_rate": 0.0,
+        "p95_ms": 1767.090314
+      },
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 61.944528
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 509.73
+      },
+      "recommendation": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 1.133399014778325,
+        "memory_mb": 35.234375
+      },
+      "frontend": {
+        "cpu_percent": 12.225763490241102,
+        "memory_mb": 157.73046875
+      },
+      "checkout": {
+        "cpu_percent": 2.345967540574282,
+        "memory_mb": 11.34375
+      },
+      "recommendation": {
+        "cpu_percent": 1.319264367816092,
+        "memory_mb": 57.82421875
+      },
+      "product-catalog": {
+        "cpu_percent": 3.2967804878048783,
+        "memory_mb": 14.453125
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 27,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 21.475169
+          },
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 46,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 61.944528
+          },
+          "frontend-proxy": {
+            "n": 24,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 62.512
+          },
+          "recommendation": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        },
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 530
+          },
+          "cart": {
+            "ok": true,
+            "ms": 14
+          }
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 34,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 1767.090314
+          },
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 41,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 61.944528
+          },
+          "frontend-proxy": {
+            "n": 24,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 509.73
+          },
+          "recommendation": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {
+          "product-catalog p95_ms": "1767.1ms > 119.6ms",
+          "frontend-proxy p95_ms": "509.7ms > 132.7ms",
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        },
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 525
+          },
+          "cart": {
+            "ok": true,
+            "ms": 20
+          }
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 0.0,
+    "metrics_confirmed": false,
+    "metrics_seconds": null,
+    "samples": [
+      {
+        "t": 0.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 44
+          },
+          "cart": {
+            "ok": true,
+            "ms": 18
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 5.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 16
+          },
+          "cart": {
+            "ok": true,
+            "ms": 16
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 10.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 14
+          },
+          "cart": {
+            "ok": true,
+            "ms": 11
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 15.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 7
+          },
+          "cart": {
+            "ok": true,
+            "ms": 24
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 20.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 13
+          },
+          "cart": {
+            "ok": true,
+            "ms": 23
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 25.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 25
+          },
+          "cart": {
+            "ok": true,
+            "ms": 23
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 30.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 50
+          },
+          "cart": {
+            "ok": true,
+            "ms": 29
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "product-catalog p95_ms": "151.3ms > 119.6ms",
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 35.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 13
+          },
+          "cart": {
+            "ok": true,
+            "ms": 11
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "product-catalog p95_ms": "151.3ms > 119.6ms",
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 40.1,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 14
+          },
+          "cart": {
+            "ok": true,
+            "ms": 14
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "product-catalog p95_ms": "124.0ms > 119.6ms",
+          "frontend p95_ms": "155.9ms > 133.6ms",
+          "frontend-proxy p95_ms": "157.3ms > 132.7ms",
+          "checkout restarts": "restarted (5)",
+          "product-catalog restarts": "restarted (1)"
+        }
+      }
+    ]
+  },
+  "impact": [
+    {
+      "service": "product-catalog",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 19.622380952380894,
+        "peak": 1767.090314,
+        "change": 1747.4679330476192
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 61.944528,
+        "change": 28.317185342657368
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 509.73,
+        "change": 477.04439393939396
+      }
+    },
+    {
+      "service": "recommendation",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 4.58,
+        "peak": null,
+        "change": null
+      }
+    }
+  ],
+  "amplification": [
+    {
+      "service": "product-catalog",
+      "role": "target",
+      "increase_ms": 1747.5,
+      "delay_ms": 250,
+      "ratio": 7.0,
+      "amplified": true
+    },
+    {
+      "service": "frontend",
+      "role": "caller",
+      "increase_ms": 28.3,
+      "delay_ms": 250,
+      "ratio": 0.1,
+      "amplified": false
+    },
+    {
+      "service": "frontend-proxy",
+      "role": "caller",
+      "increase_ms": 477.0,
+      "delay_ms": 250,
+      "ratio": 1.9,
+      "amplified": true
+    }
+  ],
+  "score": {
+    "impact_score": 25.0,
+    "resilience_score": 75,
+    "severity": "Moderate",
+    "confidence": "Medium confidence",
+    "availability_pct": 100.0,
+    "components": {
+      "error_impact": 0.0,
+      "latency_impact": 1.0,
+      "availability_loss": 0.0,
+      "recovery_impact": 0.0
+    },
+    "limitations": [
+      "Stopped after 7s, so the evidence covers only the start of the fault"
+    ]
+  },
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 1.133399014778325
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 35.234375
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 12.225763490241102
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 157.73046875
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 2.345967540574282
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 11.34375
+      }
+    },
+    {
+      "container": "recommendation",
+      "cpu_percent": {
+        "baseline": 2.7665186252937053,
+        "peak": 1.319264367816092
+      },
+      "memory_mb": {
+        "baseline": 48.0232421875,
+        "peak": 57.82421875
+      }
+    },
+    {
+      "container": "product-catalog",
+      "cpu_percent": {
+        "baseline": 0.7358883746434256,
+        "peak": 3.2967804878048783
+      },
+      "memory_mb": {
+        "baseline": 11.0890625,
+        "peak": 14.453125
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "partially held",
+    "explanation": "The experiment was aborted early after 6.8 seconds due to container restarts in product-catalog and checkout under the injected network delay. While product-catalog, frontend, and frontend-proxy showed latency increases (supported claims), checkout and recommendation had no p95 data, and error rates did not increase as hypothesized. Recovery was reported as successful.",
+    "claims": [
+      {
+        "claim": "product-catalog p95_ms rises above baseline",
+        "evidence": "product-catalog p95_ms baseline was 19.62 and peak was 1767.09 (change: 1747.47)",
+        "status": "supported"
+      },
+      {
+        "claim": "frontend p95_ms rises above baseline",
+        "evidence": "frontend p95_ms baseline was 33.63 and peak was 61.94 (change: 28.32)",
+        "status": "supported"
+      },
+      {
+        "claim": "checkout p95_ms rises above baseline",
+        "evidence": "checkout p95_ms peak was null",
+        "status": "no data"
+      },
+      {
+        "claim": "recommendation p95_ms rises above baseline",
+        "evidence": "recommendation p95_ms peak was null",
+        "status": "no data"
+      },
+      {
+        "claim": "timeout errors increase",
+        "evidence": "error_rate for all services (product-catalog, checkout, frontend, frontend-proxy, recommendation) remained at 0.0 peak (change: 0.0)",
+        "status": "contradicted"
+      },
+      {
+        "claim": "metrics will return to baseline once the delay is removed",
+        "evidence": "recovery.recovered was true with 0.0 seconds",
+        "status": "supported"
+      }
+    ],
+    "recommendation": "Implement bounded timeouts and retry budgets between checkout, frontend-proxy, and product-catalog to prevent cascading restarts and instability when downstream latency increases.",
+    "model": "gemini-3.5-flash-lite",
+    "skipped_models": []
+  },
+  "grafana_window_ms": [
+    1791648440846,
+    1791648655711
+  ]
+}

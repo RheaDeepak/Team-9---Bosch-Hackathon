@@ -1,0 +1,549 @@
+{
+  "id": "20261010T103047Z",
+  "plan": {
+    "target": "payment",
+    "fault": "network_delay",
+    "magnitude": 500,
+    "duration_s": 60,
+    "hypothesis": "Injecting a 500ms network delay into the payment service will cause an increase in the p95 latency of the checkout service since checkout synchronously calls payment, but error rates should remain minimal as requests will eventually succeed. System will recover immediately after the fault duration.",
+    "reasoning": "The payment service is on the critical checkout path, with a fan-in of 1 (called by checkout) and a fan-out of 1 (calls flagd). Its baseline p95 latency is 3.3ms. Testing network delay on payment will reveal how well the checkout service handles downstream latency spikes without cascading failures."
+  },
+  "plan_source": "llm",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ]
+  },
+  "started_at": "2026-10-10T10:30:47+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": false,
+    "reason": "duration elapsed (60s)",
+    "elapsed_s": 60.0,
+    "peaks": {
+      "payment": {
+        "error_rate": null,
+        "p95_ms": null
+      },
+      "checkout": {
+        "error_rate": null,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 26.000598
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 146.141
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 2.106163522012579,
+        "memory_mb": 34.49609375
+      },
+      "frontend": {
+        "cpu_percent": 4.2703105590062105,
+        "memory_mb": 126.296875
+      },
+      "checkout": {
+        "cpu_percent": 0.02433915211970075,
+        "memory_mb": 10.59375
+      },
+      "payment": {
+        "cpu_percent": 57.173561811505515,
+        "memory_mb": 87.09375
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 24,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 21.13447
+          },
+          "frontend-proxy": {
+            "n": 20,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 34.683
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 33,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 26.000598
+          },
+          "frontend-proxy": {
+            "n": 35,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 146.141
+          }
+        },
+        "breaches": {
+          "frontend-proxy p95_ms": "146.1ms > 132.7ms"
+        }
+      },
+      {
+        "t": 10.0,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 50,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 18.69497
+          },
+          "frontend-proxy": {
+            "n": 49,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 67.444
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 15.0,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 69,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 18.061335
+          },
+          "frontend-proxy": {
+            "n": 59,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 41.122
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 20.0,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 64,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 6.226384
+          },
+          "frontend-proxy": {
+            "n": 66,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 27.859
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 25.0,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 70,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 6.226384
+          },
+          "frontend-proxy": {
+            "n": 68,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 27.179
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 30.0,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 82,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 6.208758
+          },
+          "frontend-proxy": {
+            "n": 69,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 23.785
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 35.0,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 85,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 6.208758
+          },
+          "frontend-proxy": {
+            "n": 68,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 21.238
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 40.0,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 85,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 7.593771
+          },
+          "frontend-proxy": {
+            "n": 63,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 21.238
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 45.1,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 66,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 15.276168
+          },
+          "frontend-proxy": {
+            "n": 60,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 18.443
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 50.1,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 70,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 15.276168
+          },
+          "frontend-proxy": {
+            "n": 61,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 18.639
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 55.1,
+        "metrics": {
+          "payment": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 74,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 15.276168
+          },
+          "frontend-proxy": {
+            "n": 64,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 18.639
+          }
+        },
+        "breaches": {}
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 0.0
+  },
+  "impact": [
+    {
+      "service": "payment",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": null,
+        "change": null
+      },
+      "p95_ms": {
+        "baseline": 3.3000000000000003,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": null,
+        "change": null
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 26.000598,
+        "change": -7.6267446573426305
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 146.141,
+        "change": 113.45539393939393
+      }
+    }
+  ],
+  "amplification": [],
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 2.106163522012579
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 34.49609375
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 4.2703105590062105
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 126.296875
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 0.02433915211970075
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 10.59375
+      }
+    },
+    {
+      "container": "payment",
+      "cpu_percent": {
+        "baseline": 14.440081483107999,
+        "peak": 57.173561811505515
+      },
+      "memory_mb": {
+        "baseline": 71.5580078125,
+        "peak": 87.09375
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "inconclusive",
+    "explanation": "The telemetry data for the targeted payment service and the primary dependent checkout service show null values for peak error rates and p95 latency changes due to low traffic or missing server spans during the experiment window, making it impossible to definitively verify the latency increase on checkout.",
+    "model": "gemini-flash-lite-latest"
+  },
+  "grafana_window_ms": [
+    1791628127736,
+    1791628365509
+  ]
+}
