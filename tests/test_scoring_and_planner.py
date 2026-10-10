@@ -2,6 +2,7 @@ import json
 import unittest
 from unittest.mock import patch
 
+import llm
 import planner
 import run_experiment as exp
 
@@ -87,7 +88,7 @@ class PlannerTests(unittest.TestCase):
             seen["context"] = context
             return PLAN_JSON, "fake-model", []
 
-        with patch.dict("os.environ", {"LLM_API_KEY": "k"}), patch.object(planner, "load_dotenv"), \
+        with patch.dict("os.environ", {"LLM_API_KEY": "k"}), patch.object(llm, "load_dotenv"), \
                 patch.object(planner, "load_graph", return_value=(None, None)), patch.object(planner, "load_baseline", return_value={}), \
                 patch.object(planner, "load_flows", return_value={}), patch.object(planner, "build_context", return_value={"candidate_targets": ["cart"]}), \
                 patch.object(planner, "_call_llm", side_effect=fake_llm):
@@ -102,14 +103,14 @@ class PlannerTests(unittest.TestCase):
         self.assertNotIn("optional_operator_goal", self.propose("rm -rf /")[3])
 
     def test_no_key_falls_back_and_says_so(self):
-        with patch.dict("os.environ", {"LLM_API_KEY": ""}), patch.object(planner, "load_dotenv"):
+        with patch.dict("os.environ", {"LLM_API_KEY": ""}), patch.object(llm, "load_dotenv"):
             plan, source, note = planner.propose_experiment()
         self.assertEqual((source, plan["target"]), ("fallback", "cart"))
         self.assertIn("not set", note)
 
     def judge(self, reply):
         plan = {"target": "cart", "fault": "network_delay", "magnitude": 250, "duration_s": 60, "hypothesis": "h", "reasoning": "r"}
-        with patch.dict("os.environ", {"LLM_API_KEY": "k"}), patch.object(planner, "load_dotenv"), \
+        with patch.dict("os.environ", {"LLM_API_KEY": "k"}), patch.object(llm, "load_dotenv"), \
                 patch.object(planner, "_call_llm", return_value=(reply, "fake-model", ["m1: HTTP 429 RESOURCE_EXHAUSTED"])):
             return planner.judge_hypothesis(plan, {"aborted": True})
 

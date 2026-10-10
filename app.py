@@ -18,8 +18,10 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import activity
 import discovery
 import planner
+import ranker
 import grafana
 import guard
 import inject
@@ -272,6 +274,59 @@ def api_propose(body: dict = Body(default=None)):
         STATE.update(phase="proposed", plan=p["plan"], source=p["source"], note=p["note"], validation=p["validation"])
     _log(f"proposed: {p['plan'].get('fault')} on {p['plan'].get('target')} ({p['source']})")
     return p
+
+
+RANKING_ROWS = 40   # rows shown: one per service and fault
+CANDIDATE_FIELDS = ("rank", "target", "fault", "magnitude", "risk", "info", "priority", "outage", "why", "factors")
+
+
+@app.get("/api/ranking")
+def api_ranking():
+    """The ranker's scored candidates (no LLM) merged with the planning agent's decision for the current plan.
+    One row per service and fault: the variant the agent examined (else the ranker's best magnitude); the other
+    magnitudes of that fault come along as `variants`. A stop and a delay on one service are separate rows,
+    because the mildest delay would otherwise hide every container_stop."""
+    try:
+        ranking, _ = ranker.rank_from_files()
+    except (OSError, ValueError, KeyError) as e:
+        raise HTTPException(409, f"cannot rank: {e}")
+    with LOCK:
+        plan = STATE["plan"] or {}
+    agent = plan.get("ranking") or {}
+    by_id = {r["candidate_id"]: r for r in agent.get("top_k") or []}
+
+    def view(c):
+        a = by_id.get(c["id"], {})
+        return {"id": c["id"], **{k: c[k] for k in CANDIDATE_FIELDS}, "in_top_k": c["id"] in by_id,
+                "adjusted_risk": a.get("adjusted_risk"), "adjusted_priority": a.get("adjusted_priority"),
+                "reason": a.get("reason"), "evidence": a.get("evidence") or []}
+
+    groups = {}
+    for c in ranking:  # already best first, so each group's first entry is the ranker's best variant
+        groups.setdefault((c["target"], c["fault"]), []).append(view(c))
+    rows = []
+    for variants in groups.values():
+        primary = next((v for v in variants if v["in_top_k"]), variants[0])
+        rows.append({**primary, "variants": [v for v in variants if v is not primary]})
+    rows.sort(key=lambda r: r["rank"])
+    rows = rows[:RANKING_ROWS]
+    chosen = agent.get("chosen")
+    return {"candidates": rows, "total": len(ranking), "services": len({c["target"] for c in ranking}), "chosen": chosen,
+            "source": agent.get("source"), "run_id": agent.get("run_id"), "note": agent.get("note"),
+            "chosen_reason": next((r["reason"] for r in rows if r["id"] == chosen), None) or plan.get("reasoning")}
+
+
+@app.get("/api/agent-events")
+def api_agent_events(run: str = "", after: int = 0):
+    """Structured agent steps for the activity feed: the newest run unless `run` is given, only those after `after`."""
+    run_id, evs, last = activity.events(run or None, after)
+    return {"run_id": run_id, "events": evs, "last": last}
+
+
+@app.get("/api/agent-sessions")
+def api_agent_sessions():
+    """Saved agent sessions (sessions/<run_id>.jsonl), newest first, for replay."""
+    return activity.list_sessions()
 
 
 @app.post("/api/approve", status_code=202)

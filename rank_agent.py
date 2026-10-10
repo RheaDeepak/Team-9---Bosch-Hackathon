@@ -17,6 +17,8 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
+import activity
+import llm
 import planner
 import ranker
 from discovery import CLIENT, COMPOSE_FILES, ENV_FILE, SERVER, _expand, _load_env, fetch_spans, load_flows, load_graph
@@ -24,10 +26,11 @@ from metrics import load_baseline
 from policy import PROTECTED, blast_radius, validate
 
 TOP_K = 3
-MAX_TOOL_CALLS = 8
+MAX_TOOL_CALLS = 8                   # hard cap per run; at the cap the agent must answer from what it has
 MAX_LLM_CALLS = MAX_TOOL_CALLS + 2   # a few turns can carry several tool calls; this bounds the loop
 AGENT_LOG = Path("agent_log.jsonl")
 SRC_ENV_VAR = "OTEL_DEMO_SRC"        # root of the otel-demo checkout (contains src/ and compose.yaml)
+SRC_FALLBACK_VAR = "TARGET_REPOSITORY_PATH"   # the same checkout, already set for discovery.py / metrics.py
 MAX_RESULT_CHARS = 3000              # tool results are cut to this before going back to the LLM
 MAX_MATCHES = 20
 MAX_LINE_CHARS = 160
@@ -108,7 +111,7 @@ class ToolError(Exception):
 
 def _src_root():
     load_dotenv()
-    raw = os.getenv(SRC_ENV_VAR, "").strip()
+    raw = os.getenv(SRC_ENV_VAR, "").strip() or os.getenv(SRC_FALLBACK_VAR, "").strip()
     if not raw:
         raise ToolError(f"{SRC_ENV_VAR} is not set")
     root = Path(raw).resolve()
@@ -300,15 +303,21 @@ def _compact(result):
 # ---- log -------------------------------------------------------------------------------
 
 class AgentLog:
-    """Appends one JSON line per step to agent_log.jsonl so the UI can replay the reasoning."""
+    """One record per step: appended to agent_log.jsonl (short) and recorded as a structured event
+    (full detail) for the live activity feed and for replaying the session from sessions/<run_id>.jsonl."""
 
     def __init__(self, path=AGENT_LOG):
-        self.path, self.run_id, self.step = Path(path), uuid.uuid4().hex[:8], 0
+        self.path = Path(path)
+        self.rec = activity.Recorder(uuid.uuid4().hex[:8], self.path.parent / "sessions")
+        self.run_id = self.rec.run_id
 
-    def __call__(self, type_, summary, tool=None):
-        self.step += 1
-        rec = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "run_id": self.run_id,
-               "step": self.step, "type": type_, "tool": tool, "summary": " ".join(str(summary).split())[:240]}
+    @property
+    def step(self):
+        return self.rec.step
+
+    def __call__(self, type_, summary, tool=None, args=None, detail=None, **extra):
+        ev = self.rec.emit(type_, summary, tool=tool, args=args, detail=detail, **extra)
+        rec = {k: ev[k] for k in ("ts", "run_id", "step", "type", "tool", "summary")}
         try:
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
@@ -324,6 +333,7 @@ def _brief(top, g):
     for c in top:
         t = c["target"]
         cands.append({"id": c["id"], "risk": c["risk"], "info": c["info"], "priority": c["priority"], "why": c["why"],
+                      "outage": c["outage"], "top_factors": [f"{x['label']} ({x['contribution']:+.2f})" for x in c["factors"][:4]],
                       "callers": {u: ranker._mode(d) + (f" {d['type']}" if d.get("type") else "")
                                   for u, _, d in g.in_edges(t, data=True)},
                       "blast_radius": blast_radius(g, t)})
@@ -331,16 +341,26 @@ def _brief(top, g):
             + f"\nProtected services (never targets): {sorted(PROTECTED)}")
 
 
-def _investigate(api_key, top, g, toolbox, log, post):
-    """Bounded tool-calling loop. Returns (final text, model, tool calls used)."""
+class BudgetExhausted(RuntimeError):
+    """The agent used all its tool calls and still gave no usable final answer."""
+
+
+def _investigate(api_key, top, g, toolbox, log, post, trail=None):
+    """Bounded tool-calling loop. Returns (final text, model, tool calls used). `trail` collects what the tools
+    found, so a run that hits the cap can still hand over its evidence."""
+    with llm.listening(lambda kind, text: log(kind, text)):
+        return _loop(api_key, top, g, toolbox, log, post, [] if trail is None else trail)
+
+
+def _loop(api_key, top, g, toolbox, log, post, trail):
     contents = [{"role": "user", "parts": [{"text": _brief(top, g)}]}]
     used, model = 0, None
     for _ in range(MAX_LLM_CALLS):
         body = {"systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]}, "contents": contents,
                 "tools": [{"functionDeclarations": TOOL_DECLS}],
                 "toolConfig": {"functionCallingConfig": {"mode": "AUTO" if used < MAX_TOOL_CALLS else "NONE"}},
-                "generationConfig": {"maxOutputTokens": planner.LLM_MAX_TOKENS}}
-        cand, model = post(api_key, body, (model,) if model else planner.LLM_MODELS)  # keep one model per conversation
+                "generationConfig": {"maxOutputTokens": llm.MAX_TOKENS}}
+        cand, model = post(api_key, body, (model,) if model else llm.model_chain())  # keep one model per conversation
         parts = (cand.get("content") or {}).get("parts") or []
         contents.append({"role": "model", "parts": parts})  # verbatim: Gemini needs its thought signatures back
         text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
@@ -348,7 +368,7 @@ def _investigate(api_key, top, g, toolbox, log, post):
         if not calls:
             return text, model, used
         if text.strip():
-            log("thought", text)
+            log("thought", text, detail=text, model=model)
         replies = []
         for fc in calls:
             name, args = fc.get("name"), fc.get("args") or {}
@@ -356,14 +376,18 @@ def _investigate(api_key, top, g, toolbox, log, post):
                 result = {"error": "tool budget used up; give your final JSON answer now"}
             else:
                 used += 1
-                log("tool_call", f"{name}({json.dumps(args)})", tool=name)
+                log("tool_call", f"{name}({json.dumps(args)})", tool=name, args=args, call=f"{used}/{MAX_TOOL_CALLS}")
                 result = _compact(toolbox.call(name, args))
-                log("tool_result", json.dumps(result, default=str), tool=name)
+                shown = json.dumps(result, default=str)
+                log("tool_result", shown, tool=name, detail=json.dumps(result, indent=1, default=str))
+                trail.append({"tool": name, "finding": f"{name}({json.dumps(args)}): {shown}"[:300]})
             replies.append({"functionResponse": {"name": name, "response": {"result": result},
                                                  **({"id": fc["id"]} if fc.get("id") else {})}})
         if used >= MAX_TOOL_CALLS:
             replies.append({"text": "Tool budget used up. Reply now with the final JSON only."})
         contents.append({"role": "user", "parts": replies})
+    if used >= MAX_TOOL_CALLS:
+        raise BudgetExhausted(f"tool budget ({MAX_TOOL_CALLS} calls) used up without a final answer")
     raise RuntimeError(f"no final answer within {MAX_LLM_CALLS} LLM calls")
 
 
@@ -429,7 +453,7 @@ def _top_k_rows(top, answer=None):
     for c in top:
         adj = (answer or {}).get("ranking", {}).get(c["id"], {})
         rows.append({"candidate_id": c["id"], "rank": c["rank"], "risk": c["risk"], "info": c["info"],
-                     "priority": c["priority"], "why": c["why"],
+                     "priority": c["priority"], "why": c["why"], "outage": c["outage"], "factors": c["factors"],
                      "adjusted_risk": adj.get("adjusted_risk"), "adjusted_priority": adj.get("adjusted_priority"),
                      "evidence": adj.get("evidence", []), "reason": adj.get("reason")})
     return rows
@@ -437,13 +461,23 @@ def _top_k_rows(top, answer=None):
 
 def top_k(ranking, k):
     """Best k candidates with distinct targets: the evidence is per edge into a target, so two
-    variants of one service would spend the tool budget twice on the same question."""
+    variants of one service would spend the tool budget twice on the same question.
+    The mildest delay usually tops each service, so a plain top-k would be all network_delay:
+    when the shortlist lacks a fault kind that exists in the ranking, its best candidate (on a
+    service not yet listed) takes the last slot."""
     seen, out = set(), []
     for c in ranking:
         if c["target"] not in seen:
             seen.add(c["target"])
             out.append(c)
-    return out[:k]
+    out = out[:k]
+    for fault in sorted({c["fault"] for c in ranking}):
+        if len(out) < 2 or any(c["fault"] == fault for c in out):
+            continue
+        extra = next((c for c in ranking if c["fault"] == fault and c["target"] not in {x["target"] for x in out}), None)
+        if extra:
+            out[-1] = extra
+    return out
 
 
 def run_agent(k=TOP_K, api_key=None, post=None, graph=None, baseline=None, flows=None, history=None,
@@ -460,35 +494,45 @@ def run_agent(k=TOP_K, api_key=None, post=None, graph=None, baseline=None, flows
         raise ValueError("ranker produced no valid candidates")
     top = top_k(ranking, k)
     log = AgentLog(log_path)
-    log("thought", "investigating top-%d: %s" % (len(top), ", ".join(f"{c['id']} ({c['priority']})" for c in top)))
+    log("thought", "investigating top-%d: %s" % (len(top), ", ".join(f"{c['id']} ({c['priority']})" for c in top)),
+        detail=json.dumps([{k: c[k] for k in ("id", "risk", "info", "priority", "outage", "why")} for c in top], indent=1))
+    trail = []
 
-    def fallback(reason):
+    def fallback(reason, capped=False):
         best = top[0]
         hyp, preds = _default_story(best, graph)
-        log("decision", f"ranker_fallback -> {best['id']}: {reason}")
-        return {"source": "ranker_fallback", "note": reason, "model": None, "run_id": log.run_id, "tool_calls": 0,
-                "chosen": best["id"], "predictions": preds, "top_k": _top_k_rows(top),
+        log("decision", f"ranker_fallback -> {best['id']}: {reason}", fallback=True, capped=capped, detail=reason)
+        rows = _top_k_rows(top)
+        rows[0]["evidence"] = trail[:10]  # what the agent found before it ran out of budget (empty when it never ran)
+        return {"source": "ranker_fallback", "note": reason, "model": None, "run_id": log.run_id,
+                "tool_calls": len([t for t in trail]), "capped": capped, "chosen": best["id"], "predictions": preds,
+                "top_k": rows,
                 "plan": _plan(best, hyp, f"Ranker #1 (priority {best['priority']}): {best['why']}. "
                                          f"LLM investigation not used: {reason}")}
 
-    api_key = api_key or planner.load_api_key()
+    api_key = api_key or llm.load_api_key()
     if not api_key:
-        return fallback(f"{planner.API_KEY_VAR} is not set")
+        return fallback(f"{llm.API_KEY_VAR} is not set")
     try:
         text, model, used = _investigate(api_key, top, graph, Toolbox(graph, baseline, history, ranking), log,
-                                         post or planner._post_gemini)
+                                         post or llm.post, trail)
         answer = _check_answer(planner._parse_json(text), top, graph)
+    except BudgetExhausted as e:  # hit the cap: hand over the best plan so far (ranker #1 plus the evidence gathered)
+        return fallback(str(e), capped=True)
     except Exception as e:  # LLM/network failure or invalid output
-        return fallback(f"LLM investigation failed: {type(e).__name__}: {e}"[:300])
+        return fallback(f"LLM investigation failed: {type(e).__name__}: {e}"[:300], capped=len(trail) >= MAX_TOOL_CALLS)
     chosen = next(c for c in top if c["id"] == answer["chosen"])
     reason = answer["ranking"].get(chosen["id"], {}).get("reason") or chosen["why"]
     plan = _plan(chosen, answer["hypothesis"], reason)
     check = validate(plan, graph)
     if not check["valid"]:
         return fallback("agent's choice failed policy: " + "; ".join(check["reasons"]))
-    log("decision", f"chose {chosen['id']} after {used} tool calls: {reason}")
-    return {"source": "rank_agent", "note": f"model {model}, {used} tool calls", "model": model,
-            "run_id": log.run_id, "tool_calls": used, "chosen": chosen["id"], "predictions": answer["predictions"],
+    capped = used >= MAX_TOOL_CALLS
+    log("decision", f"chose {chosen['id']} after {used} tool calls: {reason}", fallback=False, capped=capped,
+        detail=json.dumps({"hypothesis": answer["hypothesis"], "predictions": answer["predictions"],
+                           "ranking": answer["ranking"]}, indent=1))
+    return {"source": "rank_agent", "note": f"model {model}, {used} tool calls" + (" (cap reached)" if capped else ""),
+            "model": model, "capped": capped, "run_id": log.run_id, "tool_calls": used, "chosen": chosen["id"], "predictions": answer["predictions"],
             "top_k": _top_k_rows(top, answer), "plan": plan}
 
 

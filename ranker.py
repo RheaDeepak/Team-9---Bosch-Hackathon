@@ -22,12 +22,13 @@ MAGNITUDES = {"container_stop": (0,), "network_delay": (200, 500, 1000)}
 # Every tunable number in one place. Within "risk" and "info" the weights sum to 1, so both scores are 0..1.
 WEIGHTS = {
     # priority = risk * risk_score + info * info_score - safety * (blast share x severity) - prior_abort * (aborted before)
-    "priority": {"risk": 0.55, "info": 0.45, "safety": 0.20, "prior_abort": 0.15},
+    #            - outage * (total outage / entry point)
+    "priority": {"risk": 0.55, "info": 0.45, "safety": 0.20, "prior_abort": 0.15, "outage": 0.25},
     # risk: likely user impact if the service is weak
     "risk": {"fan_in": 0.15, "blast_radius": 0.20, "checkout_path": 0.20, "journeys": 0.15, "traffic": 0.20,
              "recovery": 0.10},
     # informativeness: how much we would learn
-    "info": {"novelty": 0.40, "escalation": 0.20, "clarity": 0.15, "uncertainty": 0.25},
+    "info": {"novelty": 0.40, "escalation": 0.15, "clarity": 0.15, "uncertainty": 0.20, "partial": 0.10},
     # risk multipliers: an async-only (or uncalled) dependency keeps this share of its risk ...
     "async_floor": 0.3,
     # ... and the mildest fault keeps this share (container_stop / max delay = full severity)
@@ -39,6 +40,7 @@ NOVELTY = {"untested": 1.0, "other_fault": 0.7, "other_magnitude": 0.4, "exact_r
 NOISE_CV = 0.5        # p95 std / max(p95, LATENCY_FLOOR_MS) at which a service counts as fully noisy
 NOISE_ERR_PP = 1.0    # error-rate std (percentage points) at which a service counts as fully noisy
 UNKNOWN_NOISE = 0.5   # no baseline numbers (e.g. kafka, databases): neither clear nor noisy
+OUTAGE_JOURNEY_SHARE = 0.5  # stopping a service on more than this share of the user journeys starts to look like an outage
 PENALTY_NOTE = 0.05     # penalties at least this large are named in the why line
 GUARD_ABORT = "threshold breached"  # guard reasons that mean the system really degraded
 
@@ -107,11 +109,13 @@ def _target_features(g, stats, baseline, flows, history, t):
     else:
         cv = (p95_std or 0) / max(p95 or 0, LATENCY_FLOOR_MS)  # +-2ms on a 3ms service is not noise
         noise = min(1.0, max(cv / NOISE_CV, (err_std or 0) / NOISE_ERR_PP))
+    entry = not callers or all(c in PROTECTED for c, _ in callers)  # only the edge proxy (or nobody) calls it: users hit it directly
+    journeys = sum(any(t in (s["from"], s["to"]) for s in f["steps"]) for f in flows.values())
     past = [r for r in history if r["target"] == t]
     recoveries = [r["recovery_s"] for r in past if r["recovery_s"] is not None]
     return {"fan_in": stats["fan_in"].get(t, g.in_degree(t)), "sync_callers": sync, "async_callers": len(callers) - sync,
             "blast_radius": len(blast_radius(g, t)), "checkout_path": t in stats["checkout_path"],
-            "journeys": sum(any(t in (s["from"], s["to"]) for s in f["steps"]) for f in flows.values()),
+            "journeys": journeys, "journey_share": journeys / max(len(flows), 1), "entry_point": entry,
             "traffic": rate, "traffic_via": via, "baseline_p95": p95, "baseline_error_rate": err, "noise": noise,
             "recovery": max(recoveries) if recoveries else None}
 
@@ -142,6 +146,22 @@ def _severity(fault, magnitude):
     return 1.0 if fault == "container_stop" else min(1.0, magnitude / MAX_NETWORK_DELAY_MS)
 
 
+def _outage(f, fault, sev, sync_share):
+    """0..1: how close this fault is to taking the whole app down. A stopped entry point (frontend) is a total outage;
+    a stopped service that most journeys call synchronously is almost one; a delay at the front door is half of one."""
+    if fault == "container_stop":
+        spread = max(0.0, (f["journey_share"] - OUTAGE_JOURNEY_SHARE) / (1 - OUTAGE_JOURNEY_SHARE)) * (0.5 + 0.5 * sync_share)
+        return 1.0 if f["entry_point"] else min(1.0, spread)
+    return 0.5 * sev if f["entry_point"] else 0.0
+
+
+def _partial(fault, sev, sync_share, outage):
+    """0..1: how likely the outcome is partial degradation (slow, some errors, maybe graceful) rather than all-or-nothing.
+    Those experiments teach the most about fallbacks, so they are rewarded; an outage leaves nothing to learn."""
+    shape = 0.6 + 0.4 * (1 - sev) if fault == "network_delay" else 0.4 + 0.6 * (1 - sync_share)
+    return (1 - outage) * shape
+
+
 def _labels(f, c):
     """Human text for each feature, used in the "why" line."""
     calls = ("async only" if f["fan_in"] and not f["sync_callers"]
@@ -160,6 +180,9 @@ def _labels(f, c):
         "clarity": "no baseline metrics" if f["baseline_p95"] is None else f"clean baseline (noise {f['noise']:.2f})",
         "uncertainty": "no prior verdict" if h["last_verdict"] is None else f"last verdict {h['last_verdict']}",
         "safety": f"blast {f['blast_radius']} at severity {c['severity']:.1f}",
+        "outage": ("entry point: users hit it directly" if f["entry_point"]
+                   else f"stops {f['journeys']} user journeys (near-total outage)"),
+        "partial": "likely partial degradation",
         "prior_abort": (f"guard aborted at {h['prior_abort']}ms" if c["fault"] == "network_delay"
                         else "guard aborted before"),
     }
@@ -184,11 +207,13 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
         sync_share = f["sync_callers"] / callers if callers else 0.0
         coupling = weights["async_floor"] + (1 - weights["async_floor"]) * sync_share
         sev_factor = weights["severity_floor"] + (1 - weights["severity_floor"]) * sev
+        outage = _outage(f, p["fault"], sev, sync_share)
         score = {
             "fan_in": f["fan_in"] / norm["fan_in"], "blast_radius": f["blast_radius"] / norm["blast_radius"],
             "checkout_path": float(f["checkout_path"]), "journeys": f["journeys"] / norm["journeys"],
             "traffic": (f["traffic"] or 0) / norm["traffic"],
             "recovery": min(1.0, (f["recovery"] or 0) / RECOVERY_TIMEOUT_S),
+            "partial": _partial(p["fault"], sev, sync_share, outage),
             "novelty": NOVELTY[h["novelty"]], "escalation": 1.0 if h["escalation"] is not None else 0.0,
             "clarity": 1 - f["noise"], "uncertainty": UNCERTAINTY.get(h["last_verdict"], 0.6),
         }
@@ -196,22 +221,29 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
         info = sum(wi[k] * score[k] for k in wi)
         safety = score["blast_radius"] * sev
         prior_abort = 1.0 if h["prior_abort"] is not None else 0.0
-        priority = wp["risk"] * risk + wp["info"] * info - wp["safety"] * safety - wp["prior_abort"] * prior_abort
+        priority = (wp["risk"] * risk + wp["info"] * info - wp["safety"] * safety - wp["prior_abort"] * prior_abort
+                    - wp.get("outage", 0.0) * outage)
 
         # Each feature's share of the priority, for the "why" line.
         contrib = {k: wp["risk"] * wr[k] * score[k] * coupling * sev_factor for k in wr}
         contrib |= {k: wp["info"] * wi[k] * score[k] for k in wi}
-        contrib |= {"safety": -wp["safety"] * safety, "prior_abort": -wp["prior_abort"] * prior_abort}
+        contrib |= {"safety": -wp["safety"] * safety, "prior_abort": -wp["prior_abort"] * prior_abort,
+                    "outage": -wp.get("outage", 0.0) * outage}
         cand = {"id": f"{p['target']}:{p['fault']}:{p['magnitude']}",
                 **{k: p[k] for k in ("target", "fault", "magnitude", "duration_s")},
-                "severity": round(sev, 2), "history": h}
+                "severity": round(sev, 2), "outage": round(outage, 3), "history": h}
         labels = _labels(f, cand)
         top = sorted((k for k in contrib if contrib[k] > 1e-6), key=lambda k: -contrib[k])[:3]
-        penalties = [labels[k] for k in ("safety", "prior_abort") if -contrib[k] >= PENALTY_NOTE]
+        penalties = [labels[k] for k in ("safety", "prior_abort", "outage") if -contrib[k] >= PENALTY_NOTE]
         cand.update(
             risk=round(risk, 3), info=round(info, 3), priority=round(priority, 3),
             why="; ".join(labels[k] for k in top) + (f" | penalty: {', '.join(penalties)}" if penalties else "")
                 + (f" | {labels['novelty']}" if h["novelty"] == "exact_repeat" else ""),
+            factors=sorted(
+                ({"name": k, "kind": "risk" if k in wr else "info" if k in wi else "penalty",
+                  "score": round(score.get(k, {"safety": safety, "prior_abort": prior_abort, "outage": outage}.get(k, 0)), 3),
+                  "contribution": round(contrib[k], 3), "label": labels[k]} for k in contrib),
+                key=lambda x: -abs(x["contribution"])),
             features={
                 "fan_in": {"raw": f["fan_in"], "score": round(score["fan_in"], 3)},
                 "sync_callers": {"raw": f["sync_callers"], "score": round(sync_share, 3)},
@@ -234,6 +266,9 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
                 "uncertainty": {"raw": h["last_verdict"], "score": score["uncertainty"]},
                 "prior_abort": {"raw": h["prior_abort"], "score": prior_abort},
                 "severity": {"raw": p["magnitude"], "score": round(sev, 3)},
+                "entry_point": {"raw": f["entry_point"], "score": float(f["entry_point"])},
+                "outage": {"raw": round(outage, 3), "score": round(outage, 3)},
+                "partial": {"raw": round(score["partial"], 3), "score": round(score["partial"], 3)},
             })
         out.append(cand)
     out.sort(key=lambda c: (-c["priority"], c["id"]))

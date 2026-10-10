@@ -68,6 +68,35 @@ class RankerTest(unittest.TestCase):
         self.assertEqual(find(ranking, "pay:network_delay:1000")["features"]["prior_abort"]["score"], 1.0)
         self.assertEqual(find(ranking, "pay:network_delay:200")["features"]["prior_abort"]["score"], 0.0)
 
+    def test_entry_point_stop_is_penalised_and_gets_factors(self):
+        ranking = self.rank()
+        stop, delay = find(ranking, "web:container_stop:0"), find(ranking, "web:network_delay:200")
+        self.assertEqual(stop["outage"], 1.0)                      # web has no callers: users hit it directly
+        self.assertGreater(delay["outage"], 0.0)                   # a delay at the front door is half an outage
+        self.assertLess(delay["outage"], stop["outage"])
+        self.assertLess(stop["priority"], delay["priority"])
+        self.assertLess(find(ranking, "queue:container_stop:0")["outage"], stop["outage"])   # async-only: breaks fewer calls
+        names = {f["name"]: f for f in stop["factors"]}
+        self.assertEqual(names["outage"]["kind"], "penalty")
+        self.assertLess(names["outage"]["contribution"], 0)
+        self.assertIn("entry point", names["outage"]["label"])
+        self.assertIn("entry point", stop["why"])
+        self.assertEqual([abs(f["contribution"]) for f in stop["factors"]],
+                         sorted((abs(f["contribution"]) for f in stop["factors"]), reverse=True))
+
+    def test_partial_degradation_is_rewarded(self):
+        ranking = self.rank()
+        mild, severe = find(ranking, "pay:network_delay:200"), find(ranking, "pay:network_delay:1000")
+        self.assertGreater(mild["features"]["partial"]["score"], severe["features"]["partial"]["score"])
+        self.assertGreater(mild["features"]["partial"]["score"], find(ranking, "web:container_stop:0")["features"]["partial"]["score"])
+        self.assertEqual({f["name"] for f in mild["factors"]} >= {"partial", "outage", "novelty"}, True)
+
+    def test_outage_weight_can_be_turned_off(self):
+        w = copy.deepcopy(ranker.WEIGHTS)
+        w["priority"]["outage"] = 0.0
+        self.assertGreater(find(self.rank(weights=w), "web:container_stop:0")["priority"],
+                           find(self.rank(), "web:container_stop:0")["priority"])
+
 
 if __name__ == "__main__":
     unittest.main()
