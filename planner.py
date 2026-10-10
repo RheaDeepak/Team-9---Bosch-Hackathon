@@ -10,10 +10,11 @@ from discovery import load_flows, load_graph
 from metrics import load_baseline
 from policy import ALLOWED_FAULTS, MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECTED, REQUIRED_KEYS
 
-LLM_MODEL = "gemini-3.8-flash"
+# Tried in order: Gemini models get overloaded or retired, so one name is a single point of failure.
+LLM_MODELS = ("gemini-3.8-flash", "gemini-3-flash-preview", "gemini-flash-lite-latest")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 LLM_MAX_TOKENS = 800
-LLM_TIMEOUT_S = 60
+LLM_TIMEOUT_S = 20
 VERDICTS = ("held", "not held", "inconclusive")
 API_KEY_VAR = "LLM_API_KEY"
 PLACEHOLDER_KEY = "your-api-key-here"  # value shipped in .env.example
@@ -92,12 +93,19 @@ def _call_llm(api_key, context, system=SYSTEM_PROMPT):
     body = {"systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user", "parts": [{"text": "Context:\n" + json.dumps(context, indent=1)}]}],
             "generationConfig": {"maxOutputTokens": LLM_MAX_TOKENS, "responseMimeType": "application/json"}}
-    resp = requests.post(GEMINI_URL.format(model=LLM_MODEL), json=body, timeout=LLM_TIMEOUT_S,
-                         headers={"x-goog-api-key": api_key})
-    if not resp.ok:  # the body never contains the key, but keep it short
-        raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
-    parts = resp.json()["candidates"][0]["content"]["parts"]
-    return "".join(p.get("text", "") for p in parts)
+    errors = []
+    for model in LLM_MODELS:  # next model on timeout, overload, or retired model
+        try:
+            resp = requests.post(GEMINI_URL.format(model=model), json=body, timeout=LLM_TIMEOUT_S,
+                                 headers={"x-goog-api-key": api_key})
+        except requests.RequestException as e:
+            errors.append(f"{model}: {type(e).__name__}")
+            continue
+        if resp.ok:
+            parts = resp.json()["candidates"][0]["content"]["parts"]
+            return "".join(p.get("text", "") for p in parts), model
+        errors.append(f"{model}: HTTP {resp.status_code}")
+    raise RuntimeError("all models failed (" + "; ".join(errors) + ")")
 
 
 def propose_experiment():
@@ -109,7 +117,8 @@ def propose_experiment():
     try:
         g, stats = load_graph()
         context = build_context(g, stats, load_baseline(), load_flows())
-        return parse_plan(_call_llm(api_key, context)), "llm", f"model {LLM_MODEL}"
+        text, model = _call_llm(api_key, context)
+        return parse_plan(text), "llm", f"model {model}"
     except Exception as e:  # any LLM/network/parse/file failure must degrade to the safe plan
         return dict(FALLBACK_PLAN), "fallback", f"LLM planning failed: {type(e).__name__}: {e}"[:300]
 
@@ -120,7 +129,9 @@ Reply with a single JSON object and nothing else (no prose, no code fences):
 {"verdict": "held" | "not held" | "inconclusive", "explanation": str}
 Use "inconclusive" when the data is too sparse or noisy to decide, or the experiment was aborted
 before the hypothesis could be tested. Telemetry notes: error rate and p95 are computed from server
-spans seen in the last few seconds; services with low traffic may show no data (null)."""
+spans seen in the last few seconds; services with low traffic may show no data (null).
+Units: every error_rate value is a PERCENTAGE (0.6 means 0.6%, not 60%); p95_ms is milliseconds;
+"change" is peak minus baseline in the same unit. Quote numbers exactly as given."""
 
 
 def judge_hypothesis(plan, results):
@@ -132,9 +143,10 @@ def judge_hypothesis(plan, results):
     try:
         content = {"hypothesis": plan["hypothesis"], "experiment": {k: plan[k] for k in ("target", "fault", "magnitude", "duration_s")},
                    "results": results}
-        out = _parse_json(_call_llm(api_key, content, system=JUDGE_PROMPT))
+        text, model = _call_llm(api_key, content, system=JUDGE_PROMPT)
+        out = _parse_json(text)
         if out.get("verdict") not in VERDICTS:
             raise ValueError(f"bad verdict {out.get('verdict')!r}")
-        return {"verdict": out["verdict"], "explanation": str(out.get("explanation", ""))}
+        return {"verdict": out["verdict"], "explanation": str(out.get("explanation", "")), "model": model}
     except Exception as e:
         return {"verdict": "inconclusive", "explanation": f"LLM unavailable: {type(e).__name__}: {e}"[:300]}

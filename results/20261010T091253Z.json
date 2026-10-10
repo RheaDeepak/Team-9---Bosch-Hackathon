@@ -1,0 +1,222 @@
+{
+  "plan": {
+    "target": "cart",
+    "fault": "container_stop",
+    "magnitude": 0,
+    "duration_s": 60,
+    "hypothesis": "Stopping cart for 60s makes add-to-cart, view-cart and checkout fail visibly (error rate rises on frontend and checkout) and the system recovers once cart restarts.",
+    "reasoning": "Safe default: cart is on the checkout path and is called by both frontend and checkout, so it exercises the core purchase journey, yet it is not a protected service."
+  },
+  "plan_source": "fallback",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ]
+  },
+  "started_at": "2026-10-10T09:12:53+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T07:54:38+00:00",
+    "flags_enabled": [
+      "loadGeneratorFloodHomepage=on"
+    ]
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "interrupted by user (Ctrl+C)",
+    "elapsed_s": 19.7,
+    "peaks": {
+      "cart": {
+        "error_rate": 0.0,
+        "p95_ms": 2.412
+      },
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 5.496859
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 14.426
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "cart": {
+            "n": 12,
+            "error_rate": 0.0,
+            "p95_ms": 2.412
+          },
+          "checkout": {
+            "n": 1,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 647,
+            "error_rate": 0.0,
+            "p95_ms": 4.952997
+          },
+          "frontend-proxy": {
+            "n": 331,
+            "error_rate": 0.0,
+            "p95_ms": 6.268
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "cart": {
+            "n": 12,
+            "error_rate": 0.0,
+            "p95_ms": 2.412
+          },
+          "checkout": {
+            "n": 1,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 645,
+            "error_rate": 0.0,
+            "p95_ms": 4.952997
+          },
+          "frontend-proxy": {
+            "n": 339,
+            "error_rate": 0.0,
+            "p95_ms": 8.189
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 10.0,
+        "metrics": {
+          "cart": {
+            "n": 12,
+            "error_rate": 0.0,
+            "p95_ms": 2.412
+          },
+          "checkout": {
+            "n": 1,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 641,
+            "error_rate": 0.0,
+            "p95_ms": 4.9339
+          },
+          "frontend-proxy": {
+            "n": 444,
+            "error_rate": 0.0,
+            "p95_ms": 8.442
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 15.0,
+        "metrics": {
+          "cart": {
+            "n": 3,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 626,
+            "error_rate": 0.0,
+            "p95_ms": 5.496859
+          },
+          "frontend-proxy": {
+            "n": 339,
+            "error_rate": 0.0,
+            "p95_ms": 14.426
+          }
+        },
+        "breaches": {}
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 35.1
+  },
+  "impact": [
+    {
+      "service": "cart",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 6.993666666666667,
+        "peak": 2.412,
+        "change": -4.581666666666667
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 305.5,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 45.17101422099465,
+        "peak": 5.496859,
+        "change": -39.67415522099465
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 48.067862059330864,
+        "peak": 14.426,
+        "change": -33.64186205933086
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "inconclusive",
+    "explanation": "LLM unavailable: ReadTimeout: HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): Read timed out. (read timeout=40)"
+  }
+}

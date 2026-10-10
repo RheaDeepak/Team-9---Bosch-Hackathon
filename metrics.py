@@ -27,10 +27,12 @@ REQUEST_KINDS = 'span_kind=~"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER"'
 ERROR_STATUS = "STATUS_CODE_ERROR"
 # Suggested abort thresholds
 ERROR_PP = 5            # error rate: baseline mean + 5 percentage points
-LATENCY_MULT = 3        # latency: max(3x mean, mean + 3 std)
-STD_MULT = 3
-CPU_MULT, CPU_MIN = 3, 20.0   # container CPU %: max(3x mean, mean + 3 std, 20%)
-MEM_MULT = 1.5                # container memory: max(1.5x mean, mean + 3 std)
+LATENCY_MULT = 3        # latency: max(3x baseline p95, baseline p95 + 100ms)
+LATENCY_FLOOR_MS = 100
+# flagd's long-lived streaming spans skew its latency, so it gets no latency abort thresholds.
+LATENCY_EXCLUDED = {"flagd"}
+LOW_TRAFFIC_REQUESTS = 100  # fewer requests than this over the baseline: flag the numbers as thin
+# Container CPU/memory are recorded and displayed but are not abort conditions.
 
 SERVICE_METRICS = ("request_rate", "error_rate", "p50_ms", "p95_ms", "p99_ms")
 CONTAINER_METRICS = ("running", "restarts", "cpu_percent", "memory_mb")
@@ -137,7 +139,7 @@ def _stats(values):
 
 
 def _latency_limit(s):
-    return max(LATENCY_MULT * s["mean"], s["mean"] + STD_MULT * s["std"])
+    return max(LATENCY_MULT * s["mean"], s["mean"] + LATENCY_FLOOR_MS)
 
 
 def _aggregate(samples, group, metrics):
@@ -149,17 +151,26 @@ def _thresholds(services, containers):
     svc = {}
     for n, m in services.items():
         e, p95, p99 = m["error_rate"], m["p95_ms"], m["p99_ms"]
+        latency = p95 and n not in LATENCY_EXCLUDED
         svc[n] = {"error_rate": e["mean"] + ERROR_PP if e else None,
-                  "p95_ms": _latency_limit(p95) if p95 else None,
-                  "p99_ms": _latency_limit(p99) if p99 else None}
+                  "p95_ms": _latency_limit(p95) if latency else None,
+                  "p99_ms": _latency_limit(p99) if p99 and latency else None}
     con = {}
     for n, m in containers.items():
-        cpu, mem, rst = m["cpu_percent"], m["memory_mb"], m["restarts"]
-        con[n] = {"cpu_percent": max(CPU_MULT * cpu["mean"], cpu["mean"] + STD_MULT * cpu["std"], CPU_MIN) if cpu else None,
-                  "memory_mb": max(MEM_MULT * mem["mean"], mem["mean"] + STD_MULT * mem["std"]) if mem else None,
-                  "restarts": rst["max"] if rst else None,  # any restart beyond this is an abort
+        rst = m["restarts"]
+        con[n] = {"restarts": rst["max"] if rst else None,  # any restart beyond this is an abort
                   "running": 1}
     return {"services": svc, "containers": con}
+
+
+def request_counts(duration_s):
+    """Requests handled per service over the last duration_s (Prometheus increase; approximate)."""
+    try:
+        counts = _prom(f"sum by (service_name) (increase({CALLS}{{{REQUEST_KINDS}}}[{duration_s}s]))")
+    except (requests.RequestException, ValueError, KeyError) as e:
+        print(f"Could not count requests: {e}")
+        return {}
+    return {svc: round(c) for svc, c in counts.items() if c is not None}
 
 
 def capture_baseline(duration_s=BASELINE_DURATION_S, interval_s=SAMPLE_INTERVAL_S, path=BASELINE_JSON):
@@ -180,6 +191,7 @@ def capture_baseline(duration_s=BASELINE_DURATION_S, interval_s=SAMPLE_INTERVAL_
     baseline = {"captured_at": samples[0]["timestamp"], "duration_s": n * interval_s,
                 "interval_s": interval_s, "samples": n, "flags_enabled": flags,
                 "services": services, "containers": containers,
+                "requests": request_counts(n * interval_s),
                 "thresholds": _thresholds(services, containers)}
     path.write_text(json.dumps(baseline, indent=2), encoding="utf-8")
     print_baseline(baseline)
@@ -202,23 +214,25 @@ def _f(x, spec=".1f"):
 
 def print_baseline(b):
     print(f"\nBaseline: {b['samples']} samples over {b['duration_s']}s"
-          + (f"  (flags on: {', '.join(b['flags_enabled'])})" if b["flags_enabled"] else ""))
-    print(f"\n{'service':<16}{'req/s':>8}{'err% avg':>9}{'err% max':>9}{'p50':>7}{'p95 avg':>9}"
+          + (f"  (flags on: {', '.join(b['flags_enabled'])})" if b["flags_enabled"] else "  (no feature flags on)"))
+    print(f"\n{'service':<16}{'requests':>9}{'req/s':>7}{'err% avg':>9}{'err% max':>9}{'p50':>7}{'p95 avg':>9}"
           f"{'p95 std':>8}{'p95 max':>8}{'p99 avg':>9} | {'abort err%':>10}{'abort p95':>10}")
     for n, m in b["services"].items():
         g = lambda k, f: _f((m[k] or {}).get(f))
         t = b["thresholds"]["services"][n]
-        print(f"{n:<16}{g('request_rate', 'mean'):>8}{g('error_rate', 'mean'):>9}{g('error_rate', 'max'):>9}"
-              f"{g('p50_ms', 'mean'):>7}{g('p95_ms', 'mean'):>9}{g('p95_ms', 'std'):>8}{g('p95_ms', 'max'):>8}"
-              f"{g('p99_ms', 'mean'):>9} | {_f(t['error_rate']):>10}{_f(t['p95_ms']):>10}")
-    print(f"\n{'container':<16}{'up':>5}{'restarts':>9}{'cpu% avg':>9}{'cpu% max':>9}{'mem avg MB':>11}"
-          f"{'mem max MB':>11} | {'abort cpu%':>10}{'abort MB':>9}")
+        reqs = b.get("requests", {}).get(n)
+        thin = "*" if reqs is None or reqs < LOW_TRAFFIC_REQUESTS else " "
+        print(f"{n:<16}{_f(reqs, ',.0f') + thin:>9}{g('request_rate', 'mean'):>7}{g('error_rate', 'mean'):>9}"
+              f"{g('error_rate', 'max'):>9}{g('p50_ms', 'mean'):>7}{g('p95_ms', 'mean'):>9}{g('p95_ms', 'std'):>8}"
+              f"{g('p95_ms', 'max'):>8}{g('p99_ms', 'mean'):>9} | {_f(t['error_rate']):>10}{_f(t['p95_ms']):>10}")
+    print(f"  * fewer than {LOW_TRAFFIC_REQUESTS} requests: treat these numbers as thin. "
+          f"flagd has no latency threshold (streaming spans).")
+    print(f"\n{'container':<16}{'up':>5}{'restarts':>9}{'cpu% avg':>9}{'cpu% max':>9}{'mem avg MB':>11}{'mem max MB':>11}"
+          "   (cpu/mem are reference only, not abort conditions)")
     for n, m in b["containers"].items():
         g = lambda k, f: _f((m[k] or {}).get(f))
-        t = b["thresholds"]["containers"][n]
-        print(f"{n:<16}{g('running', 'mean'):>5}{g('restarts', 'max', ):>9}{g('cpu_percent', 'mean'):>9}"
-              f"{g('cpu_percent', 'max'):>9}{g('memory_mb', 'mean'):>11}{g('memory_mb', 'max'):>11}"
-              f" | {_f(t['cpu_percent']):>10}{_f(t['memory_mb'], '.0f'):>9}")
+        print(f"{n:<16}{g('running', 'mean'):>5}{g('restarts', 'max'):>9}{g('cpu_percent', 'mean'):>9}"
+              f"{g('cpu_percent', 'max'):>9}{g('memory_mb', 'mean'):>11}{g('memory_mb', 'max'):>11}")
 
 
 if __name__ == "__main__":
