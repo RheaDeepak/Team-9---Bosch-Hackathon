@@ -1,6 +1,7 @@
 """Monitoring baseline: per-service span metrics (Prometheus) + per-container stats (Docker)."""
 import json
 import math
+import os
 import statistics
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -9,12 +10,15 @@ from pathlib import Path
 
 import docker
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Prometheus is published on the host by compose.observability.yaml (${PROMETHEUS_PORT}=9090).
-PROM_URL = "http://localhost:9090"
-DEMO_DIR = Path(r"C:\Users\rhea\opentelemetry-demo")  # read-only
+PROM_URL = os.getenv("PROMETHEUS_URL", "http://localhost:9090").rstrip("/")
+DEMO_DIR = Path(os.getenv("TARGET_REPOSITORY_PATH", "../opentelemetry-demo")).resolve()
 FLAGD_FILE = DEMO_DIR / "src" / "flagd" / "demo.flagd.json"
-COMPOSE_PROJECT = "opentelemetry-demo"
+COMPOSE_PROJECT = os.getenv("TARGET_COMPOSE_PROJECT", "opentelemetry-demo")
 BASELINE_JSON = Path("baseline.json")
 SAMPLE_INTERVAL_S = 15
 BASELINE_DURATION_S = 300

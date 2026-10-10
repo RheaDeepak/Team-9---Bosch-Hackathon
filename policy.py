@@ -1,12 +1,25 @@
 """Deterministic safety policy: validates an experiment plan. No LLM involved."""
+import os
+
 import networkx as nx
+from dotenv import load_dotenv
+from pydantic import ValidationError
 
 from discovery import load_graph
+from traffic_spike import (
+    FAULT_TYPE as TRAFFIC_SPIKE,
+    MAX_DURATION_SECONDS as MAX_TRAFFIC_SPIKE_DURATION_S,
+    MAX_PEAK_USERS as MAX_TRAFFIC_SPIKE_USERS,
+    TARGET_SERVICE as TRAFFIC_SPIKE_TARGET,
+    TrafficSpikeParameters,
+)
 
-ALLOWED_FAULTS = ("container_stop", "network_delay")
-MAX_DURATION_S = 120
-MAX_NETWORK_DELAY_MS = 1000
-PROTECTED = {"frontend-proxy", "otel-collector", "jaeger", "prometheus", "grafana", "opensearch", "flagd"}
+load_dotenv()
+
+ALLOWED_FAULTS = ("container_stop", "network_delay", TRAFFIC_SPIKE)
+MAX_DURATION_S = int(os.getenv("MAX_FAULT_DURATION_SECONDS", "120"))
+MAX_NETWORK_DELAY_MS = int(os.getenv("MAX_NETWORK_DELAY_MS", "1000"))
+PROTECTED = {"frontend-proxy", "otel-collector", "jaeger", "prometheus", "grafana", "opensearch", "flagd", "load-generator"}
 REQUIRED_KEYS = ("target", "fault", "magnitude", "duration_s", "hypothesis", "reasoning")
 
 
@@ -55,11 +68,37 @@ def validate(plan, graph=None):
             check("Magnitude within cap", 0 < magnitude <= MAX_NETWORK_DELAY_MS,
                   f"{magnitude} ms delay (cap {MAX_NETWORK_DELAY_MS} ms)",
                   f"network delay {magnitude}ms outside 1-{MAX_NETWORK_DELAY_MS}ms")
+        elif fault == TRAFFIC_SPIKE:
+            check("Magnitude within cap", 2 <= magnitude <= MAX_TRAFFIC_SPIKE_USERS,
+                  f"{magnitude} users (cap {MAX_TRAFFIC_SPIKE_USERS})",
+                  f"traffic spike {magnitude} users outside 2-{MAX_TRAFFIC_SPIKE_USERS}")
         else:
             check("Magnitude within cap", True, "no magnitude needed for this fault", "")
+    if fault == TRAFFIC_SPIKE:
+        try:
+            parameters = TrafficSpikeParameters.model_validate(plan.get("parameters"))
+            parameters_ok = (
+                target == TRAFFIC_SPIKE_TARGET
+                and magnitude == parameters.peak_users
+                and duration == parameters.duration_seconds
+            )
+            detail = "typed parameters match the approved user count and duration"
+            failure = (
+                f"traffic_spike requires target {TRAFFIC_SPIKE_TARGET!r}, magnitude equal to peak_users, "
+                "and duration_s equal to duration_seconds"
+            )
+        except ValidationError as exc:
+            parameters_ok = False
+            detail = ""
+            failure = "traffic_spike parameters invalid (" + "; ".join(
+                f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}"
+                for item in exc.errors(include_url=False)
+            ) + ")"
+        check("Traffic spike parameters are bounded", parameters_ok, detail, failure)
     if "duration_s" in plan:
-        check("Duration within cap", _is_num(duration) and 0 < duration <= MAX_DURATION_S,
-              f"{duration} s (cap {MAX_DURATION_S} s)", f"duration {duration!r}s must be between 1 and {MAX_DURATION_S}s")
+        duration_cap = MAX_TRAFFIC_SPIKE_DURATION_S if fault == TRAFFIC_SPIKE else MAX_DURATION_S
+        check("Duration within cap", _is_num(duration) and 0 < duration <= duration_cap,
+              f"{duration} s (cap {duration_cap} s)", f"duration {duration!r}s must be between 1 and {duration_cap}s")
     if "target" in plan:
         check("Target exists in the dependency map", target in graph, f"{target} is a discovered service",
               f"target {target!r} is not a service in the dependency map")

@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeBaseline, normalizePolicy, normalizeReadiness, normalizeTopology } from "./api.js";
+import { normalizeBaseline, normalizePolicy, normalizeReadiness, normalizeTopology, resolveApiBaseUrl } from "./api.js";
+
+test("routes a standalone local frontend to the FastAPI port", () => {
+  assert.equal(resolveApiBaseUrl({ protocol: "http:", hostname: "127.0.0.1", port: "4173" }), "http://127.0.0.1:8000");
+  assert.equal(resolveApiBaseUrl({ protocol: "http:", hostname: "127.0.0.1", port: "8000" }), "");
+});
 
 test("normalizes readiness maps without treating failed checks as ready", () => {
   const result = normalizeReadiness({ checks: { docker: { passed: true }, prometheus: { passed: false, message: "No data" } } });
