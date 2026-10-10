@@ -19,9 +19,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import activity
+import analysis
+import analysis_agent
 import discovery
 import planner
+import rank_agent
 import ranker
+import report
 import grafana
 import guard
 import inject

@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 import analysis
+import llm
 import planner
 import rank_agent
 from discovery import CLIENT, SERVER, fetch_spans, load_graph
@@ -348,10 +349,10 @@ def run_analysis(api_key=None, post=None, data=None, results=None, graph=None, l
 
     if not top:
         return fallback("no weaknesses to investigate")
-    api_key = api_key or planner.load_api_key()
+    api_key = api_key or llm.load_api_key()
     if not api_key:
-        return fallback(f"{planner.API_KEY_VAR} is not set")
-    post = post or planner._post_gemini
+        return fallback(f"{llm.API_KEY_VAR} is not set")
+    post = post or llm.post
     toolbox = AnalysisToolbox(graph, data, results)
     contents = [{"role": "user", "parts": [{"text": _brief(top, data)}]}]
     used, model = 0, None

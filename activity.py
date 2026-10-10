@@ -1,4 +1,4 @@
-"""Structured events from the planning agent.
+"""Structured events from the agents (mode "planning" or "analysis").
 
 Kept in memory so the UI can poll them once a second, and written to sessions/<run_id>.jsonl (full detail)
 so a session can be replayed later.
@@ -22,18 +22,25 @@ def valid_run_id(run_id):
     return isinstance(run_id, str) and bool(RUN_ID.fullmatch(run_id))
 
 
-class Recorder:
-    """One agent run: numbers its steps and stores every event."""
+MODES = ("planning", "analysis")
 
-    def __init__(self, run_id, sessions_dir=None):
-        self.run_id, self.dir, self.step = run_id, Path(sessions_dir or SESSIONS_DIR), 0
+
+def _mode(ev):
+    return ev.get("mode") or "planning"   # events recorded before modes existed came from the planning agent
+
+
+class Recorder:
+    """One agent run: numbers its steps and stores every event, tagged with the agent's mode."""
+
+    def __init__(self, run_id, sessions_dir=None, mode="planning"):
+        self.run_id, self.dir, self.step, self.mode = run_id, Path(sessions_dir or SESSIONS_DIR), 0, mode
 
     def emit(self, type_, summary, tool=None, args=None, detail=None, **extra):
         global _seq
         self.step += 1
         with _lock:
             _seq += 1
-            ev = {"seq": _seq, "run_id": self.run_id, "step": self.step,
+            ev = {"seq": _seq, "run_id": self.run_id, "mode": self.mode, "step": self.step,
                   "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "type": type_, "tool": tool,
                   "args": args, "summary": " ".join(str(summary).split())[:240],
                   "detail": None if detail is None else str(detail), **extra}
@@ -48,15 +55,16 @@ class Recorder:
         return ev
 
 
-def latest_run_id():
+def latest_run_id(mode=None):
+    """The newest run in memory, optionally of one mode."""
     with _lock:
-        return _events[-1]["run_id"] if _events else None
+        return next((e["run_id"] for e in reversed(_events) if mode is None or _mode(e) == mode), None)
 
 
-def events(run_id=None, after=0, sessions_dir=None):
-    """(run_id, events after seq `after`, last seq) for a run; the newest run when run_id is empty.
-    A run no longer in memory (earlier server session) is read from its file."""
-    run_id = run_id or latest_run_id()
+def events(run_id=None, after=0, sessions_dir=None, mode=None):
+    """(run_id, events after seq `after`, last seq) for a run; the newest run (of `mode`, if given) when run_id
+    is empty. A run no longer in memory (earlier server session) is read from its file."""
+    run_id = run_id or latest_run_id(mode)
     if not run_id or not valid_run_id(run_id):
         return run_id, [], after
     with _lock:
@@ -82,8 +90,8 @@ def load_session(run_id, sessions_dir=None):
     return out
 
 
-def list_sessions(sessions_dir=None, limit=30):
-    """Saved sessions, newest first: [{run_id, started, steps, source}]."""
+def list_sessions(sessions_dir=None, limit=30, mode=None):
+    """Saved sessions, newest first: [{run_id, mode, started, steps, outcome}], optionally of one mode."""
     rows = []
     for p in Path(sessions_dir or SESSIONS_DIR).glob("*.jsonl"):
         if not valid_run_id(p.stem):
@@ -91,7 +99,9 @@ def list_sessions(sessions_dir=None, limit=30):
         evs = load_session(p.stem, sessions_dir)
         if not evs:
             continue
+        if mode is not None and _mode(evs[0]) != mode:
+            continue
         decision = next((e for e in reversed(evs) if e["type"] == "decision"), None)
-        rows.append({"run_id": p.stem, "started": evs[0]["ts"], "steps": len(evs),
+        rows.append({"run_id": p.stem, "mode": _mode(evs[0]), "started": evs[0]["ts"], "steps": len(evs),
                      "outcome": (decision or {}).get("summary", "")[:80]})
     return sorted(rows, key=lambda r: r["started"], reverse=True)[:limit]

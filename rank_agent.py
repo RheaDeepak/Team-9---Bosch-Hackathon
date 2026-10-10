@@ -11,7 +11,7 @@ import statistics
 import sys
 import uuid
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 
 import yaml
@@ -311,11 +311,12 @@ def _compact(result):
 
 class AgentLog:
     """One record per step: appended to agent_log.jsonl (short) and recorded as a structured event
-    (full detail) for the live activity feed and for replaying the session from sessions/<run_id>.jsonl."""
+    (full detail) for the live activity feed and for replaying the session from sessions/<run_id>.jsonl.
+    `mode` tells the agents apart in both: "planning" (this file) or "analysis" (analysis_agent.py)."""
 
-    def __init__(self, path=AGENT_LOG):
-        self.path = Path(path)
-        self.rec = activity.Recorder(uuid.uuid4().hex[:8], self.path.parent / "sessions")
+    def __init__(self, path=AGENT_LOG, mode="planning"):
+        self.path, self.mode = Path(path), mode
+        self.rec = activity.Recorder(uuid.uuid4().hex[:8], self.path.parent / "sessions", mode=mode)
         self.run_id = self.rec.run_id
 
     @property
@@ -324,12 +325,79 @@ class AgentLog:
 
     def __call__(self, type_, summary, tool=None, args=None, detail=None, **extra):
         ev = self.rec.emit(type_, summary, tool=tool, args=args, detail=detail, **extra)
-        rec = {k: ev[k] for k in ("ts", "run_id", "step", "type", "tool", "summary")}
+        rec = {k: ev[k] for k in ("ts", "mode", "run_id", "step", "type", "tool", "summary")}
         try:
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
         except OSError:
             pass  # logging must never break an agent
+
+
+def read_log(mode=None, run_id=None, path=AGENT_LOG, limit=200):
+    """The last `limit` agent_log.jsonl records, optionally of one mode / run. Kept for scripts; the UI
+    reads structured events from activity.py instead. Records written before modes existed are "planning"."""
+    try:
+        lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for line in lines:
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if (mode is None or rec.get("mode", "planning") == mode) and (run_id is None or rec.get("run_id") == run_id):
+            out.append(rec)
+    return out[-limit:]
+
+
+# ---- the tool-calling loop (shared with analysis_agent.py) -----------------------------
+
+class BudgetExhausted(RuntimeError):
+    """The agent used all its tool calls and still gave no usable final answer."""
+
+
+def tool_loop(api_key, system, contents, decls, toolbox, log, post, max_tool_calls, max_llm_calls,
+              used=0, model=None, trail=None):
+    """Bounded Gemini function-calling loop. `contents` is the conversation and is extended in place, so a
+    caller can append a follow-up message and call again with the `used` and `model` returned. Every step
+    goes to `log` (activity feed + agent_log.jsonl); `trail` collects what the tools found, so a run that
+    hits the cap can still hand over its evidence. Returns (final text, model, tool calls used so far)."""
+    trail = [] if trail is None else trail
+    for _ in range(max_llm_calls):
+        body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents,
+                "tools": [{"functionDeclarations": decls}],
+                "toolConfig": {"functionCallingConfig": {"mode": "AUTO" if used < max_tool_calls else "NONE"}},
+                "generationConfig": {"maxOutputTokens": llm.MAX_TOKENS}}
+        cand, model = post(api_key, body, (model,) if model else llm.model_chain())[:2]  # one model per conversation
+        parts = (cand.get("content") or {}).get("parts") or []
+        contents.append({"role": "model", "parts": parts})  # verbatim: Gemini needs its thought signatures back
+        text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+        calls = [p["functionCall"] for p in parts if "functionCall" in p]
+        if not calls:
+            return text, model, used
+        if text.strip():
+            log("thought", text, detail=text, model=model)
+        replies = []
+        for fc in calls:
+            name, args = fc.get("name"), fc.get("args") or {}
+            if used >= max_tool_calls:
+                result = {"error": "tool budget used up; give your final JSON answer now"}
+            else:
+                used += 1
+                log("tool_call", f"{name}({json.dumps(args)})", tool=name, args=args, call=f"{used}/{max_tool_calls}")
+                result = _compact(toolbox.call(name, args))
+                shown = json.dumps(result, default=str)
+                log("tool_result", shown, tool=name, detail=json.dumps(result, indent=1, default=str))
+                trail.append({"tool": name, "finding": f"{name}({json.dumps(args)}): {shown}"[:300]})
+            replies.append({"functionResponse": {"name": name, "response": {"result": result},
+                                                 **({"id": fc["id"]} if fc.get("id") else {})}})
+        if used >= max_tool_calls:
+            replies.append({"text": "Tool budget used up. Reply now with the final JSON only."})
+        contents.append({"role": "user", "parts": replies})
+    if used >= max_tool_calls:
+        raise BudgetExhausted(f"tool budget ({max_tool_calls} calls) used up without a final answer")
+    raise RuntimeError(f"no final answer within {max_llm_calls} LLM calls")
 
 
 # ---- the agent -------------------------------------------------------------------------
@@ -348,54 +416,13 @@ def _brief(top, g):
             + f"\nProtected services (never targets): {sorted(PROTECTED)}")
 
 
-class BudgetExhausted(RuntimeError):
-    """The agent used all its tool calls and still gave no usable final answer."""
-
-
 def _investigate(api_key, top, g, toolbox, log, post, trail=None):
-    """Bounded tool-calling loop. Returns (final text, model, tool calls used). `trail` collects what the tools
-    found, so a run that hits the cap can still hand over its evidence."""
-    with llm.listening(lambda kind, text: log(kind, text)):
-        return _loop(api_key, top, g, toolbox, log, post, [] if trail is None else trail)
-
-
-def _loop(api_key, top, g, toolbox, log, post, trail):
+    """Planning conversation over the top-K. Returns (final text, model, tool calls used). `trail` collects
+    what the tools found, so a run that hits the cap can still hand over its evidence."""
     contents = [{"role": "user", "parts": [{"text": _brief(top, g)}]}]
-    used, model = 0, None
-    for _ in range(MAX_LLM_CALLS):
-        body = {"systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]}, "contents": contents,
-                "tools": [{"functionDeclarations": TOOL_DECLS}],
-                "toolConfig": {"functionCallingConfig": {"mode": "AUTO" if used < MAX_TOOL_CALLS else "NONE"}},
-                "generationConfig": {"maxOutputTokens": llm.MAX_TOKENS}}
-        cand, model = post(api_key, body, (model,) if model else llm.model_chain())  # keep one model per conversation
-        parts = (cand.get("content") or {}).get("parts") or []
-        contents.append({"role": "model", "parts": parts})  # verbatim: Gemini needs its thought signatures back
-        text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-        calls = [p["functionCall"] for p in parts if "functionCall" in p]
-        if not calls:
-            return text, model, used
-        if text.strip():
-            log("thought", text, detail=text, model=model)
-        replies = []
-        for fc in calls:
-            name, args = fc.get("name"), fc.get("args") or {}
-            if used >= max_tool_calls:
-                result = {"error": "tool budget used up; give your final JSON answer now"}
-            else:
-                used += 1
-                log("tool_call", f"{name}({json.dumps(args)})", tool=name, args=args, call=f"{used}/{MAX_TOOL_CALLS}")
-                result = _compact(toolbox.call(name, args))
-                shown = json.dumps(result, default=str)
-                log("tool_result", shown, tool=name, detail=json.dumps(result, indent=1, default=str))
-                trail.append({"tool": name, "finding": f"{name}({json.dumps(args)}): {shown}"[:300]})
-            replies.append({"functionResponse": {"name": name, "response": {"result": result},
-                                                 **({"id": fc["id"]} if fc.get("id") else {})}})
-        if used >= max_tool_calls:
-            replies.append({"text": "Tool budget used up. Reply now with the final JSON only."})
-        contents.append({"role": "user", "parts": replies})
-    if used >= MAX_TOOL_CALLS:
-        raise BudgetExhausted(f"tool budget ({MAX_TOOL_CALLS} calls) used up without a final answer")
-    raise RuntimeError(f"no final answer within {MAX_LLM_CALLS} LLM calls")
+    with llm.listening(lambda kind, text: log(kind, text)):
+        return tool_loop(api_key, SYSTEM_PROMPT, contents, TOOL_DECLS, toolbox, log, post, MAX_TOOL_CALLS,
+                         MAX_LLM_CALLS, trail=[] if trail is None else trail)
 
 
 def _num(x):
