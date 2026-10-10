@@ -6,7 +6,7 @@ from discovery import load_flows, load_graph
 from llm import API_KEY_VAR, MAX_TOKENS as LLM_MAX_TOKENS, PLACEHOLDER_KEY, load_api_key, post as _post_gemini
 from metrics import load_baseline
 from policy import MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECTED, REQUIRED_KEYS
-from traffic_spike import JOURNEY_PROFILE, MAX_PEAK_USERS, capability as traffic_spike_capability
+from traffic_spike import candidate_plan as traffic_spike_candidate_plan, capability as traffic_spike_capability
 
 TRAFFIC_SPIKE_GOAL = "capacity"
 _RANKED_DEFAULT = object()
@@ -123,27 +123,9 @@ def propose_experiment(goal=_RANKED_DEFAULT):
     The plan carries the top-K ranking and the agent's evidence under the extra "ranking" key."""
     if goal == TRAFFIC_SPIKE_GOAL:
         traffic = traffic_spike_capability()
-        if traffic["ready"]:
-            baseline_users = int(traffic["current_state"]["user_count"])
-            peak_users = min(MAX_PEAK_USERS, max(baseline_users + 1, 8))
-            duration_seconds = 20
-            return {
-                "target": "frontend",
-                "fault": "traffic_spike",
-                "magnitude": peak_users,
-                "duration_s": duration_seconds,
-                "hypothesis": "Increasing the existing Astronomy Shop journey load reveals the frontend saturation response without changing the journey mix, then the original load is restored.",
-                "reasoning": "The load-generator is already running the fixed 9:1 user-class mix against the frontend ingress, so a bounded user-count increase exercises the full request path without targeting infrastructure.",
-                "parameters": {
-                    "baseline_users": baseline_users,
-                    "peak_users": peak_users,
-                    "spawn_rate_per_second": 2,
-                    "duration_seconds": duration_seconds,
-                    "journey_profile": JOURNEY_PROFILE,
-                },
-                "candidate_id": "traffic-spike-core-v1",
-                "capability_version": traffic["capability_version"],
-            }, "deterministic-capability", traffic["detail"]
+        candidate = traffic_spike_candidate_plan(traffic)
+        if candidate:
+            return candidate, "deterministic-capability", traffic["detail"]
         return dict(FALLBACK_PLAN), "fallback", f"Traffic-spike capability is not ready: {traffic['detail']}"
 
     if goal is not _RANKED_DEFAULT:
@@ -152,7 +134,7 @@ def propose_experiment(goal=_RANKED_DEFAULT):
         return dict(FALLBACK_PLAN), "fallback", f"{API_KEY_VAR} is not set (empty or still the placeholder)"
     from rank_agent import run_agent  # imported here: rank_agent imports this module
     try:
-        out = run_agent()
+        out = run_agent(traffic_capability=traffic_spike_capability())
     except Exception as e:  # no dependency map / baseline, or a bug: degrade to the safe plan
         return dict(FALLBACK_PLAN), "fallback", f"ranking failed: {type(e).__name__}: {e}"[:300]
     plan = dict(out["plan"])

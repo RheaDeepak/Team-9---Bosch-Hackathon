@@ -808,9 +808,34 @@ function highlight() {
 
 /* ---------- 3. plan ---------- */
 let lastPlanKey = '', lastPlanHtml = '';
-const FAULTS = { container_stop: 'Container stop (docker stop, restarted on rollback)', network_delay: 'Network delay (tc netem on the target\'s egress)' };
-function magnitudeText(p) { return p.fault === 'network_delay' ? `${p.magnitude} ms added delay` : 'n/a (container is stopped)'; }
-const SOURCE_LABEL = { llm: 'Planned by LLM', rank_agent: 'Planned by agent', ranker_fallback: 'Ranker #1 (LLM not used)', fallback: 'FALLBACK PLAN' };
+const FAULTS = {
+  container_stop: 'Container stop (docker stop, restarted on rollback)',
+  network_delay: 'Network delay (tc netem on the target\'s egress)',
+  traffic_spike: 'Traffic spike (bounded Locust users, original load restored on rollback)'
+};
+const FAULT_LABELS = { container_stop: 'Container stop', network_delay: 'Network delay', traffic_spike: 'Traffic spike' };
+function magnitudeText(p) {
+  if (p.fault === 'network_delay') return `${p.magnitude} ms added delay`;
+  if (p.fault === 'traffic_spike') {
+    const x = p.parameters || {};
+    return `${x.baseline_users} → ${x.peak_users} users at ${x.spawn_rate_per_second} users/s`;
+  }
+  return 'n/a (container is stopped)';
+}
+function planFacts(p) {
+  const x = p.parameters || {};
+  if (p.fault === 'traffic_spike') return `
+    <div class="fact"><dt>Fault</dt><dd>${esc(FAULTS[p.fault])}</dd></div>
+    <div class="fact"><dt>Original load</dt><dd>${esc(x.baseline_users)} users</dd></div>
+    <div class="fact"><dt>Peak load</dt><dd>${esc(x.peak_users)} users</dd></div>
+    <div class="fact"><dt>Spawn rate</dt><dd>${esc(x.spawn_rate_per_second)} users/s</dd></div>
+    <div class="fact"><dt>Duration</dt><dd>${esc(x.duration_seconds)}&nbsp;s</dd></div>
+    <div class="fact"><dt>Journey</dt><dd>${esc(String(x.journey_profile || '').replaceAll('-', ' '))}</dd></div>`;
+  return `<div class="fact"><dt>Fault</dt><dd>${esc(FAULTS[p.fault] || p.fault)}</dd></div>
+    <div class="fact"><dt>Magnitude</dt><dd>${esc(magnitudeText(p))}</dd></div>
+    <div class="fact"><dt>Duration</dt><dd>${esc(p.duration_s)}&nbsp;s</dd></div>`;
+}
+const SOURCE_LABEL = { llm: 'Planned by LLM', rank_agent: 'Planned by agent', ranker_fallback: 'Ranker #1 (LLM not used)', 'deterministic-capability': 'Tested capability', fallback: 'FALLBACK PLAN' };
 const fix2 = x => x == null ? '&ndash;' : Number(x).toFixed(2);
 function rankingHtml(r) {
   if (!r || !(r.top_k || []).length) return '';
@@ -829,31 +854,31 @@ function renderPlan() {
   $('propose').innerHTML = proposing ? '<span class="spin"></span>Proposing…' : 'Propose experiment';
   const canDecide = s && s.phase === 'proposed' && p;
   const planKey = p ? JSON.stringify(p) : ''; if (planKey !== lastPlanKey) { lastPlanKey = planKey; $('reviewed').checked = false; }
-  const safe = !!(canDecide && v && v.valid && readiness && readiness.ready);
+  const trafficReady = p && p.fault === 'traffic_spike'
+    ? !!(readiness && readiness.checks.find(c => c.name === 'Traffic spike' && c.ok)) : true;
+  const safe = !!(canDecide && v && v.valid && readiness && readiness.ready && trafficReady);
   $('decision').classList.toggle('hide', !p);                // nothing to decide until there is a plan
   $('reject').disabled = !canDecide;
   $('reviewed').disabled = !safe;
   $('approve').disabled = !(safe && $('reviewed').checked);
   $('approveHint').textContent = !canDecide ? '' : !v.valid ? 'Blocked by the safety gate.' : !(readiness && readiness.ready) ? 'Readiness checks are failing.'
+    : !trafficReady ? 'Traffic spike is unavailable because the Locust executor or rollback path is not ready.'
     : !$('reviewed').checked ? 'Tick the box to confirm you reviewed the plan.' : '';
   if (!p) {
     $('plan').innerHTML = proposing ? '<p class="plan-empty"><span class="spin"></span>The planner is thinking (an LLM call, up to a minute)…</p>'
       : '<p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p>';
     return;
   }
-  const faultName = p.fault === 'network_delay' ? 'Network delay' : 'Container stop';
+  const faultName = FAULT_LABELS[p.fault] || p.fault;
   const key = JSON.stringify([p, v, s.source, s.note]);
   if (key === lastPlanHtml) return;                       // the poll runs every second: do not rebuild (and deselect) unchanged text
   lastPlanHtml = key;
   $('plan').innerHTML = `<div class="plan-grid">
     <div class="plan-main">
       <div class="plan-headline"><span class="plan-target">${esc(p.target)}</span>
-        <span class="pill ${p.fault === 'network_delay' ? 'warn' : 'bad'}">${esc(faultName)}</span>
+        <span class="pill ${p.fault === 'container_stop' ? 'bad' : 'warn'}">${esc(faultName)}</span>
         <span class="pill ${['llm', 'rank_agent'].includes(s.source) ? 'info' : 'warn'}">${esc(SOURCE_LABEL[s.source] || 'FALLBACK PLAN')}</span></div>
-      <dl class="facts">
-        <div class="fact"><dt>Fault</dt><dd>${esc(FAULTS[p.fault] || p.fault)}</dd></div>
-        <div class="fact"><dt>Magnitude</dt><dd>${esc(magnitudeText(p))}</dd></div>
-        <div class="fact"><dt>Duration</dt><dd>${esc(p.duration_s)}&nbsp;s</dd></div></dl>
+      <dl class="facts">${planFacts(p)}</dl>
       <div class="prose"><h3 class="sub">Hypothesis</h3><p>${esc(p.hypothesis)}</p><h3 class="sub">Reasoning</h3><p>${esc(p.reasoning)}</p>
         <p class="muted">${esc(s.note)}</p></div>
       ${rankingHtml(p.ranking)}
@@ -929,7 +954,7 @@ function renderLive(s) {
   if (!show) return;
   renderSteps(s);
   $('elapsed').textContent = Math.round(s.elapsed_s) + 's';
-  $('fault').textContent = s.plan ? `${s.plan.fault} on ${s.plan.target}` + (s.plan.fault === 'network_delay' ? ` (${s.plan.magnitude} ms)` : '') : '-';
+  $('fault').textContent = s.plan ? `${s.plan.fault} on ${s.plan.target} (${magnitudeText(s.plan)})` : '-';
   $('faultPill').textContent = s.running ? (s.phase === 'monitoring' ? 'FAULT ACTIVE' : s.phase.replace('_', ' ')) : '';
   $('faultPill').className = 'pill ' + (s.phase === 'monitoring' ? 'bad' : 'warn') + (s.running ? '' : ' hide');
   renderCharts(s); renderProbes(s); renderEvents(s);
@@ -1013,7 +1038,7 @@ function renderHistory() {
   $('history').innerHTML = !historyRows.length ? '<p class="muted">No saved results yet.</p>' :
     `<div class="table-wrap${historyAll ? ' scroll' : ''}"><table><tr><th>Started (UTC)</th><th>Experiment</th><th>Outcome</th><th>Verdict</th><th>Recovered</th><th>Rollback</th></tr>${rows.map(r =>
       `<tr class="click" data-id="${esc(r.id)}"><td><button type="button" class="rowbtn" aria-label="Open the ${esc(r.fault.replace('_', ' '))} on ${esc(r.target)} result from ${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))} UTC">${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))}</button></td>
-       <td>${esc(r.fault)} on <b>${esc(r.target)}</b>${r.fault === 'network_delay' ? ` ${esc(r.magnitude)}&nbsp;ms` : ''}</td>
+       <td>${esc(r.fault)} on <b>${esc(r.target)}</b>${r.fault === 'network_delay' ? ` ${esc(r.magnitude)}&nbsp;ms` : r.fault === 'traffic_spike' ? ` ${esc((r.parameters || {}).baseline_users)}→${esc((r.parameters || {}).peak_users)} users` : ''}</td>
        <td><span class="pill ${r.aborted ? 'warn' : 'ok'}">${r.aborted ? 'aborted' : 'completed'}</span></td>
        <td><span class="pill ${verdictClass(r.verdict)}">${esc(r.verdict)}</span></td>
        <td>${r.recovered ? 'yes' : 'no'}</td><td>${r.rollback_verified ? 'verified' : '<b class="pos">FAILED</b>'}</td></tr>`).join('')}</table></div>`
@@ -1041,7 +1066,7 @@ function evidenceValue(it) {
   if (it.kind === 'recovery') return v.recovered ? `recovered after ${esc(v.seconds)} s` : `not recovered${v.note ? ' (' + esc(v.note) + ')' : ''}`;
   if (it.kind === 'guard') return `${v.aborted ? 'aborted' : 'completed'} after ${esc(v.elapsed_s)} s: ${esc(v.reason)}`;
   if (it.kind === 'claim') return `<span class="pill ${v.status === 'contradicted' ? 'bad' : v.status === 'supported' ? 'ok' : ''}">${esc(v.status)}</span> ${esc(v.claim)}`;
-  if (it.kind === 'plan') return `${esc(v.fault)} on <b>${esc(v.target)}</b>${v.fault === 'network_delay' ? ', ' + esc(v.magnitude) + ' ms' : ''}`;
+  if (it.kind === 'plan') return `${esc(v.fault)} on <b>${esc(v.target)}</b>, ${esc(magnitudeText(v))}`;
   if (it.kind === 'link') return `<a href="${esc(v.url)}" target="_blank" rel="noopener">open</a>`;
   return `<code>${esc(JSON.stringify(v).slice(0, 160))}</code>`;
 }
@@ -1328,6 +1353,11 @@ function variantsHtml(r) {
 }
 function renderRanking() {
   const d = rankData; if (!d) return;
+  const selectedFault = $('rankFault').value;
+  const faultLabels = { container_stop: 'Container stop only', network_delay: 'Network delay only', traffic_spike: 'Traffic spike only' };
+  const availableFaults = [...new Set(d.candidates.map(r => r.fault))].sort();
+  $('rankFault').innerHTML = '<option value="">All faults</option>' + availableFaults.map(f => `<option value="${esc(f)}">${esc(faultLabels[f] || f)}</option>`).join('');
+  $('rankFault').value = availableFaults.includes(selectedFault) ? selectedFault : '';
   const all = d.candidates, fault = $('rankFault').value, rows = fault ? all.filter(r => r.fault === fault) : all, top = Math.max(0.01, ...all.map(r => r.priority));
   $('rankMeta').textContent = `${rows.length} rows \u00b7 ${d.services} services, ${d.total} variants`;
   const chosen = all.find(r => r.id === d.chosen);
@@ -1458,7 +1488,7 @@ async function poll() {
   syncNav();
 }
 
-$('refreshReady').onclick = () => withBusy($('refreshReady'), 'Refreshing…', () => loadReadiness());
+$('refreshReady').onclick = () => withBusy($('refreshReady'), 'Refreshing…', () => Promise.all([loadReadiness(), loadGoals()]));
 $('refreshHistory').onclick = () => withBusy($('refreshHistory'), 'Refreshing…', loadHistory);
 $('bannerClose').onclick = () => banner('');
 $('focus').onchange = () => { chartSig = ''; renderCharts(status); };
@@ -1476,7 +1506,7 @@ $('zoomIn').onclick = () => zoomBy(1.25); $('zoomOut').onclick = () => zoomBy(0.
 $('nodeSel').onchange = () => selectNode($('nodeSel').value || null);
 $('nodeDetail').onclick = ev => { const c = ev.target.closest('[data-node]'); if (c) selectNode(c.dataset.node); };
 async function loadGoals() {
-  try { const g = await api('/api/goals'); $('goalSel').innerHTML = '<option value="">no preference: let the AI explore</option>' + Object.entries(g).map(([k, label]) => `<option value="${esc(k)}">${esc(label)}</option>`).join(''); }
+  try { const selected = $('goalSel').value, g = await api('/api/goals'); $('goalSel').innerHTML = '<option value="">no preference: let the AI explore</option>' + Object.entries(g).map(([k, label]) => `<option value="${esc(k)}">${esc(label)}</option>`).join(''); if ([...$('goalSel').options].some(o => o.value === selected)) $('goalSel').value = selected; }
   catch (e) { /* the selector simply stays at "no preference" */ }
 }
 $('approve').onclick = async () => { await act('/api/approve', 'Approve', undefined, $('approve')); await poll(); };

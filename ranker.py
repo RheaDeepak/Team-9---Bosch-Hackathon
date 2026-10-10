@@ -13,6 +13,7 @@ from discovery import compute_stats, load_flows, load_graph
 from guard import RECOVERY_TIMEOUT_S
 from metrics import LATENCY_FLOOR_MS, load_baseline
 from policy import ALLOWED_FAULTS, MAX_NETWORK_DELAY_MS, PROTECTED, blast_radius, validate
+from traffic_spike import FAULT_TYPE as TRAFFIC_SPIKE, MAX_PEAK_USERS, candidate_plan as traffic_spike_candidate_plan, capability as traffic_spike_capability
 
 RESULTS_DIR = Path("results")
 RANKINGS_DIR = Path("rankings")
@@ -79,7 +80,7 @@ def candidate_targets(g, baseline):
     return [t for t in sorted(g) if t not in PROTECTED and (_mean(containers.get(t), "running") or 0) > 0]
 
 
-def generate_candidates(g, baseline, duration_s=DEFAULT_DURATION_S):
+def generate_candidates(g, baseline, duration_s=DEFAULT_DURATION_S, traffic_capability=None):
     """Every (target, fault, magnitude) on the ladder that passes policy.validate()."""
     out = []
     for t in candidate_targets(g, baseline):
@@ -89,6 +90,9 @@ def generate_candidates(g, baseline, duration_s=DEFAULT_DURATION_S):
                         "hypothesis": "(ranker candidate)", "reasoning": "(ranker candidate)"}
                 if validate(plan, g)["valid"]:
                     out.append(plan)
+    traffic = traffic_spike_candidate_plan(traffic_capability or {})
+    if traffic and traffic["target"] in g and validate(traffic, g)["valid"]:
+        out.append(traffic)
     return out
 
 
@@ -143,7 +147,10 @@ def _history_features(history, t, fault, magnitude):
 
 
 def _severity(fault, magnitude):
-    return 1.0 if fault == "container_stop" else min(1.0, magnitude / MAX_NETWORK_DELAY_MS)
+    if fault == "container_stop":
+        return 1.0
+    cap = MAX_PEAK_USERS if fault == TRAFFIC_SPIKE else MAX_NETWORK_DELAY_MS
+    return min(1.0, magnitude / cap)
 
 
 def _outage(f, fault, sev, sync_share):
@@ -152,13 +159,18 @@ def _outage(f, fault, sev, sync_share):
     if fault == "container_stop":
         spread = max(0.0, (f["journey_share"] - OUTAGE_JOURNEY_SHARE) / (1 - OUTAGE_JOURNEY_SHARE)) * (0.5 + 0.5 * sync_share)
         return 1.0 if f["entry_point"] else min(1.0, spread)
+    if fault == TRAFFIC_SPIKE:
+        return 0.25 * sev if f["entry_point"] else 0.0
     return 0.5 * sev if f["entry_point"] else 0.0
 
 
 def _partial(fault, sev, sync_share, outage):
     """0..1: how likely the outcome is partial degradation (slow, some errors, maybe graceful) rather than all-or-nothing.
     Those experiments teach the most about fallbacks, so they are rewarded; an outage leaves nothing to learn."""
-    shape = 0.6 + 0.4 * (1 - sev) if fault == "network_delay" else 0.4 + 0.6 * (1 - sync_share)
+    if fault == TRAFFIC_SPIKE:
+        shape = 0.9
+    else:
+        shape = 0.6 + 0.4 * (1 - sev) if fault == "network_delay" else 0.4 + 0.6 * (1 - sync_share)
     return (1 - outage) * shape
 
 
@@ -176,25 +188,25 @@ def _labels(f, c):
         "checkout_path": "on checkout path", "journeys": f"in {f['journeys']} user journeys",
         "traffic": f"traffic {traffic}", "recovery": f"past recovery {f['recovery']}s",
         "novelty": tested[h["novelty"]],
-        "escalation": f"escalate: {h['escalation']}ms held",
+        "escalation": f"escalate: {h['escalation']}{' users' if c['fault'] == TRAFFIC_SPIKE else 'ms'} held",
         "clarity": "no baseline metrics" if f["baseline_p95"] is None else f"clean baseline (noise {f['noise']:.2f})",
         "uncertainty": "no prior verdict" if h["last_verdict"] is None else f"last verdict {h['last_verdict']}",
         "safety": f"blast {f['blast_radius']} at severity {c['severity']:.1f}",
         "outage": ("entry point: users hit it directly" if f["entry_point"]
                    else f"stops {f['journeys']} user journeys (near-total outage)"),
         "partial": "likely partial degradation",
-        "prior_abort": (f"guard aborted at {h['prior_abort']}ms" if c["fault"] == "network_delay"
-                        else "guard aborted before"),
+        "prior_abort": (f"guard aborted at {h['prior_abort']}{' users' if c['fault'] == TRAFFIC_SPIKE else 'ms'}" if c["fault"] in {"network_delay", TRAFFIC_SPIKE}
+                         else "guard aborted before"),
     }
 
 
-def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DEFAULT_DURATION_S):
+def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DEFAULT_DURATION_S, traffic_capability=None):
     """Score and sort all candidates (best first). Returns a list of candidate dicts."""
     if not baseline:
         raise ValueError("no baseline: run metrics.py first")
     stats = stats or compute_stats(g)
     wp, wr, wi = weights["priority"], weights["risk"], weights["info"]
-    plans = generate_candidates(g, baseline, duration_s)
+    plans = generate_candidates(g, baseline, duration_s, traffic_capability)
     per_target = {t: _target_features(g, stats, baseline, flows, history, t) for t in {p["target"] for p in plans}}
     peak = lambda k: max([f[k] or 0 for f in per_target.values()] + [1e-9])
     norm = {k: peak(k) for k in ("fan_in", "blast_radius", "journeys", "traffic", "baseline_p95")}
@@ -230,8 +242,9 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
         contrib |= {"safety": -wp["safety"] * safety, "prior_abort": -wp["prior_abort"] * prior_abort,
                     "outage": -wp.get("outage", 0.0) * outage}
         cand = {"id": f"{p['target']}:{p['fault']}:{p['magnitude']}",
-                **{k: p[k] for k in ("target", "fault", "magnitude", "duration_s")},
-                "severity": round(sev, 2), "outage": round(outage, 3), "history": h}
+                 **{k: p[k] for k in ("target", "fault", "magnitude", "duration_s")},
+                 "severity": round(sev, 2), "outage": round(outage, 3), "history": h}
+        cand.update({k: p[k] for k in ("parameters", "candidate_id", "capability_version") if k in p})
         labels = _labels(f, cand)
         top = sorted((k for k in contrib if contrib[k] > 1e-6), key=lambda k: -contrib[k])[:3]
         penalties = [labels[k] for k in ("safety", "prior_abort", "outage") if -contrib[k] >= PENALTY_NOTE]
@@ -280,7 +293,8 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
 def rank_from_files(weights=WEIGHTS):
     """Rank using dependency_map.json, baseline.json and results/*.json. Returns (ranking, graph)."""
     g, stats = load_graph()
-    return rank(g, load_baseline(), load_flows(), load_history(), stats, weights), g
+    return rank(g, load_baseline(), load_flows(), load_history(), stats, weights,
+                traffic_capability=traffic_spike_capability()), g
 
 
 def print_table(ranking, top):

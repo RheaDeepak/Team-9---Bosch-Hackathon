@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from fixtures import baseline, flows, graph, run
+from fixtures import baseline, flows, graph, run, traffic_capability
 
 import ranker
 from policy import validate
@@ -96,6 +96,25 @@ class RankerTest(unittest.TestCase):
         w["priority"]["outage"] = 0.0
         self.assertGreater(find(self.rank(weights=w), "web:container_stop:0")["priority"],
                            find(self.rank(), "web:container_stop:0")["priority"])
+
+    def test_traffic_spike_candidate_requires_complete_capability_readiness(self):
+        g, base = self.g.copy(), copy.deepcopy(self.base)
+        g.add_edge("frontend", "checkout", mode="sync", type="sync-http")
+        base["services"]["frontend"] = copy.deepcopy(base["services"]["web"])
+        base["containers"]["frontend"] = {"running": {"mean": 1}}
+
+        unavailable = traffic_capability(rollback_ready=False)
+        hidden = ranker.rank(g, base, self.flows, [], traffic_capability=unavailable)
+        self.assertNotIn("traffic_spike", {candidate["fault"] for candidate in hidden})
+
+        ranking = ranker.rank(g, base, self.flows, [], traffic_capability=traffic_capability())
+        candidate = find(ranking, "frontend:traffic_spike:8")
+        self.assertEqual(candidate["parameters"]["baseline_users"], 5)
+        self.assertEqual(candidate["parameters"]["peak_users"], 8)
+        self.assertEqual(candidate["candidate_id"], "traffic-spike-core-v1")
+        plan = {**{key: candidate[key] for key in ("target", "fault", "magnitude", "duration_s", "parameters")},
+                "hypothesis": "h", "reasoning": "r"}
+        self.assertTrue(validate(plan, g)["valid"])
 
 
 if __name__ == "__main__":
