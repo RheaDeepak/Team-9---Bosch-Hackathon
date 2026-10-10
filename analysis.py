@@ -217,7 +217,7 @@ def _impacted(row):
 
 def detect(r, g):
     """Candidate findings (weaknesses and strengths) for one result, each with its evidence ids."""
-    p, t, rid = r["plan"], r["plan"]["target"], r["id"]
+    p, t = r["plan"], r["plan"]["target"]
     rows = {row["service"]: row for row in r["impact"] if row["service"] != t}
     out = []
 

@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 import analysis
+import llm
 import planner
 import rank_agent
 from discovery import CLIENT, SERVER, fetch_spans, load_graph
@@ -287,12 +288,25 @@ def load_latest():
         return None
 
 
-def latest_or_deterministic():
+def coverage(data=None, latest=None):
+    """How the last agent analysis (reports/latest.json) relates to the results on disk:
+    {analysed, fresh, stale, covered_runs, new_runs, generated_at, run_id}. Fresh = it covers exactly the
+    current results; stale = there are results it has not seen."""
+    data = data or analysis.current()
+    latest = latest if latest is not None else load_latest()
+    covered = list((latest or {}).get("results_used") or [])
+    new = [r for r in data["results_used"] if r not in set(covered)]
+    return {"analysed": bool(latest), "fresh": bool(latest) and covered == data["results_used"],
+            "stale": bool(new), "covered_runs": covered, "new_runs": new,
+            "generated_at": (latest or {}).get("generated_at"), "run_id": (latest or {}).get("run_id")}
+
+
+def latest_or_deterministic(data=None, latest=None):
     """The cached agent findings if they cover the current results (deterministic parts recomputed fresh),
     else a fresh deterministic analysis (no LLM)."""
-    data = analysis.current()
-    latest = load_latest()
-    if latest and latest.get("results_used") == data["results_used"]:
+    data = data or analysis.current()
+    latest = latest if latest is not None else load_latest()
+    if coverage(data, latest)["fresh"]:
         agent = {"findings": {f["id"]: f for f in latest["findings"] if f.get("source") == "agent"},
                  "summary": latest.get("summary"), "strength_notes": latest.get("strength_notes", [])}
         out = build_output(data, latest["source"], latest.get("note"), agent, latest.get("model"),
@@ -343,35 +357,37 @@ def run_analysis(api_key=None, post=None, data=None, results=None, graph=None, l
         return out
 
     def fallback(reason, used=0, model=None):
-        log("decision", f"analysis_fallback: {reason}")
+        log("decision", f"analysis_fallback: {reason}", fallback=True, detail=reason)
         return finish(build_output(data, "analysis_fallback", reason, model=model, run_id=log.run_id, tool_calls=used))
 
     if not top:
         return fallback("no weaknesses to investigate")
-    api_key = api_key or planner.load_api_key()
+    api_key = api_key or llm.load_api_key()
     if not api_key:
-        return fallback(f"{planner.API_KEY_VAR} is not set")
-    post = post or planner._post_gemini
+        return fallback(f"{llm.API_KEY_VAR} is not set")
+    post = post or llm.post
     toolbox = AnalysisToolbox(graph, data, results)
     contents = [{"role": "user", "parts": [{"text": _brief(top, data)}]}]
     used, model = 0, None
     try:
-        text, model, used = tool_loop(api_key, SYSTEM_PROMPT, contents, TOOL_DECLS, toolbox, log, post,
-                                      MAX_TOOL_CALLS, MAX_LLM_CALLS)
-        try:
-            answer = check_answer(planner._parse_json(text), top, data, toolbox.seen_locations)
-        except ValueError as e:  # re-ask once with the reason
-            log("thought", f"answer rejected, asking once more: {e}")
-            contents.append({"role": "user", "parts": [{"text": f"Your answer was rejected: {e}. "
-                                                                 "Reply again with the corrected JSON only."}]})
+        with llm.listening(lambda kind, text: log(kind, text)):  # model answers and 429 waits show up in the feed
             text, model, used = tool_loop(api_key, SYSTEM_PROMPT, contents, TOOL_DECLS, toolbox, log, post,
-                                          MAX_TOOL_CALLS, REASK_LLM_CALLS, used=used, model=model)
-            answer = check_answer(planner._parse_json(text), top, data, toolbox.seen_locations)
+                                          MAX_TOOL_CALLS, MAX_LLM_CALLS)
+            try:
+                answer = check_answer(planner._parse_json(text), top, data, toolbox.seen_locations)
+            except ValueError as e:  # re-ask once with the reason
+                log("thought", f"answer rejected, asking once more: {e}")
+                contents.append({"role": "user", "parts": [{"text": f"Your answer was rejected: {e}. "
+                                                                     "Reply again with the corrected JSON only."}]})
+                text, model, used = tool_loop(api_key, SYSTEM_PROMPT, contents, TOOL_DECLS, toolbox, log, post,
+                                              MAX_TOOL_CALLS, REASK_LLM_CALLS, used=used, model=model)
+                answer = check_answer(planner._parse_json(text), top, data, toolbox.seen_locations)
     except Exception as e:  # LLM/network failure or invalid output (twice)
         return fallback(f"LLM analysis failed: {type(e).__name__}: {e}"[:300], used, model)
     replaced = [f for f in answer["findings"].values() if f["root_cause_replaced"]]
     log("decision", f"{len(answer['findings'])} findings from the agent after {used} tool calls"
-                    + (f"; {len(replaced)} root causes replaced by the rule text (numbers not in evidence)" if replaced else ""))
+                    + (f"; {len(replaced)} root causes replaced by the rule text (numbers not in evidence)" if replaced else ""),
+        fallback=False)
     return finish(build_output(data, "analysis_agent", f"model {model}, {used} tool calls", answer, model,
                                log.run_id, used))
 

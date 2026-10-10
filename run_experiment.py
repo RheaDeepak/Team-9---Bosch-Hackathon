@@ -206,7 +206,7 @@ def score_experiment(impact, recovery, availability, elapsed_s=None):
 
 def propose(goal=None):
     """Planner + policy: {plan, source, note, validation}. `goal` optionally steers the planner."""
-    plan, source, note = propose_experiment(goal)
+    plan, source, note = propose_experiment(goal) if goal else propose_experiment()  # no goal -> ranker + agent
     return {"plan": plan, "source": source, "note": note, "validation": validate(plan)}
 
 
