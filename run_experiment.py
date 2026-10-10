@@ -255,7 +255,8 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         unit = f" ({plan['magnitude']} ms)" if plan["fault"] == "network_delay" else ""
         _annotate(emit, f"FAULT: {plan['fault']} on {plan['target']}{unit}", [plan["target"], plan["fault"]], injected_at)
         phase("monitoring")
-        g = guard.watch(plan, baseline, services, thresholds, emit, on_sample, stop, restart_limits)
+        g = guard.watch(plan, baseline, services, thresholds=thresholds, emit=emit, on_sample=on_sample, stop=stop,
+                        restart_limits=restart_limits)
     except KeyboardInterrupt:
         g["reason"] = "interrupted by user (Ctrl+C) during injection"
     except Exception as e:
@@ -275,7 +276,8 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         if stop is not None:
             stop.clear()  # STOP already did its job; pressing it again skips the recovery wait
         emit(f"Waiting up to {guard.RECOVERY_TIMEOUT_S}s for recovery...")
-        recovery = guard.wait_for_recovery(plan, baseline, services, emit, on_sample, stop, restart_limits)
+        recovery = guard.wait_for_recovery(plan, baseline, services, emit=emit, on_sample=on_sample, stop=stop,
+                                           restart_limits=restart_limits)
     ended_at = time.time()
     phase("analyzing")
     impact = guard.impact_table(baseline, g["peaks"])
