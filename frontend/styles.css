@@ -68,7 +68,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .section-label h2 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; }
 .pulse-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 5px rgba(25, 123, 81, 0.12); }
 .pulse-dot.blocked { background: var(--red); box-shadow: 0 0 0 5px rgba(255, 93, 82, 0.12); }
-.readiness-checks { display: grid; grid-template-columns: repeat(5, minmax(104px, 1fr)); gap: 8px; }
+.readiness-checks { display: grid; grid-template-columns: repeat(6, minmax(96px, 1fr)); gap: 8px; }
 .readiness-check { padding: 0 14px; border-left: 1px solid var(--line); }
 .readiness-check strong, .readiness-check small { display: block; }
 .readiness-check strong { font-size: 13px; margin-bottom: 5px; }
@@ -154,7 +154,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 @media (max-width: 1080px) {
   .hero { grid-template-columns: 1fr; }.hero-principle { max-width: 680px; }.workspace { grid-template-columns: 1fr; }.proposal-panel { min-height: 540px; }
   .policy-layout, .run-status-grid { grid-template-columns: 1fr; }.approval-card { min-height: 330px; }.result-content { grid-template-columns: 1fr 1fr; }.remediation-card { grid-column: 1 / -1; min-height: 210px; }
-  .readiness-bar { grid-template-columns: 180px 1fr; }.readiness-summary { display: none; }
+  .readiness-bar { grid-template-columns: 180px 1fr; }.readiness-summary { display: none; }.readiness-checks { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 720px) {

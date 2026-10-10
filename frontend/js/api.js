@@ -1,5 +1,16 @@
 const DEFAULT_TIMEOUT_MS = 3500;
 
+export function resolveApiBaseUrl(locationLike = globalThis.location, configuredUrl = globalThis.CHAOS_COPILOT_API_URL) {
+  if (typeof configuredUrl === "string" && configuredUrl.trim()) return configuredUrl.trim().replace(/\/$/, "");
+  if (!locationLike) return "";
+  if (locationLike.protocol === "file:") return "http://127.0.0.1:8000";
+  const isLocal = locationLike.hostname === "127.0.0.1" || locationLike.hostname === "localhost";
+  if (isLocal && locationLike.port && locationLike.port !== "8000") {
+    return `${locationLike.protocol}//${locationLike.hostname}:8000`;
+  }
+  return "";
+}
+
 export class ApiError extends Error {
   constructor(message, status = 0) {
     super(message);
@@ -9,6 +20,7 @@ export class ApiError extends Error {
 }
 
 export function createApiClient({ baseUrl = "", timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  const endpoint = (path) => `${baseUrl}${path}`;
   const request = async (path, options = {}) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -16,7 +28,7 @@ export function createApiClient({ baseUrl = "", timeoutMs = DEFAULT_TIMEOUT_MS }
     if (options.body) headers["Content-Type"] = "application/json";
 
     try {
-      const response = await fetch(`${baseUrl}${path}`, { ...options, headers, signal: controller.signal });
+      const response = await fetch(endpoint(path), { ...options, headers, signal: controller.signal });
       if (!response.ok) throw new ApiError(`Request failed with ${response.status}`, response.status);
       if (response.status === 204) return null;
       return await response.json();
@@ -35,6 +47,8 @@ export function createApiClient({ baseUrl = "", timeoutMs = DEFAULT_TIMEOUT_MS }
   });
 
   return {
+    baseUrl,
+    eventsUrl: (id) => endpoint(`/api/experiments/${encodeURIComponent(id)}/events`),
     health: () => request("/api/health"),
     readiness: () => request("/api/readiness"),
     topology: () => request("/api/topology"),

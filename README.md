@@ -14,8 +14,8 @@ orchestration, observation, analysis, and reporting layer around it.
 
 ## Project status
 
-This repository currently contains the **topology-discovery prototype**, the
-first building block of the planned MVP. The prototype:
+This repository now contains an integrated **hackathon MVP control plane and
+operator UI**. It:
 
 - reads service dependencies reported by Jaeger;
 - supplements traces with dependencies found in the Astronomy Shop Compose
@@ -23,12 +23,39 @@ first building block of the planned MVP. The prototype:
 - classifies synchronous, asynchronous, database, and cache interactions;
 - reconstructs sampled Locust user journeys;
 - calculates fan-in, fan-out, and the checkout dependency path; and
-- exports a machine-readable graph and a PNG visualization.
+- exports a machine-readable graph and a PNG visualization;
+- proposes one LLM or deterministic fallback experiment;
+- validates it through deterministic policy before approval;
+- executes bounded container-stop or network-delay faults;
+- guarantees rollback on completion, abort, or execution error;
+- streams experiment state and telemetry to a single-screen web UI;
+- plots live request-rate, error-rate, and latency timelines with Grafana panel links; and
+- generates deterministic impact and resilience scores.
 
-The experiment API, policy engine, human-approval flow, fault executors,
-rollback controls, scoring, and UI described below are planned and are **not
-yet implemented**. See [CHAOS_COPILOT_PRD.md](CHAOS_COPILOT_PRD.md) for the
-complete requirements and delivery plan.
+See [INTEGRATION_REPORT.md](INTEGRATION_REPORT.md) for the component map,
+endpoint contract, safety flow, and judge-facing demo explanation.
+
+## Run the integrated application
+
+Create the local environment once:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+Update `.env` if the Astronomy Shop checkout or local ports differ, then start
+the API and UI together:
+
+```powershell
+python -m uvicorn api:app --host 127.0.0.1 --port 8000
+```
+
+Open <http://127.0.0.1:8000>. FastAPI serves the frontend and all `/api/*`
+routes from the same localhost origin. Do not approve an experiment unless the
+target is the disposable local Compose project and the readiness bar is green.
 
 ## Why Chaos Copilot?
 
@@ -202,15 +229,10 @@ python -m pip install -r requirements.txt
 
 ### 3. Point the prototype at your demo
 
-The current script predates the planned settings layer. Before running it,
-update these constants near the top of [`discovery.py`](discovery.py):
-
-- `DEMO_DIR` — absolute path to the OpenTelemetry Demo checkout;
-- `JAEGER_URL` — Jaeger dependency endpoint; and
-- `TRACES_URL` — Jaeger v2 OTLP-JSON trace endpoint.
-
-An [`.env.example`](.env.example) is included for the future application
-configuration, but `discovery.py` does not consume it yet.
+Copy [`.env.example`](.env.example) to `.env` and configure
+`TARGET_REPOSITORY_PATH`, `TARGET_COMPOSE_PROJECT`, `PROMETHEUS_URL`, and
+`JAEGER_URL`. Discovery and telemetry use these values directly; no source-code
+path edits are required.
 
 ### 4. Generate the topology
 
@@ -286,12 +308,17 @@ rather than Prometheus, because span metrics reach Prometheus only once a minute
 ```text
 .
 ├── CHAOS_COPILOT_PRD.md   # Product requirements and implementation phases
-├── README.md              # Project overview and prototype instructions
+├── INTEGRATION_REPORT.md   # Architecture, demo flow, and judge explanation
+├── README.md              # Project setup and overview
+├── api.py                 # REST/SSE API and static frontend hosting
+├── control_plane.py       # State machine, rollback, scoring, and reports
 ├── discovery.py           # Trace- and Compose-based topology discovery
 ├── dependency_map.json    # Sample generated graph and journey data
 ├── dependency_map.png     # Sample generated graph visualization
-├── requirements.txt       # Prototype Python dependencies
-└── .env.example           # Planned runtime settings and safety limits
+├── frontend/              # Single-screen operator console
+├── tests/                 # Safe tests with fake fault/telemetry adapters
+├── requirements.txt       # Python dependencies
+└── .env.example           # Runtime endpoints and safety configuration
 ```
 
 ## Roadmap

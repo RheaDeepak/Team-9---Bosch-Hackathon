@@ -4,16 +4,21 @@ A dependency-free, single-screen operator console for the Chaos Copilot MVP.
 It implements the six UI zones in `CHAOS_COPILOT_PRD.md`: readiness, topology,
 proposal, policy, live run, and findings.
 
-## Run locally
+## Run the integrated application
 
 ```powershell
-cd frontend
-python -m http.server 4173
+cd ..
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn api:app --host 127.0.0.1 --port 8000
 ```
 
-Then open <http://localhost:4173>. The UI first attempts the PRD's relative
-`/api/*` endpoints. If the backend is unavailable, it switches to clearly
-labelled demo data so the hackathon flow remains presentable.
+Then open <http://127.0.0.1:8000>. FastAPI serves this directory and the PRD's
+relative `/api/*` endpoints from the same origin.
+
+For frontend-only styling work, `python -m http.server 4173` still works. In
+that mode the UI automatically calls `http://127.0.0.1:8000`. If the API is
+not running, it switches to clearly labelled demo data. Set
+`window.CHAOS_COPILOT_API_URL` before `app.js` to override the API origin.
 
 ## Backend integration
 
