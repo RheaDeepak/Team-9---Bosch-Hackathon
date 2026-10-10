@@ -1,0 +1,337 @@
+{
+  "id": "20261010T215344Z",
+  "plan": {
+    "target": "ad",
+    "fault": "network_delay",
+    "magnitude": 200,
+    "duration_s": 30,
+    "hypothesis": "Adding 200 ms to ad for 30 s raises frontend's GetAds latency by about 200 ms without errors, and everything returns to baseline after rollback.",
+    "reasoning": "Verification run: short, mild, and ad is not on the checkout path."
+  },
+  "plan_source": "manual-test",
+  "ranking": null,
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ],
+    "checks": [
+      {
+        "name": "Plan is complete",
+        "passed": true,
+        "detail": "all fields present"
+      },
+      {
+        "name": "Fault type is allowed",
+        "passed": true,
+        "detail": "network_delay is on the allowlist"
+      },
+      {
+        "name": "Magnitude within cap",
+        "passed": true,
+        "detail": "200 ms delay (cap 1000 ms)"
+      },
+      {
+        "name": "Duration within cap",
+        "passed": true,
+        "detail": "30 s (cap 60 s)"
+      },
+      {
+        "name": "Target exists in the dependency map",
+        "passed": true,
+        "detail": "ad is a discovered service"
+      },
+      {
+        "name": "Target is not protected",
+        "passed": true,
+        "detail": "ad is not on the protected list"
+      }
+    ]
+  },
+  "started_at": "2026-10-10T21:53:44+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: frontend-proxy p95_ms (205.1ms > 132.7ms); frontend p95_ms (213.5ms > 133.6ms)",
+    "elapsed_s": 12.5,
+    "peaks": {
+      "ad": {
+        "error_rate": 0.0,
+        "p95_ms": 4.217637
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 220.982855
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 205.076
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 4.802192691029901,
+        "memory_mb": 58.41796875
+      },
+      "frontend": {
+        "cpu_percent": 15.87963394342762,
+        "memory_mb": 223.1875
+      },
+      "ad": {
+        "cpu_percent": 0.4025774058577406,
+        "memory_mb": 268.84765625
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "ad": {
+            "n": 9,
+            "errors": 0,
+            "request_rate": 0.3,
+            "error_rate": 0.0,
+            "p95_ms": 2.970888
+          },
+          "frontend": {
+            "n": 101,
+            "errors": 0,
+            "request_rate": 3.3666666666666667,
+            "error_rate": 0.0,
+            "p95_ms": 40.3382
+          },
+          "frontend-proxy": {
+            "n": 130,
+            "errors": 0,
+            "request_rate": 4.333333333333333,
+            "error_rate": 0.0,
+            "p95_ms": 86.188
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "ad": {
+            "n": 10,
+            "errors": 0,
+            "request_rate": 0.3333333333333333,
+            "error_rate": 0.0,
+            "p95_ms": 4.049084
+          },
+          "frontend": {
+            "n": 116,
+            "errors": 0,
+            "request_rate": 3.8666666666666667,
+            "error_rate": 0.0,
+            "p95_ms": 220.982855
+          },
+          "frontend-proxy": {
+            "n": 132,
+            "errors": 0,
+            "request_rate": 4.4,
+            "error_rate": 0.0,
+            "p95_ms": 194.536
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "221.0ms > 133.6ms",
+          "frontend-proxy p95_ms": "194.5ms > 132.7ms"
+        }
+      },
+      {
+        "t": 10.0,
+        "metrics": {
+          "ad": {
+            "n": 11,
+            "errors": 0,
+            "request_rate": 0.36666666666666664,
+            "error_rate": 0.0,
+            "p95_ms": 4.217637
+          },
+          "frontend": {
+            "n": 113,
+            "errors": 0,
+            "request_rate": 3.7666666666666666,
+            "error_rate": 0.0,
+            "p95_ms": 213.543595
+          },
+          "frontend-proxy": {
+            "n": 127,
+            "errors": 0,
+            "request_rate": 4.233333333333333,
+            "error_rate": 0.0,
+            "p95_ms": 205.076
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "213.5ms > 133.6ms",
+          "frontend-proxy p95_ms": "205.1ms > 132.7ms"
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 17.8,
+    "first_healthy_seconds": 10.0,
+    "healthy_samples": 2,
+    "required_samples": 2
+  },
+  "impact": [
+    {
+      "service": "ad",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 1.9600000000000002,
+        "peak": 4.217637,
+        "change": 2.257637
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 220.982855,
+        "change": 187.35551234265736
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 205.076,
+        "change": 172.39039393939393
+      }
+    }
+  ],
+  "amplification": [
+    {
+      "service": "ad",
+      "role": "target",
+      "increase_ms": 2.3,
+      "delay_ms": 200,
+      "ratio": 0.0,
+      "amplified": false
+    },
+    {
+      "service": "frontend",
+      "role": "caller",
+      "increase_ms": 187.4,
+      "delay_ms": 200,
+      "ratio": 0.9,
+      "amplified": false
+    },
+    {
+      "service": "frontend-proxy",
+      "role": "caller",
+      "increase_ms": 172.4,
+      "delay_ms": 200,
+      "ratio": 0.9,
+      "amplified": false
+    }
+  ],
+  "score": {
+    "impact_score": 27.0,
+    "resilience_score": 73,
+    "severity": "Moderate",
+    "confidence": "Medium confidence",
+    "availability_pct": null,
+    "components": {
+      "error_impact": 0.0,
+      "latency_impact": 1.0,
+      "availability_loss": 0.0,
+      "recovery_impact": 0.099
+    },
+    "limitations": [
+      "Stopped after 12s, so the evidence covers only the start of the fault"
+    ]
+  },
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 4.802192691029901
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 58.41796875
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 15.87963394342762
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 223.1875
+      }
+    },
+    {
+      "container": "ad",
+      "cpu_percent": {
+        "baseline": 0.5443293899433259,
+        "peak": 0.4025774058577406
+      },
+      "memory_mb": {
+        "baseline": 226.8041015625,
+        "peak": 268.84765625
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "held",
+    "explanation": "All claims in the hypothesis were supported by the data: frontend latency increased by approximately 187.4 ms (close to the 200 ms injected delay), no errors were introduced across any service, and the system successfully recovered after rollback.",
+    "claims": [
+      {
+        "claim": "adding 200 ms to ad raises frontend's GetAds latency by about 200 ms",
+        "evidence": "frontend p95_ms increased by 187.36ms (from baseline 33.63ms to peak 220.98ms), which is close to the 200 ms injected delay.",
+        "status": "supported"
+      },
+      {
+        "claim": "the fault causes no errors",
+        "evidence": "ad, frontend, and frontend-proxy all maintained an error rate change of 0.0% (peak error rate was 0.0%).",
+        "status": "supported"
+      },
+      {
+        "claim": "everything returns to baseline after rollback",
+        "evidence": "recovery.recovered is true, taking 17.8 seconds to fully recover.",
+        "status": "supported"
+      }
+    ],
+    "recommendation": "Implement a bounded timeout and fallback for ad calls from the frontend to prevent downstream latency spikes from proportionally blocking upstream callers.",
+    "model": "gemini-3.5-flash-lite",
+    "skipped_models": []
+  },
+  "grafana_window_ms": [
+    1791669106335,
+    1791669302895
+  ]
+}
