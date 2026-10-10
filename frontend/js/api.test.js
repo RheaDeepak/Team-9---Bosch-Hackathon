@@ -28,6 +28,15 @@ test("normalizes snake-case baseline metrics", () => {
   });
 });
 
+test("preserves missing live metrics instead of displaying fake zeroes", () => {
+  assert.deepEqual(normalizeBaseline({ availability: 100, error_rate: 0, p95_latency_ms: 109, throughput_rps: null }), {
+    availability: 100,
+    errorRate: 0,
+    p95LatencyMs: 109,
+    throughputRps: null,
+  });
+});
+
 test("normalizes policy decisions", () => {
   const result = normalizePolicy({ valid: true, rules: [{ rule: "target allowlist", valid: true }] });
   assert.equal(result.allowed, true);

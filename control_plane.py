@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+import guard
 from inject import ACTIVE_FILE, ROLLBACK_ACTIONS, inject, rollback
 from metrics import current_snapshot, load_baseline
 from planner import judge_hypothesis, propose_experiment
@@ -150,13 +151,16 @@ class ExperimentManager:
     def __init__(
         self,
         *,
-        planner: Callable[[], tuple[dict[str, Any], str, str]] = propose_experiment,
+        planner: Callable[[str | None], tuple[dict[str, Any], str, str]] = propose_experiment,
         validator: Callable[[dict[str, Any]], dict[str, Any]] = validate,
         injector: Callable[[dict[str, Any]], dict[str, Any]] = inject,
         rollback_fn: Callable[[dict[str, Any] | None], bool] = rollback,
         snapshotter: Callable[[], dict[str, Any]] = current_snapshot,
         baseline_loader: Callable[[], dict[str, Any] | None] = load_baseline,
         judge: Callable[[dict[str, Any], dict[str, Any]], dict[str, str]] = judge_hypothesis,
+        telemetry_probe: Callable[[list[str]], dict[str, Any]] = guard.live_metrics,
+        guard_watcher: Callable[..., dict[str, Any]] = guard.watch,
+        recovery_waiter: Callable[..., dict[str, Any]] = guard.wait_for_recovery,
         observation_interval_s: float = 5.0,
     ) -> None:
         self._planner = planner
@@ -166,6 +170,9 @@ class ExperimentManager:
         self._snapshotter = snapshotter
         self._baseline_loader = baseline_loader
         self._judge = judge
+        self._telemetry_probe = telemetry_probe
+        self._guard_watcher = guard_watcher
+        self._recovery_waiter = recovery_waiter
         self._observation_interval_s = observation_interval_s
         self._lock = threading.RLock()
         self._experiments: dict[str, dict[str, Any]] = {}
@@ -178,8 +185,8 @@ class ExperimentManager:
         with self._lock:
             return self._active_id
 
-    def propose(self, goal: str) -> dict[str, Any]:
-        plan, source, note = self._planner()
+    def propose(self, goal: str | None = None) -> dict[str, Any]:
+        plan, source, note = self._planner(goal)
         experiment_id = f"exp-{uuid.uuid4().hex[:8]}"
         experiment = {
             "id": experiment_id,
@@ -244,6 +251,8 @@ class ExperimentManager:
         with self._lock:
             experiment = self._require_locked(experiment_id)
             abort_event = self._abort_events.get(experiment_id)
+            if experiment["state"] in {"rolling_back", "recovering", "analyzing"}:
+                raise ValueError("the fault is already removed; recovery verification cannot be emergency-stopped")
             if experiment["state"] not in ACTIVE_STATES or abort_event is None:
                 raise ValueError(f"experiment is not active (state {experiment['state']})")
             experiment["abort_reason"] = reason
@@ -278,6 +287,7 @@ class ExperimentManager:
 
     def _record_event_locked(self, experiment_id: str, event_type: str, message: str) -> None:
         experiment = self._experiments[experiment_id]
+        experiment["latest_event"] = message
         self._events[experiment_id].append({
             "sequence": len(self._events[experiment_id]) + 1,
             "timestamp": utc_now(),
@@ -298,24 +308,40 @@ class ExperimentManager:
         with self._lock:
             self._require_locked(experiment_id)["live_metrics"] = summary
 
+    def _set_guard_metrics(self, experiment_id: str, metrics: dict[str, Any], containers: dict[str, Any]) -> None:
+        self._set_live_metrics(experiment_id, {"services": metrics, "containers": containers})
+
     def _run(self, experiment_id: str) -> None:
         active_handle = None
         injected = False
-        fault_snapshots: list[dict[str, Any]] = []
-        recovery_snapshot: dict[str, Any] = {}
-        recovery_seconds = 0.0
+        services: list[str] = []
+        guard_result: dict[str, Any] = {
+            "aborted": True,
+            "reason": "experiment did not start",
+            "elapsed_s": 0,
+            "peaks": {},
+            "container_peaks": {},
+            "timeline": [],
+        }
+        recovery = {"recovered": False, "seconds": None, "note": "recovery was not checked"}
         run_error: str | None = None
         abort_event = self._abort_events[experiment_id]
         experiment = self.get(experiment_id)
         plan = experiment["plan"]
         baseline_data = self._baseline_loader()
+        if not baseline_data:
+            self._finish_failed(experiment_id, "No measured baseline is available; fault injection was not attempted.")
+            return
         base_summary = baseline_summary(baseline_data)
 
         try:
-            self._set_state(experiment_id, "baseline", "Loading the measured healthy baseline.", "baseline_started")
-            baseline_live = self._snapshotter()
-            self._set_live_metrics(experiment_id, baseline_live)
-            self._record_phase_event(experiment_id, "baseline_completed", "Baseline loaded; rollback path is armed.")
+            self._set_state(experiment_id, "baseline", "Loading the measured baseline and verifying live guard telemetry.", "baseline_started")
+            services = guard.watched_services(plan, baseline_data, experiment.get("blast_radius", []))
+            if not services:
+                raise RuntimeError("None of the affected services has a measured safety threshold")
+            initial_metrics = self._telemetry_probe(services)
+            self._set_guard_metrics(experiment_id, initial_metrics, {})
+            self._record_phase_event(experiment_id, "baseline_completed", f"Baseline loaded; telemetry guard is watching {len(services)} service(s).")
             if abort_event.is_set():
                 raise InterruptedError("aborted before fault injection")
 
@@ -324,16 +350,17 @@ class ExperimentManager:
             injected = True
             self._record_phase_event(experiment_id, "fault_verified", "The bounded fault is active on the approved target.")
 
-            self._set_state(experiment_id, "observing", "Collecting telemetry during the fault window.", "observation_started")
-            deadline = time.monotonic() + float(plan["duration_s"])
-            while time.monotonic() < deadline and not abort_event.is_set():
-                snapshot = self._snapshotter()
-                fault_snapshots.append(snapshot)
-                self._set_live_metrics(experiment_id, snapshot)
-                remaining = max(0.0, deadline - time.monotonic())
-                abort_event.wait(min(self._observation_interval_s, remaining))
+            self._set_state(experiment_id, "observing", "The completed backend guard is comparing Jaeger spans and container health with the baseline.", "observation_started")
+            guard_result = self._guard_watcher(
+                plan,
+                baseline_data,
+                services,
+                stop_event=abort_event,
+                on_sample=lambda metrics, containers: self._set_guard_metrics(experiment_id, metrics, containers),
+            )
         except InterruptedError as exc:
             run_error = str(exc)
+            guard_result["reason"] = run_error
         except Exception as exc:
             run_error = f"{type(exc).__name__}: {exc}"
             with self._lock:
@@ -341,32 +368,102 @@ class ExperimentManager:
         finally:
             if injected or active_handle is not None or ACTIVE_FILE.exists():
                 self._set_state(experiment_id, "rolling_back", "Rollback invoked for every active fault handle.", "rollback_invoked")
-                recovery_started = time.monotonic()
                 rollback_ok = self._rollback(active_handle)
-                recovery_seconds = time.monotonic() - recovery_started
                 if not rollback_ok:
                     self._finish_failed(experiment_id, "Rollback could not be verified. Manual operator action is required.")
                     return
                 self._record_phase_event(experiment_id, "rollback_completed", "Rollback completed and the fault handle was cleared.")
 
-        if abort_event.is_set() or isinstance(run_error, str) and run_error.startswith("aborted"):
-            self._set_state(experiment_id, "recovering", "Abort completed; verifying recovery.", "recovery_check_started")
-            recovery_snapshot = self._snapshotter()
-            self._set_live_metrics(experiment_id, recovery_snapshot)
-            self._finish_aborted(experiment_id, base_summary, fault_snapshots, recovery_seconds)
-            return
         if run_error:
+            if isinstance(run_error, str) and run_error.startswith("aborted"):
+                self._finish_aborted(experiment_id, base_summary, [], 0.0)
+                return
             self._finish_failed(experiment_id, run_error)
             return
 
-        self._set_state(experiment_id, "recovering", "Fault removed; verifying the service and telemetry recovered.", "recovery_check_started")
-        recovery_started = time.monotonic()
-        recovery_snapshot = self._snapshotter()
-        recovery_seconds += time.monotonic() - recovery_started
-        self._set_live_metrics(experiment_id, recovery_snapshot)
-        self._record_phase_event(experiment_id, "recovery_detected", "Target container is running and a recovery snapshot was collected.")
+        self._set_state(experiment_id, "recovering", "Fault removed; waiting for three consecutive healthy telemetry samples.", "recovery_check_started")
+        recovery = self._recovery_waiter(
+            plan,
+            baseline_data,
+            services,
+            on_sample=lambda metrics, containers: self._set_guard_metrics(experiment_id, metrics, containers),
+            on_progress=lambda progress: self._record_recovery_progress(experiment_id, progress),
+        )
+        recovery_seconds = float(recovery.get("seconds") or guard.RECOVERY_TIMEOUT_S)
+        recovery_event = "recovery_detected" if recovery.get("recovered") else "recovery_unverified"
+        recovery_message = "Recovery verified across three consecutive samples." if recovery.get("recovered") else "Rollback succeeded, but telemetry recovery was not verified before the timeout."
+        self._record_phase_event(experiment_id, recovery_event, recovery_message)
         self._set_state(experiment_id, "analyzing", "Calculating deterministic impact and resilience scores.", "analysis_started")
-        self._finish_completed(experiment_id, base_summary, fault_snapshots, recovery_snapshot, recovery_seconds)
+        self._finish_guarded(experiment_id, baseline_data, base_summary, guard_result, recovery, recovery_seconds)
+
+    def _record_recovery_progress(self, experiment_id: str, progress: dict[str, Any]) -> None:
+        healthy = progress.get("healthy_samples", 0)
+        required = progress.get("required_samples", guard.RECOVERY_SAMPLES)
+        breaches = progress.get("breaches", {})
+        if breaches:
+            detail = "; ".join(f"{key}: {value}" for key, value in breaches.items())
+            message = f"Recovery check {healthy}/{required} healthy samples; waiting on {detail}."
+        else:
+            message = f"Recovery check {healthy}/{required} healthy samples passed."
+        self._record_phase_event(experiment_id, "recovery_sample", message)
+
+    def _finish_guarded(
+        self,
+        experiment_id: str,
+        baseline_data: dict[str, Any],
+        base_summary: dict[str, float | None],
+        guard_result: dict[str, Any],
+        recovery: dict[str, Any],
+        recovery_seconds: float,
+    ) -> None:
+        experiment = self.get(experiment_id)
+        impact = guard.impact_table(baseline_data, guard_result.get("peaks", {}))
+        containers = guard.container_table(baseline_data, guard_result.get("container_peaks", {}))
+        frontend_impact = next((row for row in impact if row["service"] == "frontend"), None)
+        if frontend_impact is None:
+            frontend_impact = next((row for row in impact if row["service"] == experiment["plan"]["target"]), None)
+        error_rate = (frontend_impact or {}).get("error_rate", {}).get("peak")
+        p95 = (frontend_impact or {}).get("p95_ms", {}).get("peak")
+        fault_summary = {
+            "availability": None if error_rate is None else max(0.0, 100.0 - error_rate),
+            "error_rate": error_rate,
+            "p95_latency_ms": p95,
+            "throughput_rps": None,
+        }
+        scoring = score_experiment(base_summary, fault_summary, recovery_seconds, guard.RECOVERY_TIMEOUT_S)
+        measured = {
+            "aborted": bool(guard_result.get("aborted")),
+            "reason": guard_result.get("reason"),
+            "elapsed_s": guard_result.get("elapsed_s"),
+            "impact_baseline_to_peak": impact,
+            "recovery": recovery,
+        }
+        if guard_result.get("aborted"):
+            judge = {"verdict": "inconclusive", "explanation": "The guard stopped the experiment before the complete observation window elapsed."}
+        elif not recovery.get("recovered"):
+            judge = {"verdict": "inconclusive", "explanation": "Rollback completed, but recovery was not verified within the bounded recovery window."}
+        else:
+            judge = self._judge(experiment["plan"], measured)
+        recovery_summary = base_summary if recovery.get("recovered") else snapshot_summary({})
+        report = self._build_report(experiment, base_summary, fault_summary, recovery_summary, recovery_seconds, scoring, judge)
+        report.update({
+            "status": "aborted" if guard_result.get("aborted") else "completed",
+            "summary": f"{experiment['plan']['target']} was tested with {experiment['plan']['fault']}. {guard_result.get('reason', '')}",
+            "guard": guard_result,
+            "impact": impact,
+            "container_resources": containers,
+            "rollback_verified": True,
+            "recovery_verified": bool(recovery.get("recovered")),
+            "recovery": recovery,
+        })
+        with self._lock:
+            current = self._require_locked(experiment_id)
+            current["report"] = report
+            current["state"] = report["status"]
+            current["updated_at"] = utc_now()
+            event_type = "experiment_aborted" if report["status"] == "aborted" else "report_generated"
+            self._record_event_locked(experiment_id, event_type, "Experiment evidence is ready; rollback was verified.")
+            self._active_id = None
 
     def _record_phase_event(self, experiment_id: str, event_type: str, message: str) -> None:
         with self._lock:

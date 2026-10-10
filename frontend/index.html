@@ -91,20 +91,25 @@
             </div>
 
             <form id="proposalForm" class="proposal-form">
-              <label for="goalSelect">What do you want to learn?</label>
-              <div class="select-wrap">
-                <select id="goalSelect" name="goal">
-                  <option value="graceful_degradation">Test graceful degradation</option>
-                  <option value="critical_dependency">Find a critical dependency</option>
-                  <option value="recovery_time">Measure recovery time</option>
-                  <option value="timeout_behavior">Expose timeout and retry behavior</option>
-                </select>
-                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg>
-              </div>
+              <p class="explore-copy">Let the AI inspect topology, baseline telemetry, and blast radius to choose one informative failure test.</p>
               <button id="proposeButton" class="button button-dark button-full" type="submit">
-                <span>Generate safe proposal</span>
+                <span>Explore failures with AI</span>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
               </button>
+              <details class="goal-options">
+                <summary>Optional: guide the AI</summary>
+                <label for="goalSelect">Learning goal</label>
+                <div class="select-wrap">
+                  <select id="goalSelect" name="goal">
+                    <option value="" selected>No preference — let AI explore</option>
+                    <option value="graceful_degradation">Test graceful degradation</option>
+                    <option value="critical_dependency">Find a critical dependency</option>
+                    <option value="recovery_time">Measure recovery time</option>
+                    <option value="timeout_behavior">Expose timeout and retry behavior</option>
+                  </select>
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg>
+                </div>
+              </details>
             </form>
 
             <div id="proposalEmpty" class="proposal-empty">

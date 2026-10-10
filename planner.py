@@ -35,6 +35,8 @@ Rules:
 - magnitude is the delay in ms for network_delay (1-{MAX_NETWORK_DELAY_MS}); use 0 for container_stop.
 - duration_s is at most {MAX_DURATION_S}.
 - target must be one of "candidate_targets" in the context. Never pick a protected service.
+- "optional_operator_goal", when present, is a hint rather than a required constraint. When absent,
+  independently choose the most informative safe failure from the topology and baseline.
 - hypothesis: what you expect to observe (which services/metrics degrade, and that it recovers).
 - reasoning: why this target is informative; cite the dependency map (fan-in, fan-out, checkout path,
   who depends on it) and the baseline."""
@@ -111,7 +113,7 @@ def _call_llm(api_key, context, system=SYSTEM_PROMPT):
     raise RuntimeError("all models failed (" + "; ".join(errors) + ")")
 
 
-def propose_experiment():
+def propose_experiment(goal=None):
     """Return (plan, source, note); source is "llm" or "fallback" and note says why."""
     load_dotenv()
     api_key = os.getenv(API_KEY_VAR, "").strip()
@@ -120,6 +122,8 @@ def propose_experiment():
     try:
         g, stats = load_graph()
         context = build_context(g, stats, load_baseline(), load_flows())
+        if goal:
+            context["optional_operator_goal"] = goal
         text, model = _call_llm(api_key, context)
         return parse_plan(text), "llm", f"model {model}"
     except Exception as e:  # any LLM/network/parse/file failure must degrade to the safe plan

@@ -1,4 +1,5 @@
-const DEFAULT_TIMEOUT_MS = 3500;
+const DEFAULT_TIMEOUT_MS = 8000;
+const PLANNER_TIMEOUT_MS = 65000;
 
 export function resolveApiBaseUrl(locationLike = globalThis.location, configuredUrl = globalThis.CHAOS_COPILOT_API_URL) {
   if (typeof configuredUrl === "string" && configuredUrl.trim()) return configuredUrl.trim().replace(/\/$/, "");
@@ -22,14 +23,18 @@ export class ApiError extends Error {
 export function createApiClient({ baseUrl = "", timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   const endpoint = (path) => `${baseUrl}${path}`;
   const request = async (path, options = {}) => {
+    const { timeoutMs: requestTimeoutMs = timeoutMs, ...fetchOptions } = options;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const headers = { Accept: "application/json", ...options.headers };
-    if (options.body) headers["Content-Type"] = "application/json";
+    const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+    const headers = { Accept: "application/json", ...fetchOptions.headers };
+    if (fetchOptions.body) headers["Content-Type"] = "application/json";
 
     try {
-      const response = await fetch(endpoint(path), { ...options, headers, signal: controller.signal });
-      if (!response.ok) throw new ApiError(`Request failed with ${response.status}`, response.status);
+      const response = await fetch(endpoint(path), { ...fetchOptions, headers, signal: controller.signal });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new ApiError(payload.detail || `Request failed with ${response.status}`, response.status);
+      }
       if (response.status === 204) return null;
       return await response.json();
     } catch (error) {
@@ -40,10 +45,11 @@ export function createApiClient({ baseUrl = "", timeoutMs = DEFAULT_TIMEOUT_MS }
     }
   };
 
-  const mutate = (path, body = {}) => request(path, {
+  const mutate = (path, body = {}, timeoutOverride) => request(path, {
     method: "POST",
     headers: { "Idempotency-Key": crypto.randomUUID() },
     body: JSON.stringify(body),
+    timeoutMs: timeoutOverride,
   });
 
   return {
@@ -53,7 +59,7 @@ export function createApiClient({ baseUrl = "", timeoutMs = DEFAULT_TIMEOUT_MS }
     readiness: () => request("/api/readiness"),
     topology: () => request("/api/topology"),
     latestBaseline: () => request("/api/baselines/latest"),
-    propose: (goal) => mutate("/api/experiments/propose", { goal }),
+    propose: (goal = null) => mutate("/api/experiments/propose", goal ? { goal } : {}, PLANNER_TIMEOUT_MS),
     validate: (id) => mutate(`/api/experiments/${encodeURIComponent(id)}/validate`),
     approve: (id, approvalName = "hackathon-operator") => mutate(`/api/experiments/${encodeURIComponent(id)}/approve`, { approval_name: approvalName }),
     abort: (id, reason = "Manual emergency stop") => mutate(`/api/experiments/${encodeURIComponent(id)}/abort`, { reason }),
@@ -98,11 +104,12 @@ export function normalizeTopology(payload = {}) {
 
 export function normalizeBaseline(payload = {}) {
   const source = payload.metrics || payload.summary || payload;
+  const numeric = (value) => value === null || value === undefined || value === "" ? null : Number(value);
   return {
-    availability: Number(source.availability ?? source.success_rate ?? 0),
-    errorRate: Number(source.errorRate ?? source.error_rate ?? 0),
-    p95LatencyMs: Number(source.p95LatencyMs ?? source.p95_latency_ms ?? source.p95 ?? 0),
-    throughputRps: Number(source.throughputRps ?? source.throughput_rps ?? source.throughput ?? 0),
+    availability: numeric(source.availability ?? source.success_rate),
+    errorRate: numeric(source.errorRate ?? source.error_rate),
+    p95LatencyMs: numeric(source.p95LatencyMs ?? source.p95_latency_ms ?? source.p95),
+    throughputRps: numeric(source.throughputRps ?? source.throughput_rps ?? source.throughput),
   };
 }
 

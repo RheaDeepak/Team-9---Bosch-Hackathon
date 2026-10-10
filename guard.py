@@ -5,6 +5,7 @@ once per 60s (OTLP push + 60s scrape), so a 30s rate window is empty and detecti
 Error rate and p95 are defined as in metrics.py (server/consumer spans; status ERROR; duration in ms).
 """
 import math
+import os
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -12,10 +13,14 @@ from datetime import timedelta
 
 import docker
 import requests
+from dotenv import load_dotenv
 
 from discovery import CONSUMER, SERVER, fetch_spans
 from inject import COMPOSE_PROJECT, PROJECT_LABEL, SERVICE_LABEL
 from metrics import LATENCY_EXCLUDED, _container_stats
+from policy import MAX_DURATION_S
+
+load_dotenv()
 
 POLL_S = 5
 WINDOW_S = 30             # spans newer than this count towards a sample
@@ -25,9 +30,8 @@ MIN_SPANS_ERROR = 1       # smallest sample that still yields an error rate
 MIN_FAILED_REQUESTS = 3   # abort on error rate only with at least this many failed requests in the window
 MIN_SPANS_LATENCY = 5     # a p95 from fewer spans is noise
 CONSECUTIVE_BREACHES = 2
-RECOVERY_SAMPLES = 3
-RECOVERY_TIMEOUT_S = 180
-MAX_DURATION_S = 120      # hard stop, same cap as the policy
+RECOVERY_SAMPLES = max(1, int(os.getenv("RECOVERY_REQUIRED_SAMPLES", "2")))
+RECOVERY_TIMEOUT_S = max(POLL_S, int(os.getenv("RECOVERY_TIMEOUT_SECONDS", "45")))
 MAX_SPAN_MS = 60_000      # longer spans are streams (flagd EventStream), not request latency
 ERROR_CODES = (2, "STATUS_CODE_ERROR")  # OTLP status codes: 0 unset, 1 ok, 2 error
 METRICS = ("error_rate", "p95_ms")
@@ -104,11 +108,12 @@ def _line(prefix, metrics, breaches, containers=None):
     return f"{prefix} | " + " | ".join(parts) + (f"  <-- {'; '.join(f'{k}: {v}' for k, v in breaches.items())}" if breaches else "")
 
 
-def _sample(services, window_s):
-    return live_metrics(services, window_s), container_state(set(services))
+def _sample(services, window_s, required_containers=()):
+    containers = set(services) | set(required_containers)
+    return live_metrics(services, window_s), container_state(containers)
 
 
-def watch(plan, baseline, services, thresholds=None):
+def watch(plan, baseline, services, thresholds=None, stop_event=None, on_sample=None):
     """Poll while the fault is active. Returns {aborted, reason, elapsed_s, peaks, timeline}."""
     thr = thresholds or baseline["thresholds"]["services"]
     restart_limits = {n: t["restarts"] for n, t in baseline["thresholds"]["containers"].items()}
@@ -127,9 +132,12 @@ def watch(plan, baseline, services, thresholds=None):
     start = time.monotonic()
     try:
         while time.monotonic() - start < duration:
+            if stop_event is not None and stop_event.is_set():
+                aborted, reason = True, "operator requested emergency stop"
+                break
             tick, t = time.monotonic(), time.monotonic() - start
             try:
-                metrics, containers = _sample(services, WINDOW_S)
+                metrics, containers = _sample(services, WINDOW_S, [plan["target"]])
                 failures = 0
             except (requests.RequestException, docker.errors.DockerException, ValueError, KeyError) as e:
                 failures += 1
@@ -149,6 +157,8 @@ def watch(plan, baseline, services, thresholds=None):
                     if v[m] is not None and (cp[m] is None or v[m] > cp[m]):
                         cp[m] = v[m]
             breaches = _breaches(metrics, containers, thr, restart_limits, expected_down)
+            if on_sample is not None:
+                on_sample(metrics, containers)
             for k in set(streak) | set(breaches):
                 streak[k] = streak[k] + 1 if k in breaches else 0
             timeline.append({"t": round(t, 1), "metrics": metrics, "breaches": breaches})
@@ -159,25 +169,33 @@ def watch(plan, baseline, services, thresholds=None):
                 reason = f"threshold breached {CONSECUTIVE_BREACHES} samples in a row: " + "; ".join(
                     f"{k} ({breaches[k]})" for k in tripped)
                 break
-            time.sleep(max(0, min(POLL_S - (time.monotonic() - tick), duration - (time.monotonic() - start))))
+            wait_s = max(0, min(POLL_S - (time.monotonic() - tick), duration - (time.monotonic() - start)))
+            if stop_event is not None:
+                if stop_event.wait(wait_s):
+                    aborted, reason = True, "operator requested emergency stop"
+                    break
+            else:
+                time.sleep(wait_s)
     except KeyboardInterrupt:
         aborted, reason = True, "interrupted by user (Ctrl+C)"
     return {"aborted": aborted, "reason": reason, "elapsed_s": round(time.monotonic() - start, 1),
             "peaks": peaks, "container_peaks": container_peaks, "timeline": timeline}
 
 
-def wait_for_recovery(plan, baseline, services):
+def wait_for_recovery(plan, baseline, services, on_sample=None, on_progress=None):
     """After rollback: poll until everything is within the baseline thresholds for RECOVERY_SAMPLES in a row.
     Returns {recovered, seconds} where seconds = time from rollback to the first sample of that streak."""
     thr = baseline["thresholds"]["services"]
     restart_limits = {n: t["restarts"] for n, t in baseline["thresholds"]["containers"].items()}
-    start, streak, first_ok, last = time.monotonic(), 0, None, ""
+    start, streak, first_ok, last_breaches = time.monotonic(), 0, None, {}
     try:
         while time.monotonic() - start < RECOVERY_TIMEOUT_S:
             tick, t = time.monotonic(), time.monotonic() - start
             try:
-                metrics, containers = _sample(services, RECOVERY_WINDOW_S)
+                metrics, containers = _sample(services, RECOVERY_WINDOW_S, [plan["target"]])
                 breaches = _breaches(metrics, containers, thr, restart_limits, None)
+                if on_sample is not None:
+                    on_sample(metrics, containers)
                 if plan["target"] not in containers or not containers[plan["target"]]["running"]:
                     breaches[f"{plan['target']} container"] = "not running"
             except (requests.RequestException, docker.errors.DockerException, ValueError, KeyError) as e:
@@ -189,10 +207,22 @@ def wait_for_recovery(plan, baseline, services):
                 streak, first_ok = streak + 1, first_ok if first_ok is not None else t
                 if streak >= RECOVERY_SAMPLES:
                     return {"recovered": True, "seconds": round(first_ok, 1)}
+            last_breaches = breaches
+            if on_progress is not None:
+                on_progress({
+                    "elapsed_s": round(t, 1),
+                    "healthy_samples": streak,
+                    "required_samples": RECOVERY_SAMPLES,
+                    "breaches": breaches,
+                })
             time.sleep(max(0, POLL_S - (time.monotonic() - tick)))
     except KeyboardInterrupt:
         return {"recovered": False, "seconds": None, "note": "recovery wait interrupted by user"}
-    return {"recovered": False, "seconds": None}
+    detail = "; ".join(f"{key}: {value}" for key, value in last_breaches.items())
+    note = f"not within thresholds after {RECOVERY_TIMEOUT_S}s"
+    if detail:
+        note += f" ({detail})"
+    return {"recovered": False, "seconds": None, "note": note}
 
 
 def impact_table(baseline, peaks):

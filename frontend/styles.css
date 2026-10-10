@@ -45,6 +45,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .environment-badge::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: var(--amber); }
 .environment-badge.live::before { background: var(--green); }
 .environment-badge.demo::before { background: var(--amber); }
+.environment-badge.unavailable::before { background: var(--red); }
 .icon-button { border: 0; background: transparent; width: 34px; height: 34px; padding: 7px; color: var(--ink); border-radius: 50%; }
 .icon-button:hover { background: var(--paper-deep); }
 .icon-button svg { fill: none; stroke: currentColor; stroke-width: 1.8; width: 100%; }
@@ -111,6 +112,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .fault-badge { color: #8e2d27; background: #ffe8e5; }
 .proposal-form { padding: 26px 28px; border-bottom: 1px solid var(--line); }
 .proposal-form label { display: block; margin-bottom: 9px; font-size: 11px; font-weight: 800; letter-spacing: 0.05em; }
+.explore-copy { margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.goal-options { margin-top: 14px; }
+.goal-options summary { color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
+.goal-options[open] summary { margin-bottom: 13px; }
+.goal-options .select-wrap { margin-bottom: 0; }
 .select-wrap { position: relative; margin-bottom: 12px; }
 .select-wrap select { width: 100%; appearance: none; border: 1px solid var(--line); border-radius: 10px; background: var(--white); padding: 13px 38px 13px 13px; color: var(--ink); }
 .select-wrap svg { pointer-events: none; position: absolute; width: 17px; right: 13px; top: 14px; fill: none; stroke: var(--muted); stroke-width: 1.7; }

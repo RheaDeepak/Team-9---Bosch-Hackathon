@@ -13,12 +13,19 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const svgNs = "http://www.w3.org/2000/svg";
 const api = createApiClient({ baseUrl: resolveApiBaseUrl() });
+const demoRequested = new URLSearchParams(window.location.search).get("demo") === "1";
+const emptyBaseline = { availability: null, errorRate: null, p95LatencyMs: null, throughputRps: null };
+const emptyTopology = { nodes: [], edges: [] };
+const unavailableReadiness = {
+  status: "blocked",
+  checks: [{ id: "api", label: "Chaos Copilot API", detail: "Backend unavailable", ready: false }],
+};
 
 const state = {
   mode: "connecting",
-  readiness: mockReadiness,
-  topology: mockTopology,
-  baseline: mockBaseline,
+  readiness: unavailableReadiness,
+  topology: emptyTopology,
+  baseline: emptyBaseline,
   proposal: null,
   policy: null,
   experimentId: null,
@@ -26,6 +33,7 @@ const state = {
   startedAt: null,
   timer: null,
   pollTimer: null,
+  pollFailures: 0,
   eventSource: null,
   demoTimers: [],
 };
@@ -95,7 +103,10 @@ function setMode(mode) {
     elements.connectionDetail.textContent = `API connected · ${api.baseUrl || window.location.origin}`;
   } else if (mode === "demo") {
     elements.environmentBadge.textContent = "Demo data";
-    elements.connectionDetail.textContent = "API offline · demo mode";
+    elements.connectionDetail.textContent = "Explicit demo mode · no backend calls";
+  } else if (mode === "unavailable") {
+    elements.environmentBadge.textContent = "Backend unavailable";
+    elements.connectionDetail.textContent = `Could not reach ${api.baseUrl || window.location.origin}`;
   } else {
     elements.environmentBadge.textContent = "Connecting";
     elements.connectionDetail.textContent = "API connecting";
@@ -309,13 +320,14 @@ function renderSparklines(phase) {
 
 const phaseOrder = ["baseline", "injecting", "observing", "rolling_back", "recovering"];
 const activePhases = new Set(["baseline", "injecting", "observing", "rolling_back", "recovering"]);
+const stoppablePhases = new Set(["baseline", "injecting", "observing"]);
 
 function updatePhase(phase, message, metrics) {
   state.phase = phase.toLowerCase().replaceAll(" ", "_");
   const active = activePhases.has(state.phase);
   elements.phaseBadge.textContent = state.phase.replaceAll("_", " ").toUpperCase();
   elements.phaseBadge.classList.toggle("active", active);
-  elements.stopButton.disabled = !active;
+  elements.stopButton.disabled = !stoppablePhases.has(state.phase);
   elements.activeFault.textContent = ["injecting", "observing"].includes(state.phase)
     ? `${state.proposal?.failure_type?.replaceAll("_", " ") || "Fault"} · ${state.proposal?.target_service || "target"}`
     : "None";
@@ -393,11 +405,23 @@ function connectLiveExperiment() {
     state.eventSource.onerror = () => state.eventSource?.close();
   }
   state.pollTimer = setInterval(async () => {
-    try { applyExperimentUpdate(await api.experiment(state.experimentId)); } catch { /* SSE may still be active */ }
+    try {
+      applyExperimentUpdate(await api.experiment(state.experimentId));
+      state.pollFailures = 0;
+    } catch {
+      state.pollFailures += 1;
+      if (state.pollFailures >= 3) {
+        clearLiveConnections();
+        stopTimer();
+        updatePhase("failed", "The backend lost this experiment state. Recovery cannot be verified from this page; refresh readiness before another run.", null);
+        toast("Experiment connection was lost. Refresh readiness before starting another run.", "warn");
+      }
+    }
   }, 2500);
 }
 
 function applyExperimentUpdate(payload) {
+  state.pollFailures = 0;
   const update = extractExperiment(payload);
   updatePhase(update.phase, update.message, update.metrics);
   const terminal = update.phase.toLowerCase();
@@ -502,6 +526,17 @@ function buildReportTable(result) {
 
 async function loadData({ announce = false } = {}) {
   elements.refreshButton.classList.add("is-spinning");
+  if (demoRequested) {
+    state.readiness = mockReadiness;
+    state.topology = mockTopology;
+    state.baseline = mockBaseline;
+    setMode("demo");
+    renderReadiness();
+    renderTopology();
+    renderBaseline();
+    elements.refreshButton.classList.remove("is-spinning");
+    return;
+  }
   setMode("connecting");
   try {
     await api.health();
@@ -510,15 +545,18 @@ async function loadData({ announce = false } = {}) {
     ]);
     state.readiness = normalizeReadiness(readinessPayload);
     state.topology = normalizeTopology(topologyPayload);
-    state.baseline = baselinePayload ? normalizeBaseline(baselinePayload) : mockBaseline;
+    state.baseline = baselinePayload ? normalizeBaseline(baselinePayload) : emptyBaseline;
     setMode("live");
     if (announce) toast("Live system data refreshed.", "success");
-  } catch {
-    state.readiness = mockReadiness;
-    state.topology = mockTopology;
-    state.baseline = mockBaseline;
-    setMode("demo");
-    if (announce) toast("Backend unavailable. Showing safe demo data.", "warn");
+  } catch (error) {
+    state.readiness = {
+      ...unavailableReadiness,
+      checks: [{ ...unavailableReadiness.checks[0], detail: error.message || "Backend unavailable" }],
+    };
+    state.topology = emptyTopology;
+    state.baseline = emptyBaseline;
+    setMode("unavailable");
+    if (announce) toast("Backend unavailable. No demo data was substituted.", "warn");
   } finally {
     renderReadiness();
     renderTopology();
@@ -529,11 +567,16 @@ async function loadData({ announce = false } = {}) {
 
 elements.proposalForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (state.mode === "unavailable" || state.mode === "connecting") {
+    toast("Connect the backend before proposing an experiment.", "warn");
+    return;
+  }
   setBusy(elements.proposeButton, true, "Designing experiment…");
   state.policy = null;
   renderPolicy();
   try {
-    const payload = state.mode === "live" ? await api.propose(elements.goalSelect.value) : mockProposal;
+    const optionalGoal = elements.goalSelect.value || null;
+    const payload = state.mode === "live" ? await api.propose(optionalGoal) : mockProposal;
     state.proposal = normalizeProposal(payload);
     state.experimentId = state.proposal.id;
     renderProposal();
@@ -584,7 +627,7 @@ elements.approveButton.addEventListener("click", async () => {
 });
 
 elements.stopButton.addEventListener("click", async () => {
-  if (!activePhases.has(state.phase)) return;
+  if (!stoppablePhases.has(state.phase)) return;
   elements.stopButton.disabled = true;
   try {
     if (state.mode === "live") {

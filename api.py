@@ -49,7 +49,7 @@ _idempotency_lock = RLock()
 
 
 class GoalRequest(BaseModel):
-    goal: str = Field(default="graceful_degradation", max_length=120)
+    goal: str | None = Field(default=None, max_length=120)
 
 
 class ApprovalRequest(BaseModel):
@@ -203,7 +203,8 @@ def create_baseline(body: BaselineRequest, idempotency_key: str | None = Header(
 @app.post("/api/experiments/propose")
 def propose(body: GoalRequest, idempotency_key: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        return _idempotent("propose", idempotency_key, lambda: manager.propose(body.goal))
+        goal = body.goal.strip() if body.goal and body.goal.strip() else None
+        return _idempotent("propose", idempotency_key, lambda: manager.propose(goal))
     except Exception as exc:
         raise _http_error(exc) from exc
 

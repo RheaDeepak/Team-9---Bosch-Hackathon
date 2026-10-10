@@ -38,11 +38,34 @@ def baseline():
                 "p95_ms": metric(50.0),
                 "request_rate": metric(20.0),
             }
-        }
+        },
+        "containers": {"cart": {"cpu_percent": metric(1.0), "memory_mb": metric(20.0)}},
+        "thresholds": {
+            "services": {"frontend": {"error_rate": 5.5, "p95_ms": 150.0}},
+            "containers": {"cart": {"restarts": 0, "running": 1}},
+        },
+    }
+
+
+def guarded_result(*, aborted=False, reason="duration elapsed"):
+    return {
+        "aborted": aborted,
+        "reason": reason,
+        "elapsed_s": 0.03,
+        "peaks": {"frontend": {"error_rate": 20.0, "p95_ms": 250.0}},
+        "container_peaks": {"cart": {"cpu_percent": 2.0, "memory_mb": 22.0}},
+        "timeline": [],
     }
 
 
 class ControlPlaneTests(unittest.TestCase):
+    def test_ai_can_explore_without_an_operator_goal(self):
+        received = []
+        manager = ExperimentManager(planner=lambda goal: received.append(goal) or (dict(PLAN), "fallback", "test"))
+        proposal = manager.propose()
+        self.assertEqual(received, [None])
+        self.assertIsNone(proposal["goal"])
+
     def test_baseline_summary_preserves_missing_data(self):
         self.assertEqual(
             baseline_summary({"services": {"frontend": {}}}),
@@ -63,13 +86,16 @@ class ControlPlaneTests(unittest.TestCase):
         actions = []
         snapshots = iter([snapshot(), snapshot(20, 250, 12), snapshot(1, 55, 19)])
         manager = ExperimentManager(
-            planner=lambda: (dict(PLAN), "fallback", "test"),
+            planner=lambda goal: (dict(PLAN), "fallback", "test"),
             validator=lambda plan: {"valid": True, "reasons": [], "blast_radius": ["frontend"]},
             injector=lambda plan: actions.append(("inject", plan["target"])) or {"target": plan["target"], "fault": plan["fault"]},
             rollback_fn=lambda active: actions.append(("rollback", active["target"])) or True,
             snapshotter=lambda: next(snapshots, snapshot(1, 55, 19)),
             baseline_loader=baseline,
             judge=lambda plan, results: {"verdict": "held", "explanation": "Cart failed and recovered."},
+            telemetry_probe=lambda services: snapshot()["services"],
+            guard_watcher=lambda plan, measured, services, **kwargs: guarded_result(),
+            recovery_waiter=lambda plan, measured, services, **kwargs: {"recovered": True, "seconds": 0.01},
             observation_interval_s=0.01,
         )
         experiment = manager.propose("test graceful degradation")
@@ -84,14 +110,22 @@ class ControlPlaneTests(unittest.TestCase):
     def test_abort_still_rolls_back(self):
         plan = {**PLAN, "duration_s": 2}
         actions = []
+
+        def wait_for_abort(candidate, measured, services, *, stop_event, on_sample):
+            stop_event.wait(1)
+            return guarded_result(aborted=True, reason="operator requested emergency stop")
+
         manager = ExperimentManager(
-            planner=lambda: (plan, "fallback", "test"),
-            validator=lambda candidate: {"valid": True, "reasons": [], "blast_radius": []},
+            planner=lambda goal: (plan, "fallback", "test"),
+            validator=lambda candidate: {"valid": True, "reasons": [], "blast_radius": ["frontend"]},
             injector=lambda candidate: actions.append("inject") or {"target": "cart", "fault": "container_stop"},
             rollback_fn=lambda active: actions.append("rollback") or True,
             snapshotter=lambda: snapshot(4, 80, 16),
             baseline_loader=baseline,
             judge=lambda candidate, results: {"verdict": "inconclusive", "explanation": "aborted"},
+            telemetry_probe=lambda services: snapshot()["services"],
+            guard_watcher=wait_for_abort,
+            recovery_waiter=lambda candidate, measured, services, **kwargs: {"recovered": True, "seconds": 0.01},
             observation_interval_s=0.01,
         )
         experiment = manager.propose("test abort")

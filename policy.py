@@ -1,11 +1,16 @@
 """Deterministic safety policy: validates an experiment plan. No LLM involved."""
+import os
+
 import networkx as nx
+from dotenv import load_dotenv
 
 from discovery import load_graph
 
+load_dotenv()
+
 ALLOWED_FAULTS = ("container_stop", "network_delay")
-MAX_DURATION_S = 120
-MAX_NETWORK_DELAY_MS = 1000
+MAX_DURATION_S = int(os.getenv("MAX_FAULT_DURATION_SECONDS", "120"))
+MAX_NETWORK_DELAY_MS = int(os.getenv("MAX_NETWORK_DELAY_MS", "1000"))
 PROTECTED = {"frontend-proxy", "otel-collector", "jaeger", "prometheus", "grafana", "opensearch", "flagd"}
 REQUIRED_KEYS = ("target", "fault", "magnitude", "duration_s", "hypothesis", "reasoning")
 
