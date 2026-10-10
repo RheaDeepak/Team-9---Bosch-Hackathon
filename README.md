@@ -185,6 +185,29 @@ your machine. Follow the upstream
 [Docker deployment documentation](https://opentelemetry.io/docs/demo/docker-deployment/)
 and confirm the storefront and Jaeger UI are reachable before continuing.
 
+To use the Grafana panels in the experiment UI, also pass this repository's
+[`grafana-embed.yaml`](grafana-embed.yaml) override. It only lets Grafana be embedded in an
+iframe (`GF_SECURITY_ALLOW_EMBEDDING=true`), so the demo repository is never modified. For
+the default deployment (full demo plus observability):
+
+```powershell
+# run from the opentelemetry-demo checkout; adjust the path to this repository
+docker compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
+  -f C:\path\to\Team-9---Bosch-Hackathon\grafana-embed.yaml up -d
+```
+
+If the demo is already running, recreate only Grafana with the same `-f` files (add any others
+you started with, e.g. `compose.extras.yaml`) plus the override:
+
+```powershell
+docker compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
+  -f C:\path\to\Team-9---Bosch-Hackathon\grafana-embed.yaml up -d --no-deps grafana
+```
+
+Recreating the container resets Grafana's own database (provisioned dashboards reload from
+files). Without the override the experiment UI still works; the Grafana panels stay blank and
+the readiness panel says so.
+
 ### 2. Create a Python environment
 
 PowerShell:
@@ -220,6 +243,59 @@ On success, the command prints graph statistics and journey data, then rewrites
 `dependency_map.json` and `dependency_map.png` in the current directory. If no
 dependencies are returned, leave the Astronomy Shop load generator running and
 try again after it has produced recent traces.
+
+## Run the experiment UI
+
+Beyond topology discovery the repo now contains the experiment loop: plan
+(`planner.py`), validate (`policy.py`), inject and roll back (`inject.py`),
+guard (`guard.py`), and report (`run_experiment.py`), with a web UI on top.
+
+**Prerequisites**
+
+1. Astronomy Shop running via Docker Compose, with every feature flag off.
+2. `pip install -r requirements.txt`
+3. `.env` containing `LLM_API_KEY` (a Gemini key; see `.env.example`). Without it the planner uses a built-in
+   fallback plan (stop `cart` for 60 s) and says so.
+4. `python discovery.py` (writes `dependency_map.json`) and `python metrics.py` (writes `baseline.json`, about
+   5 minutes). Re-capture the baseline whenever traffic or flags change.
+
+**Start the UI**
+
+```bash
+python app.py
+# open http://127.0.0.1:8000
+```
+
+The server binds to `127.0.0.1` only. Flow: check the readiness panel, **Propose experiment**, read the plan and
+blast radius, **Approve**, watch the live charts, press **STOP** at any time, read the result. Past results are
+under `results/` and listed in the History panel.
+
+**Terminal mode** still works: `python run_experiment.py` proposes, prints, and asks `y/n`.
+
+**What the UI shows**
+
+- **Layout:** a top bar with a step navigation (it highlights where you are). The page re-composes around what matters
+  now: the live view comes first while a fault runs, the result comes first once it is over, and readiness folds into
+  one line when everything is green. It works down to phone width; the red STOP becomes a full-width bar at the bottom.
+
+- **Dependency graph:** services laid out left to right by call depth (callers on the left, data stores and the
+  flag service on the right), with edge width for call volume and node height for fan-in. Click a service to see
+  its role, live container health, criticality, baseline numbers, and what it calls and is called by; hover an
+  edge for its protocol, operations and latency. Pick a user journey (or the checkout path) to light up its route
+  with numbered steps. Protected services are marked and can never be targeted.
+- **Optional learning goal** next to *Propose experiment* (graceful degradation, critical dependency, recovery time,
+  timeout behaviour). It steers the AI; the safety policy still decides.
+- **Safety gate:** every policy check is listed as passed or failed, and *Approve* needs the "I reviewed the
+  hypothesis and blast radius" box ticked.
+- **Result:** a resilience score out of 100 (deterministic: error rise, latency rise, shop-probe availability,
+  recovery time), a claim-by-claim verdict, amplification ratios, and a recommended next move.
+
+**Tests:** `python -m unittest discover -s tests -t .` (no containers are touched; the LLM and Docker are stubbed).
+
+**Safety.** STOP, a threshold breach and Ctrl+C all take the same rollback path. On startup `app.py` (and
+`run_experiment.py`) first rolls back any fault left in `active_experiment.json` by a crashed run. Stopping the
+server while an experiment runs aborts it and waits for the rollback. The guard reads recent spans from Jaeger
+rather than Prometheus, because span metrics reach Prometheus only once a minute.
 
 ## Repository contents
 

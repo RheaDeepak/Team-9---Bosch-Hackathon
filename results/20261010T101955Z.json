@@ -1,0 +1,253 @@
+{
+  "id": "20261010T101955Z",
+  "plan": {
+    "target": "product-catalog",
+    "fault": "network_delay",
+    "magnitude": 400,
+    "duration_s": 60,
+    "hypothesis": "I expect the P95 latency for the frontend and checkout services to increase by approximately 400ms, affecting the browse_product and checkout user journeys, with metrics returning to baseline after the fault ends.",
+    "reasoning": "product-catalog has a fan-in of 3, being a direct dependency for the frontend, checkout, and recommendation services. It is also on the critical checkout path. Testing latency here is informative because it evaluates how delays in product metadata retrieval impact downstream transaction performance and the overall user experience, given its baseline P95 is 19.62ms."
+  },
+  "plan_source": "llm",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator",
+      "recommendation"
+    ]
+  },
+  "started_at": "2026-10-10T10:19:55+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "stopped by user (STOP button)",
+    "elapsed_s": 4.6,
+    "peaks": {
+      "product-catalog": {
+        "error_rate": 0.0,
+        "p95_ms": 14.921455
+      },
+      "checkout": {
+        "error_rate": null,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 30.650716
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 31.099
+      },
+      "recommendation": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 0.6019143576826197,
+        "memory_mb": 34.453125
+      },
+      "frontend": {
+        "cpu_percent": 0.7831738035264484,
+        "memory_mb": 125.9296875
+      },
+      "checkout": {
+        "cpu_percent": 0.5641309823677582,
+        "memory_mb": 10.21875
+      },
+      "recommendation": {
+        "cpu_percent": 0.6787909319899245,
+        "memory_mb": 48.02734375
+      },
+      "product-catalog": {
+        "cpu_percent": 0.13333333333333333,
+        "memory_mb": 11.08984375
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 21,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 14.921455
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 19,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 30.650716
+          },
+          "frontend-proxy": {
+            "n": 26,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 31.099
+          },
+          "recommendation": {
+            "n": 3,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {}
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": false,
+    "seconds": null,
+    "note": "recovery wait stopped by user"
+  },
+  "impact": [
+    {
+      "service": "product-catalog",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 19.622380952380894,
+        "peak": 14.921455,
+        "change": -4.700925952380894
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": null,
+        "change": null
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 30.650716,
+        "change": -2.9766266573426314
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 31.099,
+        "change": -1.5866060606060621
+      }
+    },
+    {
+      "service": "recommendation",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 4.58,
+        "peak": null,
+        "change": null
+      }
+    }
+  ],
+  "amplification": [],
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 0.6019143576826197
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 34.453125
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 0.7831738035264484
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 125.9296875
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 0.5641309823677582
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 10.21875
+      }
+    },
+    {
+      "container": "recommendation",
+      "cpu_percent": {
+        "baseline": 2.7665186252937053,
+        "peak": 0.6787909319899245
+      },
+      "memory_mb": {
+        "baseline": 48.0232421875,
+        "peak": 48.02734375
+      }
+    },
+    {
+      "container": "product-catalog",
+      "cpu_percent": {
+        "baseline": 0.7358883746434256,
+        "peak": 0.13333333333333333
+      },
+      "memory_mb": {
+        "baseline": 11.0890625,
+        "peak": 11.08984375
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "inconclusive",
+    "explanation": "The experiment was aborted by the user after only 4.6 seconds, which is insufficient time for the 400ms network delay to be reflected in the P95 latency telemetry. Additionally, peak data for the checkout service was null, making it impossible to evaluate the impact on that specific target.",
+    "model": "gemini-3-flash-preview"
+  }
+}

@@ -1,0 +1,736 @@
+{
+  "id": "20261010T171436Z",
+  "plan": {
+    "target": "email",
+    "fault": "container_stop",
+    "magnitude": 0,
+    "duration_s": 60,
+    "hypothesis": "Stopping email for 60s makes order confirmations fail, so checkout errors rise, and everything recovers once email restarts.",
+    "reasoning": "design review run: email is a low-traffic leaf on the checkout path, so the guard stays quiet and the whole live view can be observed."
+  },
+  "plan_source": "llm",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ],
+    "checks": [
+      {
+        "name": "Plan is complete",
+        "passed": true,
+        "detail": "all fields present"
+      },
+      {
+        "name": "Fault type is allowed",
+        "passed": true,
+        "detail": "container_stop is on the allowlist"
+      },
+      {
+        "name": "Magnitude within cap",
+        "passed": true,
+        "detail": "no magnitude needed for this fault"
+      },
+      {
+        "name": "Duration within cap",
+        "passed": true,
+        "detail": "60 s (cap 120 s)"
+      },
+      {
+        "name": "Target exists in the dependency map",
+        "passed": true,
+        "detail": "email is a discovered service"
+      },
+      {
+        "name": "Target is not protected",
+        "passed": true,
+        "detail": "email is not on the protected list"
+      }
+    ]
+  },
+  "started_at": "2026-10-10T17:14:36+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": false,
+    "reason": "duration elapsed (60s)",
+    "elapsed_s": 61.8,
+    "peaks": {
+      "email": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 77.472757
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 85.335
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 8.356791979949875,
+        "memory_mb": 36.8828125
+      },
+      "frontend": {
+        "cpu_percent": 17.036095118898622,
+        "memory_mb": 159.89453125
+      },
+      "checkout": {
+        "cpu_percent": 0.4239907727797001,
+        "memory_mb": 11.62109375
+      },
+      "email": {
+        "cpu_percent": null,
+        "memory_mb": null
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "email": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 41,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 42.920987
+          },
+          "frontend-proxy": {
+            "n": 31,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 60.777
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 13
+          },
+          "cart": {
+            "ok": true,
+            "ms": 20
+          }
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "email": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 76,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 58.662992
+          },
+          "frontend-proxy": {
+            "n": 39,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 60.777
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 10
+          },
+          "cart": {
+            "ok": true,
+            "ms": 18
+          }
+        }
+      },
+      {
+        "t": 10.0,
+        "metrics": {
+          "email": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 90,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 42.920987
+          },
+          "frontend-proxy": {
+            "n": 46,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 43.852
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 12
+          },
+          "cart": {
+            "ok": true,
+            "ms": 11
+          }
+        }
+      },
+      {
+        "t": 17.3,
+        "metrics": {
+          "email": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 98,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 59.743185
+          },
+          "frontend-proxy": {
+            "n": 50,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 60.777
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 35
+          },
+          "cart": {
+            "ok": true,
+            "ms": 45
+          }
+        }
+      },
+      {
+        "t": 27.0,
+        "metrics": {
+          "email": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 120,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 51.084201
+          },
+          "frontend-proxy": {
+            "n": 60,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 51.863
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 18
+          },
+          "cart": {
+            "ok": true,
+            "ms": 19
+          }
+        }
+      },
+      {
+        "t": 32.0,
+        "metrics": {
+          "email": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 93,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 51.084201
+          },
+          "frontend-proxy": {
+            "n": 48,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 51.863
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 43
+          },
+          "cart": {
+            "ok": true,
+            "ms": 40
+          }
+        }
+      },
+      {
+        "t": 39.2,
+        "metrics": {
+          "email": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 98,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 77.472757
+          },
+          "frontend-proxy": {
+            "n": 50,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 85.335
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 35
+          },
+          "cart": {
+            "ok": true,
+            "ms": 21
+          }
+        }
+      },
+      {
+        "t": 44.2,
+        "metrics": {
+          "email": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 104,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 50.159305
+          },
+          "frontend-proxy": {
+            "n": 50,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 51.863
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 25
+          },
+          "cart": {
+            "ok": true,
+            "ms": 9
+          }
+        }
+      },
+      {
+        "t": 49.2,
+        "metrics": {
+          "email": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 84,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 44.338491
+          },
+          "frontend-proxy": {
+            "n": 47,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 45.852
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 8
+          },
+          "cart": {
+            "ok": true,
+            "ms": 19
+          }
+        }
+      },
+      {
+        "t": 54.2,
+        "metrics": {
+          "email": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 90,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 24.362104
+          },
+          "frontend-proxy": {
+            "n": 49,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 28.776
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 10
+          },
+          "cart": {
+            "ok": true,
+            "ms": 12
+          }
+        }
+      },
+      {
+        "t": 59.2,
+        "metrics": {
+          "email": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 91,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 24.362104
+          },
+          "frontend-proxy": {
+            "n": 52,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 28.776
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 10
+          },
+          "cart": {
+            "ok": true,
+            "ms": 16
+          }
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 0.0,
+    "metrics_confirmed": true,
+    "metrics_seconds": 0.0,
+    "samples": [
+      {
+        "t": 0.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 11
+          },
+          "cart": {
+            "ok": true,
+            "ms": 9
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      },
+      {
+        "t": 5.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 19
+          },
+          "cart": {
+            "ok": true,
+            "ms": 20
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      },
+      {
+        "t": 10.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 10
+          },
+          "cart": {
+            "ok": true,
+            "ms": 4
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      }
+    ]
+  },
+  "impact": [
+    {
+      "service": "email",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 4.82,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 77.472757,
+        "change": 43.84541434265737
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 85.335,
+        "change": 52.64939393939393
+      }
+    }
+  ],
+  "amplification": [],
+  "score": {
+    "impact_score": 10.1,
+    "resilience_score": 90,
+    "severity": "Low",
+    "confidence": "High confidence",
+    "availability_pct": 100.0,
+    "components": {
+      "error_impact": 0.0,
+      "latency_impact": 0.403,
+      "availability_loss": 0.0,
+      "recovery_impact": 0.0
+    },
+    "limitations": []
+  },
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 8.356791979949875
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 36.8828125
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 17.036095118898622
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 159.89453125
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 0.4239907727797001
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 11.62109375
+      }
+    },
+    {
+      "container": "email",
+      "cpu_percent": {
+        "baseline": 1.6835424144052866,
+        "peak": null
+      },
+      "memory_mb": {
+        "baseline": 59.534765625,
+        "peak": null
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "partially held",
+    "explanation": "The hypothesis predicted that stopping email would cause order confirmations to fail and checkout errors to rise. The telemetry shows checkout error_rate stayed at 0.0 (baseline 0.0, peak 0.0), contradicting the error claim. However, the system recovered successfully as predicted.",
+    "claims": [
+      {
+        "claim": "checkout errors rise when email is stopped",
+        "evidence": "checkout error_rate remained at baseline peak: 0.0 with a change of 0.0",
+        "status": "contradicted"
+      },
+      {
+        "claim": "the system recovers once email restarts",
+        "evidence": "recovery.recovered was true with metrics_confirmed true in 0.0 seconds",
+        "status": "supported"
+      }
+    ],
+    "recommendation": "Implement asynchronous message queuing or fire-and-forget patterns for email notifications originating from checkout to ensure synchronous blocking does not occur if email fails.",
+    "model": "gemini-3.5-flash-lite",
+    "skipped_models": []
+  },
+  "grafana_window_ms": [
+    1791652357370,
+    1791652598297
+  ]
+}

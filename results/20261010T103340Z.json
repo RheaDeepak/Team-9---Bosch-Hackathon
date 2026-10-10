@@ -1,0 +1,347 @@
+{
+  "id": "20261010T103340Z",
+  "plan": {
+    "target": "product-catalog",
+    "fault": "network_delay",
+    "magnitude": 400,
+    "duration_s": 60,
+    "hypothesis": "A 400 ms egress delay on product-catalog raises request latency for GetProduct and its callers, then recovers.",
+    "reasoning": "controlled plan: product-catalog has real traffic, so the Spanmetrics panels can show it"
+  },
+  "plan_source": "fallback",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator",
+      "recommendation"
+    ]
+  },
+  "started_at": "2026-10-10T10:33:40+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: product-catalog p95_ms (1203.0ms > 119.6ms)",
+    "elapsed_s": 12.6,
+    "peaks": {
+      "product-catalog": {
+        "error_rate": 0.0,
+        "p95_ms": 1202.991857
+      },
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 1604.934035
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 805.308
+      },
+      "recommendation": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 0.9227722772277227,
+        "memory_mb": 34.4921875
+      },
+      "frontend": {
+        "cpu_percent": 1.1598513011152418,
+        "memory_mb": 126.34765625
+      },
+      "checkout": {
+        "cpu_percent": 1.1403221809169763,
+        "memory_mb": 10.65234375
+      },
+      "recommendation": {
+        "cpu_percent": 0.8574718397997496,
+        "memory_mb": 48.0234375
+      },
+      "product-catalog": {
+        "cpu_percent": 0.6181637717121589,
+        "memory_mb": 11.10546875
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 16,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 18.832806
+          },
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 32,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 28.007338
+          },
+          "frontend-proxy": {
+            "n": 26,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 29.401
+          },
+          "recommendation": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 18,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 400.79851
+          },
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 40,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 22.199708
+          },
+          "frontend-proxy": {
+            "n": 41,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 125.919
+          },
+          "recommendation": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {
+          "product-catalog p95_ms": "400.8ms > 119.6ms"
+        }
+      },
+      {
+        "t": 10.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 18,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 1202.991857
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 37,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 1604.934035
+          },
+          "frontend-proxy": {
+            "n": 45,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 805.308
+          },
+          "recommendation": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {
+          "product-catalog p95_ms": "1203.0ms > 119.6ms",
+          "frontend p95_ms": "1604.9ms > 133.6ms",
+          "frontend-proxy p95_ms": "805.3ms > 132.7ms"
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 15.0
+  },
+  "impact": [
+    {
+      "service": "product-catalog",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 19.622380952380894,
+        "peak": 1202.991857,
+        "change": 1183.3694760476192
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 1604.934035,
+        "change": 1571.3066923426575
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 805.308,
+        "change": 772.622393939394
+      }
+    },
+    {
+      "service": "recommendation",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 4.58,
+        "peak": null,
+        "change": null
+      }
+    }
+  ],
+  "amplification": [
+    {
+      "service": "product-catalog",
+      "increase_ms": 1183.4,
+      "delay_ms": 400,
+      "ratio": 3.0
+    },
+    {
+      "service": "frontend",
+      "increase_ms": 1571.3,
+      "delay_ms": 400,
+      "ratio": 3.9
+    }
+  ],
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 0.9227722772277227
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 34.4921875
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 1.1598513011152418
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 126.34765625
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 1.1403221809169763
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 10.65234375
+      }
+    },
+    {
+      "container": "recommendation",
+      "cpu_percent": {
+        "baseline": 2.7665186252937053,
+        "peak": 0.8574718397997496
+      },
+      "memory_mb": {
+        "baseline": 48.0232421875,
+        "peak": 48.0234375
+      }
+    },
+    {
+      "container": "product-catalog",
+      "cpu_percent": {
+        "baseline": 0.7358883746434256,
+        "peak": 0.6181637717121589
+      },
+      "memory_mb": {
+        "baseline": 11.0890625,
+        "peak": 11.10546875
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "inconclusive",
+    "explanation": "The experiment was aborted early at 12.6 seconds due to a threshold breach, preventing the observation of the full recovery phase as stated in the hypothesis.",
+    "model": "gemini-flash-lite-latest"
+  },
+  "grafana_window_ms": [
+    1791628301235,
+    1791628506812
+  ]
+}
