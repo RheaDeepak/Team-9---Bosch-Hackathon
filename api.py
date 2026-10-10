@@ -27,6 +27,7 @@ from control_plane import TERMINAL_STATES, ExperimentManager, baseline_summary
 from inject import ACTIVE_FILE, COMPOSE_PROJECT, PROJECT_LABEL
 from metrics import BASELINE_JSON, PROM_URL, capture_baseline, load_baseline
 from policy import PROTECTED
+from traffic_spike import capability as traffic_spike_capability
 
 
 ROOT = Path(__file__).resolve().parent
@@ -49,7 +50,7 @@ _idempotency_lock = RLock()
 
 
 class GoalRequest(BaseModel):
-    goal: str = Field(default="graceful_degradation", max_length=120)
+    goal: str | None = Field(default=None, max_length=120)
 
 
 class ApprovalRequest(BaseModel):
@@ -104,16 +105,17 @@ def _check_url(url: str, label: str) -> tuple[bool, str]:
         return False, f"{label} unreachable"
 
 
-def _runtime_checks() -> tuple[tuple[bool, str, int], tuple[bool, str], tuple[bool, str]]:
-    with ThreadPoolExecutor(max_workers=3) as pool:
+def _runtime_checks() -> tuple[tuple[bool, str, int], tuple[bool, str], tuple[bool, str], dict[str, Any]]:
+    with ThreadPoolExecutor(max_workers=4) as pool:
         docker_future = pool.submit(_check_docker)
         prometheus_future = pool.submit(_check_url, f"{PROM_URL}/-/ready", "Prometheus")
         jaeger_future = pool.submit(_check_url, JAEGER_URL, "Jaeger")
-        return docker_future.result(), prometheus_future.result(), jaeger_future.result()
+        traffic_future = pool.submit(traffic_spike_capability)
+        return docker_future.result(), prometheus_future.result(), jaeger_future.result(), traffic_future.result()
 
 
-def _ensure_execution_ready() -> None:
-    (docker_ready, docker_detail, container_count), (prometheus_ready, prometheus_detail), (jaeger_ready, jaeger_detail) = _runtime_checks()
+def _ensure_execution_ready(experiment_id: str) -> None:
+    (docker_ready, docker_detail, container_count), (prometheus_ready, prometheus_detail), (jaeger_ready, jaeger_detail), traffic = _runtime_checks()
     if not docker_ready or container_count == 0:
         raise RuntimeError(f"Astronomy Shop is not ready: {docker_detail}")
     if not prometheus_ready:
@@ -122,10 +124,13 @@ def _ensure_execution_ready() -> None:
         raise RuntimeError(f"Trace evidence is not ready: {jaeger_detail}")
     if not BASELINE_JSON.exists():
         raise RuntimeError("A measured baseline is required before fault injection")
+    experiment = manager.get(experiment_id)
+    if experiment.get("plan", {}).get("fault") == "traffic_spike" and not traffic["ready"]:
+        raise RuntimeError(f"Traffic-spike capability is not ready: {traffic['detail']}")
 
 
 def _approve_ready(experiment_id: str, approval_name: str) -> dict[str, Any]:
-    _ensure_execution_ready()
+    _ensure_execution_ready(experiment_id)
     return manager.approve(experiment_id, approval_name)
 
 
@@ -136,7 +141,7 @@ def health() -> dict[str, Any]:
 
 @app.get("/api/readiness")
 def readiness() -> dict[str, Any]:
-    (docker_ready, docker_detail, container_count), (prometheus_ready, prometheus_detail), (jaeger_ready, jaeger_detail) = _runtime_checks()
+    (docker_ready, docker_detail, container_count), (prometheus_ready, prometheus_detail), (jaeger_ready, jaeger_detail), traffic = _runtime_checks()
     topology_ready = DEPENDENCY_MAP.exists()
     baseline_ready = BASELINE_JSON.exists()
     safety_ready = topology_ready and not ACTIVE_FILE.exists() and manager.active_id is None
@@ -147,8 +152,15 @@ def readiness() -> dict[str, Any]:
         {"id": "jaeger", "label": "Jaeger", "detail": jaeger_detail, "ready": jaeger_ready},
         {"id": "safety", "label": "Safety policy", "detail": "Loaded" if safety_ready else "Blocked by active or missing state", "ready": safety_ready},
         {"id": "baseline", "label": "Baseline", "detail": "Available" if baseline_ready else "Capture required", "ready": baseline_ready},
+        {"id": "traffic_spike", "label": "Traffic spike", "detail": traffic["detail"], "ready": traffic["ready"]},
     ]
     return {"status": "ready" if all(check["ready"] for check in checks) else "blocked", "checks": checks}
+
+
+@app.get("/api/fault-capabilities")
+def fault_capabilities() -> dict[str, Any]:
+    traffic = traffic_spike_capability()
+    return {"capabilities": [traffic], "ready": traffic["ready"]}
 
 
 @app.get("/api/topology")
@@ -203,7 +215,8 @@ def create_baseline(body: BaselineRequest, idempotency_key: str | None = Header(
 @app.post("/api/experiments/propose")
 def propose(body: GoalRequest, idempotency_key: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        return _idempotent("propose", idempotency_key, lambda: manager.propose(body.goal))
+        goal = body.goal.strip() if body.goal and body.goal.strip() else None
+        return _idempotent("propose", idempotency_key, lambda: manager.propose(goal))
     except Exception as exc:
         raise _http_error(exc) from exc
 
@@ -251,7 +264,7 @@ def experiment_events(experiment_id: str) -> StreamingResponse:
         _, index = manager.events_since(experiment_id, 0)
         idle_ticks = 0
         experiment = manager.get(experiment_id)
-        yield f"data: {json.dumps({'state': experiment['state'], 'message': 'Live experiment stream connected.', 'live_metrics': experiment.get('live_metrics')})}\n\n"
+        yield f"data: {json.dumps({'state': experiment['state'], 'message': 'Live experiment stream connected.', 'live_metrics': experiment.get('live_metrics'), 'live_services': experiment.get('live_services')})}\n\n"
         while True:
             events, index = manager.events_since(experiment_id, index)
             experiment = manager.get(experiment_id)
@@ -262,6 +275,7 @@ def experiment_events(experiment_id: str) -> StreamingResponse:
                         "state": event["state"],
                         "message": event["message"],
                         "live_metrics": experiment.get("live_metrics"),
+                        "live_services": experiment.get("live_services"),
                         "event": event,
                     }
                     yield f"data: {json.dumps(payload)}\n\n"

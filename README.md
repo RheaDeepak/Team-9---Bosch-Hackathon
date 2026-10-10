@@ -28,7 +28,8 @@ operator UI**. It:
 - validates it through deterministic policy before approval;
 - executes bounded container-stop or network-delay faults;
 - guarantees rollback on completion, abort, or execution error;
-- streams experiment state and telemetry to a single-screen web UI; and
+- streams experiment state and telemetry to a single-screen web UI;
+- plots live request-rate, error-rate, and latency timelines with Grafana panel links; and
 - generates deterministic impact and resilience scores.
 
 See [INTEGRATION_REPORT.md](INTEGRATION_REPORT.md) for the component map,

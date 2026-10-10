@@ -291,8 +291,9 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
     verdict = judge_hypothesis(plan, measured)
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    path = RESULTS_DIR / f"{started.strftime('%Y%m%dT%H%M%SZ')}.json"
-    path.write_text(json.dumps({
+    result_id = started.strftime("%Y%m%dT%H%M%SZ")
+    result = {
+        "id": result_id,
         "plan": {k: v for k, v in plan.items() if k != "ranking"}, "plan_source": source,
         "ranking": plan.get("ranking"), "validation": validation,
         "started_at": started.isoformat(timespec="seconds"),
@@ -300,7 +301,8 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         "forced_abort_test": FORCE_ABORT_TEST, "guard": g, "rollback_verified": rolled_back,
         "recovery": recovery, "impact": impact, "amplification": amplified, "score": score,
         "container_resources": containers, "verdict": verdict,
-        "grafana_window_ms": grafana.window_ms(injected_at, ended_at) if injected_at else None}
+        "grafana_window_ms": grafana.window_ms(injected_at, ended_at) if injected_at else None,
+    }
     (RESULTS_DIR / f"{result_id}.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     emit(f"Saved {RESULTS_DIR / (result_id + '.json')}")
     phase("done")

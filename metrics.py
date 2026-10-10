@@ -18,7 +18,7 @@ load_dotenv()
 PROM_URL = os.getenv("PROMETHEUS_URL", "http://localhost:9090").rstrip("/")
 DEMO_DIR = Path(os.getenv("TARGET_REPOSITORY_PATH", "../opentelemetry-demo")).resolve()
 FLAGD_FILE = DEMO_DIR / "src" / "flagd" / "demo.flagd.json"
-COMPOSE_PROJECT = "opentelemetry-demo"
+COMPOSE_PROJECT = os.getenv("TARGET_COMPOSE_PROJECT", "opentelemetry-demo")
 BASELINE_JSON = Path("baseline.json")
 SAMPLE_INTERVAL_S = 15
 BASELINE_DURATION_S = 300
