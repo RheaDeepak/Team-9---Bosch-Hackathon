@@ -275,6 +275,11 @@ under `results/` and listed in the History panel.
 
 **What the UI shows**
 
+- **Keyboard and screen readers:** a skip link, a real button for every action, and an *Inspect service* menu plus zoom
+  buttons as the keyboard route into the dependency graph. Phase changes (plan proposed, fault active, rolling back,
+  result ready) are announced, errors appear in a dismissible banner under the top bar, and focus follows the layout when
+  the live view or the result moves to the top.
+
 - **Layout:** a top bar with a step navigation (it highlights where you are). The page re-composes around what matters
   now: the live view comes first while a fault runs, the result comes first once it is over, and readiness folds into
   one line when everything is green. It works down to phone width; the red STOP becomes a full-width bar at the bottom.

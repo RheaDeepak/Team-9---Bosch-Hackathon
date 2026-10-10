@@ -6,3 +6,5 @@ active_experiment.json
 agent_log.jsonl
 .venv/
 rankings/
+sessions/
+reports/

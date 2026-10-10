@@ -206,7 +206,7 @@ def score_experiment(impact, recovery, availability, elapsed_s=None):
 
 def propose(goal=None):
     """Planner + policy: {plan, source, note, validation}. `goal` optionally steers the planner."""
-    plan, source, note = propose_experiment(goal)
+    plan, source, note = propose_experiment(goal) if goal else propose_experiment()  # no goal -> ranker + agent
     return {"plan": plan, "source": source, "note": note, "validation": validate(plan)}
 
 
@@ -305,6 +305,11 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
     }
     (RESULTS_DIR / f"{result_id}.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     emit(f"Saved {RESULTS_DIR / (result_id + '.json')}")
+    try:  # cheap deterministic refresh for the Findings view; the AI analysis only runs when someone asks for it
+        import analysis  # here, not at the top: analysis imports this module
+        analysis.refresh()
+    except Exception as e:  # the findings view must never affect an experiment
+        emit(f"Findings refresh failed (ignored): {type(e).__name__}: {e}")
     phase("done")
     return result
 

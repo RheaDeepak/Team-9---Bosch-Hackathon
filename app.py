@@ -15,11 +15,16 @@ import docker
 import requests
 import uvicorn
 from fastapi import Body, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import activity
+import analysis
+import analysis_agent
 import discovery
 import planner
+import ranker
+import report
 import grafana
 import guard
 import inject
@@ -126,6 +131,7 @@ def _worker(plan, source, validation):
         probes_done.set()
         with LOCK:
             STATE["running"] = False
+        _maybe_auto_analyse()
 
 
 # ---- readiness -------------------------------------------------------------------------
@@ -274,6 +280,70 @@ def api_propose(body: dict = Body(default=None)):
     return p
 
 
+RANKING_ROWS = 40   # rows shown: one per service and fault
+CANDIDATE_FIELDS = ("rank", "target", "fault", "magnitude", "risk", "info", "priority", "outage", "why", "factors")
+
+
+@app.get("/api/ranking")
+def api_ranking():
+    """The ranker's scored candidates (no LLM) merged with the planning agent's decision for the current plan.
+    One row per service and fault: the variant the agent examined (else the ranker's best magnitude); the other
+    magnitudes of that fault come along as `variants`. A stop and a delay on one service are separate rows,
+    because the mildest delay would otherwise hide every container_stop."""
+    try:
+        ranking, _ = ranker.rank_from_files()
+    except (OSError, ValueError, KeyError) as e:
+        raise HTTPException(409, f"cannot rank: {e}")
+    with LOCK:
+        plan = STATE["plan"] or {}
+    agent = plan.get("ranking") or {}
+    by_id = {r["candidate_id"]: r for r in agent.get("top_k") or []}
+
+    def view(c):
+        a = by_id.get(c["id"], {})
+        return {"id": c["id"], **{k: c[k] for k in CANDIDATE_FIELDS}, "in_top_k": c["id"] in by_id,
+                "adjusted_risk": a.get("adjusted_risk"), "adjusted_priority": a.get("adjusted_priority"),
+                "reason": a.get("reason"), "evidence": a.get("evidence") or []}
+
+    groups = {}
+    for c in ranking:  # already best first, so each group's first entry is the ranker's best variant
+        groups.setdefault((c["target"], c["fault"]), []).append(view(c))
+    rows = []
+    for variants in groups.values():
+        primary = next((v for v in variants if v["in_top_k"]), variants[0])
+        rows.append({**primary, "variants": [v for v in variants if v is not primary]})
+    rows.sort(key=lambda r: r["rank"])
+    rows = rows[:RANKING_ROWS]
+    chosen = agent.get("chosen")
+    return {"candidates": rows, "total": len(ranking), "services": len({c["target"] for c in ranking}), "chosen": chosen,
+            "source": agent.get("source"), "run_id": agent.get("run_id"), "note": agent.get("note"),
+            "chosen_reason": next((r["reason"] for r in rows if r["id"] == chosen), None) or plan.get("reasoning")}
+
+
+FEED_MODES = ("", "planning", "analysis", "all")
+
+
+def _feed_mode(mode):
+    if mode not in FEED_MODES:
+        raise HTTPException(400, "mode must be one of: planning, analysis, all")
+    return mode or None
+
+
+@app.get("/api/agent-events")
+def api_agent_events(run: str = "", after: int = 0, mode: str = ""):
+    """Structured agent steps for the activity feed: the newest run (of `mode`, if given) unless `run` is given,
+    only those after `after`. mode=all streams every agent's steps of this server session."""
+    run_id, evs, last = activity.events(run or None, after, mode=_feed_mode(mode))
+    return {"run_id": run_id, "events": evs, "last": last}
+
+
+@app.get("/api/agent-sessions")
+def api_agent_sessions(mode: str = ""):
+    """Saved agent sessions (sessions/<run_id>.jsonl), newest first, for replay; optionally of one agent."""
+    m = _feed_mode(mode)
+    return activity.list_sessions(mode=None if m == "all" else m)
+
+
 @app.post("/api/approve", status_code=202)
 def api_approve():
     global WORKER
@@ -331,23 +401,12 @@ def api_status():
         s = {k: (list(v) if isinstance(v, list) else v) for k, v in STATE.items()}
         s["elapsed_s"] = _elapsed()
         s["server_time"] = time.time()
+        s["analysis"] = dict(ANALYSIS)
         return s
 
 
 def _load_result(path):
-    d = json.loads(path.read_text(encoding="utf-8"))
-    d["id"] = path.stem
-    d.setdefault("container_resources", [])
-    d["amplification"] = exp.amplification(d["plan"], d["impact"])  # recomputed: older results have an older shape
-    d["recovery"].setdefault("metrics_confirmed", None)
-    d["recovery"].setdefault("recovered", False)
-    if not d.get("score"):  # older results: score what was recorded (no probe data then)
-        d["score"] = exp.score_experiment(d["impact"], d["recovery"], None, d["guard"]["elapsed_s"])
-    d["verdict"].setdefault("recommendation", planner.remediation_for(d["plan"]))
-    if not d.get("grafana_window_ms"):  # older results: derive the window from what was recorded
-        start = datetime.fromisoformat(d["started_at"]).timestamp()
-        d["grafana_window_ms"] = grafana.window_ms(start, start + d["guard"]["elapsed_s"] + (d["recovery"]["seconds"] or 60))
-    return d
+    return analysis.normalise_result(json.loads(path.read_text(encoding="utf-8")), path.stem)
 
 
 @app.get("/api/results")
@@ -372,6 +431,91 @@ def api_result(rid: str):
     if not RESULT_ID.match(rid) or not path.is_file():
         raise HTTPException(404, "no such result")
     return _load_result(path)
+
+
+# ---- analysis (findings) ---------------------------------------------------------------
+
+ANALYSIS = {"running": False, "started_at": None, "trigger": None, "error": None, "source": None, "note": None,
+            "run_id": None, "auto": False}
+
+
+def _analysis_worker():
+    try:
+        out = analysis_agent.run_analysis()
+        with LOCK:
+            ANALYSIS.update(running=False, source=out["source"], note=out["note"], run_id=out.get("run_id"))
+    except Exception as e:  # e.g. no dependency map; the agent itself never raises for LLM problems
+        with LOCK:
+            ANALYSIS.update(running=False, error=f"{type(e).__name__}: {e}"[:300])
+
+
+def _start_analysis(trigger):
+    """Start the analysis agent in the background. Returns None, or why it did not start
+    ("experiment" while one runs, "running" while an analysis runs). Read-only: it never touches Docker."""
+    with LOCK:
+        if STATE["running"]:
+            return "experiment"
+        if ANALYSIS["running"]:
+            return "running"
+        ANALYSIS.update(running=True, started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                        trigger=trigger, error=None, source=None, note=None, run_id=None)
+    threading.Thread(target=_analysis_worker, name="analysis", daemon=True).start()
+    return None
+
+
+def _maybe_auto_analyse():
+    """After an experiment: analyse automatically when the operator switched that on. Never while one runs."""
+    with LOCK:
+        wanted = ANALYSIS["auto"] and STATE["phase"] == "done"
+    return _start_analysis("auto") is None if wanted else False
+
+
+@app.post("/api/analysis/run", status_code=202)
+def api_analysis_run():
+    why = _start_analysis("manual")
+    if why == "experiment":
+        raise HTTPException(409, "an experiment is running; analyse after it finishes")
+    if why == "running":
+        raise HTTPException(409, "an analysis is already running")
+    return {"started": True}
+
+
+@app.post("/api/analysis/auto")
+def api_analysis_auto(body: dict = Body(default=None)):
+    """Switch the automatic analysis after each completed experiment on or off (server state, off by default)."""
+    enabled = (body or {}).get("enabled")
+    if not isinstance(enabled, bool):
+        raise HTTPException(422, "body must be {\"enabled\": true|false}")
+    with LOCK:
+        ANALYSIS["auto"] = enabled
+    return {"auto": enabled}
+
+
+@app.get("/api/analysis/latest")
+def api_analysis_latest():
+    """Latest findings (agent output if it covers the current results, else deterministic) plus how fresh they are:
+    run_id of the analysis session (the live one while it runs), stale / covered_runs / new_runs, generated_at."""
+    with LOCK:
+        status = dict(ANALYSIS)
+    try:
+        data, latest = analysis.current(), analysis_agent.load_latest()
+        cov = analysis_agent.coverage(data, latest)
+        out = analysis_agent.latest_or_deterministic(data, latest)
+    except (OSError, ValueError, KeyError) as e:
+        raise HTTPException(503, f"analysis unavailable: {e}")
+    run_id = (activity.latest_run_id("analysis") if status["running"] else None) or status["run_id"] or cov["run_id"]
+    return {"status": status, "analysis": out, "run_id": run_id, "stale": cov["stale"], "analysed": cov["analysed"],
+            "covered_runs": cov["covered_runs"], "new_runs": cov["new_runs"],
+            "generated_at": cov["generated_at"] or out["generated_at"]}
+
+
+@app.get("/api/report", response_class=HTMLResponse)
+def api_report():
+    """The findings report as one self-contained HTML page."""
+    try:
+        return HTMLResponse(report.render_html(analysis_agent.latest_or_deterministic()))
+    except (OSError, ValueError, KeyError) as e:
+        raise HTTPException(503, f"report unavailable: {e}")
 
 
 app.mount("/", StaticFiles(directory=BASE_DIR / "static", html=True), name="static")

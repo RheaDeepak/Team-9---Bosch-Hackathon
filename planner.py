@@ -1,11 +1,9 @@
 """Experiment planner: PROPOSES one experiment (ranker + investigating agent). It never runs anything."""
 import json
-import os
 import re
 
-import requests
-from dotenv import load_dotenv
 from discovery import load_flows, load_graph
+from llm import API_KEY_VAR, MAX_TOKENS as LLM_MAX_TOKENS, PLACEHOLDER_KEY, load_api_key, post as _post_gemini
 from metrics import load_baseline
 from policy import MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECTED, REQUIRED_KEYS
 from traffic_spike import JOURNEY_PROFILE, MAX_PEAK_USERS, capability as traffic_spike_capability
@@ -13,15 +11,8 @@ from traffic_spike import JOURNEY_PROFILE, MAX_PEAK_USERS, capability as traffic
 TRAFFIC_SPIKE_GOAL = "capacity"
 _RANKED_DEFAULT = object()
 
-# Tried in order: Gemini models get overloaded or retired, so one name is a single point of failure.
-LLM_MODELS = ("gemini-3.8-flash", "gemini-3-flash-preview", "gemini-flash-lite-latest")
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-LLM_MAX_TOKENS = 4096  # thinking models spend part of this on reasoning before the answer
-LLM_TIMEOUT_S = 20
 VERDICTS = ("held", "partially held", "not held", "inconclusive")
 CLAIM_STATUSES = ("supported", "contradicted", "no data")
-API_KEY_VAR = "LLM_API_KEY"
-PLACEHOLDER_KEY = "your-api-key-here"  # value shipped in .env.example
 # Optional operator goals offered by the UI: key -> hint given to the planner.
 GOALS = {
     "graceful_degradation": ("Test graceful degradation",
@@ -101,33 +92,6 @@ def build_context(graph, stats, baseline, flows):
                           for name, flow in flows.items()},
         "baseline_flags_enabled": (baseline or {}).get("flags_enabled", []),
     }
-
-
-def load_api_key():
-    """The Gemini API key from .env / the environment, or None if unset or still the placeholder."""
-    load_dotenv()
-    key = os.getenv(API_KEY_VAR, "").strip()
-    return None if not key or key == PLACEHOLDER_KEY else key
-
-
-def _post_gemini(api_key, body, models=LLM_MODELS):
-    """POST one generateContent request, trying each model in turn -> (candidate, model)."""
-    errors = []
-    for model in models:  # next model on timeout, overload, or retired model
-        try:
-            resp = requests.post(GEMINI_URL.format(model=model), json=body, timeout=LLM_TIMEOUT_S,
-                                 headers={"x-goog-api-key": api_key})
-        except requests.RequestException as e:
-            errors.append(f"{model}: {type(e).__name__}")
-            continue
-        if resp.ok:
-            cand = resp.json()["candidates"][0]
-            if cand.get("finishReason") == "MAX_TOKENS":
-                errors.append(f"{model}: reply truncated (MAX_TOKENS)")
-                continue
-            return cand, model
-        errors.append(f"{model}: HTTP {resp.status_code}")
-    raise RuntimeError("all models failed (" + "; ".join(errors) + ")")
 
 
 def _call_llm(api_key, content, system=SYSTEM_PROMPT):

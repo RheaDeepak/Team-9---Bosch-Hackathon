@@ -49,9 +49,15 @@ class SearchSourceSandboxTest(unittest.TestCase):
         self.assertEqual(out["matches"], [])
 
     def test_refuses_without_root(self):
-        with mock.patch.dict(os.environ, {rank_agent.SRC_ENV_VAR: ""}), mock.patch.object(rank_agent, "load_dotenv"):
+        blank = {rank_agent.SRC_ENV_VAR: "", rank_agent.SRC_FALLBACK_VAR: ""}
+        with mock.patch.dict(os.environ, blank), mock.patch.object(rank_agent, "load_dotenv"):
             with self.assertRaises(rank_agent.ToolError):
                 rank_agent.search_source("checkout", "x")
+
+    def test_falls_back_to_target_repository_path(self):
+        env = {rank_agent.SRC_ENV_VAR: "", rank_agent.SRC_FALLBACK_VAR: str(self.root)}
+        with mock.patch.dict(os.environ, env), mock.patch.object(rank_agent, "load_dotenv"):
+            self.assertEqual(rank_agent._src_root(), self.root.resolve())
 
 
 def reply(*parts):
@@ -115,6 +121,48 @@ class RankAgentTest(unittest.TestCase):
         out = self.agent(loop)
         self.assertEqual(out["source"], "ranker_fallback")
         self.assertEqual(self.log_types().count("tool_call"), rank_agent.MAX_TOOL_CALLS)
+
+    def test_cap_returns_best_plan_so_far_with_the_evidence_found(self):
+        loop = [reply({"functionCall": {"name": "get_history", "args": {"service": "pay"}}})] * 20
+        out = self.agent(loop)
+        self.assertEqual(out["source"], "ranker_fallback")
+        self.assertTrue(out["capped"])
+        self.assertEqual(out["tool_calls"], rank_agent.MAX_TOOL_CALLS)
+        self.assertIn("tool budget", out["note"])
+        self.assertTrue(validate(out["plan"], self.g)["valid"])
+        evidence = out["top_k"][0]["evidence"]
+        self.assertEqual(len(evidence), rank_agent.MAX_TOOL_CALLS)
+        self.assertEqual(evidence[0]["tool"], "get_history")
+
+    def test_events_are_structured_and_saved_for_replay(self):
+        import activity
+        loop = [reply({"functionCall": {"name": "get_edges", "args": {"service": "pay"}}}),
+                reply({"text": "garbage"})]
+        out = self.agent(loop)
+        evs = activity.load_session(out["run_id"], Path(self.tmp.name) / "sessions")
+        self.assertEqual([e["type"] for e in evs], ["thought", "tool_call", "tool_result", "decision"])
+        call, result, decision = evs[1], evs[2], evs[3]
+        self.assertEqual((call["tool"], call["args"]), ("get_edges", {"service": "pay"}))
+        self.assertIn("callers", result["detail"])
+        self.assertTrue(decision["fallback"])
+        _, live, last = activity.events(out["run_id"], after=evs[1]["seq"], sessions_dir=Path(self.tmp.name) / "sessions")
+        self.assertEqual([e["step"] for e in live], [3, 4])
+        self.assertEqual(last, live[-1]["seq"])
+        self.assertEqual(activity.events("../etc", 0)[1], [])   # a run id is never a path
+        self.assertEqual(activity.list_sessions(Path(self.tmp.name) / "sessions")[0]["run_id"], out["run_id"])
+
+    def test_top_k_keeps_both_fault_kinds_and_distinct_targets(self):
+        ranking = rank_agent.ranker.rank(self.g, baseline(), flows(), [])
+        plain = []
+        for c in ranking:                    # what a plain one-per-target top-3 would give
+            if c["target"] not in {x["target"] for x in plain}:
+                plain.append(c)
+        self.assertEqual({c["fault"] for c in plain[:3]}, {"network_delay"})   # the problem: no container_stop in sight
+        top = rank_agent.top_k(ranking, 3)
+        self.assertEqual({c["fault"] for c in top}, {"network_delay", "container_stop"})
+        self.assertEqual(len({c["target"] for c in top}), 3)
+        self.assertEqual(top[:2], plain[:2])                                   # only the last slot changes
+        self.assertEqual(len(rank_agent.top_k(ranking, 1)), 1)
 
 
 if __name__ == "__main__":
