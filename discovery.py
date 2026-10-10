@@ -148,6 +148,8 @@ def fetch_spans(extra_services=(), url=TRACES_URL, lookback=TRACE_LOOKBACK, limi
                   "query.start_time_min": (now - lookback).strftime(fmt),
                   "query.start_time_max": now.strftime(fmt)}
         resp = requests.get(url, params=params, timeout=60)
+        if resp.status_code == 404 and "No traces found" in resp.text:
+            continue  # e.g. a stopped service: no traces is an answer, not an error
         resp.raise_for_status()
         for rs in resp.json().get("result", {}).get("resourceSpans", []):
             svc_name = _attrs(rs.get("resource", {})).get("service.name", "unknown")

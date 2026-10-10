@@ -1,0 +1,425 @@
+{
+  "plan": {
+    "target": "cart",
+    "fault": "container_stop",
+    "magnitude": 0,
+    "duration_s": 60,
+    "hypothesis": "Stopping cart for 60s makes add-to-cart, view-cart and checkout fail visibly (error rate rises on frontend and checkout) and the system recovers once cart restarts.",
+    "reasoning": "Safe default: cart is on the checkout path and is called by both frontend and checkout, so it exercises the core purchase journey, yet it is not a protected service."
+  },
+  "plan_source": "fallback",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ]
+  },
+  "started_at": "2026-10-10T09:54:37+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: frontend p95_ms (15003.2ms > 133.6ms)",
+    "elapsed_s": 36.7,
+    "peaks": {
+      "cart": {
+        "error_rate": 0.0,
+        "p95_ms": 2.5794
+      },
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 15003.19903
+      },
+      "frontend-proxy": {
+        "error_rate": 5.714285714285714,
+        "p95_ms": 15003.798
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 1.6212531328320803,
+        "memory_mb": 34.41015625
+      },
+      "frontend": {
+        "cpu_percent": 2.532780487804878,
+        "memory_mb": 125.77734375
+      },
+      "checkout": {
+        "cpu_percent": 0.025635910224438903,
+        "memory_mb": 11.91015625
+      },
+      "cart": {
+        "cpu_percent": null,
+        "memory_mb": null
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "cart": {
+            "n": 16,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 2.5794
+          },
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 42,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 8.486422
+          },
+          "frontend-proxy": {
+            "n": 25,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 14.553
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "cart": {
+            "n": 14,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 2.5794
+          },
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 46,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 9.694399
+          },
+          "frontend-proxy": {
+            "n": 34,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 57.239
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 10.0,
+        "metrics": {
+          "cart": {
+            "n": 14,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 2.5794
+          },
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 46,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 23.896279
+          },
+          "frontend-proxy": {
+            "n": 36,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 57.239
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 15.0,
+        "metrics": {
+          "cart": {
+            "n": 14,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 2.5794
+          },
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 50,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 23.896279
+          },
+          "frontend-proxy": {
+            "n": 42,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 46.418
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 20.0,
+        "metrics": {
+          "cart": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 26,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 22.4733
+          },
+          "frontend-proxy": {
+            "n": 39,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 46.418
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 25.0,
+        "metrics": {
+          "cart": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 31,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 23.896279
+          },
+          "frontend-proxy": {
+            "n": 44,
+            "errors": 1,
+            "error_rate": 2.272727272727273,
+            "p95_ms": 46.418
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 30.0,
+        "metrics": {
+          "cart": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 26,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 15001.566515
+          },
+          "frontend-proxy": {
+            "n": 40,
+            "errors": 2,
+            "error_rate": 5.0,
+            "p95_ms": 126.489
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "15001.6ms > 133.6ms"
+        }
+      },
+      {
+        "t": 35.0,
+        "metrics": {
+          "cart": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 19,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 15003.19903
+          },
+          "frontend-proxy": {
+            "n": 35,
+            "errors": 2,
+            "error_rate": 5.714285714285714,
+            "p95_ms": 15003.798
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "15003.2ms > 133.6ms",
+          "frontend-proxy p95_ms": "15003.8ms > 132.7ms"
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 0.0
+  },
+  "impact": [
+    {
+      "service": "cart",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 2.017674418604651,
+        "peak": 2.5794,
+        "change": 0.5617255813953492
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 15003.19903,
+        "change": 14969.571687342657
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 5.714285714285714,
+        "change": 5.714285714285714
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 15003.798,
+        "change": 14971.112393939395
+      }
+    }
+  ],
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 1.6212531328320803
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 34.41015625
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 2.532780487804878
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 125.77734375
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 0.025635910224438903
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 11.91015625
+      }
+    },
+    {
+      "container": "cart",
+      "cpu_percent": {
+        "baseline": 0.14628476840824492,
+        "peak": null
+      },
+      "memory_mb": {
+        "baseline": 55.3525390625,
+        "peak": null
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "inconclusive",
+    "explanation": "LLM unavailable: ValueError: no JSON object in LLM reply"
+  }
+}

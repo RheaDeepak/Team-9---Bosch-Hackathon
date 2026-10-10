@@ -1,0 +1,206 @@
+{
+  "plan": {
+    "target": "product-catalog",
+    "fault": "network_delay",
+    "magnitude": 300,
+    "duration_s": 60,
+    "hypothesis": "300ms egress delay on product-catalog raises p95 on its callers and the system recovers after removal.",
+    "reasoning": "kill-switch proof run"
+  },
+  "plan_source": "fallback",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator",
+      "recommendation"
+    ]
+  },
+  "started_at": "2026-10-10T09:10:55+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T07:54:38+00:00",
+    "flags_enabled": [
+      "loadGeneratorFloodHomepage=on"
+    ]
+  },
+  "forced_abort_test": true,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: product-catalog p95_ms (946.7ms > 0.0ms); frontend p95_ms (7.1ms > 0.0ms); frontend-proxy p95_ms (65.7ms > 0.0ms)",
+    "elapsed_s": 9.2,
+    "peaks": {
+      "product-catalog": {
+        "error_rate": 0.0,
+        "p95_ms": 946.709459
+      },
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 7.133901
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 65.712
+      },
+      "recommendation": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 20,
+            "error_rate": 0.0,
+            "p95_ms": 8.130034
+          },
+          "checkout": {
+            "n": 1,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 441,
+            "error_rate": 0.0,
+            "p95_ms": 6.262871
+          },
+          "frontend-proxy": {
+            "n": 230,
+            "error_rate": 0.0,
+            "p95_ms": 9.046
+          },
+          "recommendation": {
+            "n": 2,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {
+          "product-catalog p95_ms": "8.1ms > 0.0ms",
+          "frontend p95_ms": "6.3ms > 0.0ms",
+          "frontend-proxy p95_ms": "9.0ms > 0.0ms"
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 17,
+            "error_rate": 0.0,
+            "p95_ms": 946.709459
+          },
+          "checkout": {
+            "n": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 439,
+            "error_rate": 0.0,
+            "p95_ms": 7.133901
+          },
+          "frontend-proxy": {
+            "n": 235,
+            "error_rate": 0.0,
+            "p95_ms": 65.712
+          },
+          "recommendation": {
+            "n": 2,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {
+          "product-catalog p95_ms": "946.7ms > 0.0ms",
+          "frontend p95_ms": "7.1ms > 0.0ms",
+          "frontend-proxy p95_ms": "65.7ms > 0.0ms"
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 25.0
+  },
+  "impact": [
+    {
+      "service": "product-catalog",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 45.94883356398586,
+        "peak": 946.709459,
+        "change": 900.7606254360142
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 305.5,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 45.17101422099465,
+        "peak": 7.133901,
+        "change": -38.03711322099465
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 48.067862059330864,
+        "peak": 65.712,
+        "change": 17.64413794066914
+      }
+    },
+    {
+      "service": "recommendation",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 39.48071428571428,
+        "peak": null,
+        "change": null
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "inconclusive",
+    "explanation": "LLM unavailable: ReadTimeout: HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): Read timed out. (read timeout=40)"
+  }
+}
