@@ -79,7 +79,10 @@ class FlowFixture(unittest.TestCase):
             self.seen.append(("judge", self.phase()))
             return {"verdict": "held", "explanation": "stub", "claims": [], "recommendation": "stub"}
 
+        self.normal = [{"t": t, "services": {"cart": dict(HEALTHY), "frontend": dict(HEALTHY), "checkout": dict(HEALTHY)}}
+                       for t in range(-120, 1, 5)]
         patches = [
+            mock.patch.object(guard, "history", lambda services, **kw: self.normal),
             mock.patch.object(exp, "load_baseline", lambda: self.base),
             mock.patch.object(exp, "RESULTS_DIR", self.dir / "results"),
             mock.patch.object(exp, "APPROVED_JSON", self.dir / "approved.json"),
@@ -120,6 +123,7 @@ class FlowFixture(unittest.TestCase):
         self.assertTrue(result["recovery"]["recovered"], result["recovery"])
         self.assertEqual(result["recovery"]["required_samples"], 2)
         self.assertEqual(result["verdict"]["verdict"], "held")
+        self.assertEqual(result["normal"], self.normal)          # the "Normal" side of the charts is saved with the result
         self.assertIn("resilience_score", result["score"])
         self.assertEqual([i["service"] for i in result["impact"]][0], "cart")
         order = [what for what, _ in self.seen]
@@ -187,6 +191,7 @@ class AppPathTest(FlowFixture):
         self.assertEqual(s["phase"], "done", (s["refused"], s["events"][-5:]))
         self.assert_full_flow(s["result"], aborted=False)
         self.assert_full_flow(self.saved(), aborted=False)
+        self.assertEqual(s["normal"], self.normal)               # and published for the live charts
         # every phase was entered, in order: what each fake saw is the phase the worker had published
         by_what = {}
         for what, phase in self.seen:

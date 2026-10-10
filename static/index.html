@@ -217,6 +217,14 @@ button.chip.link { transition:background-color var(--ease); } button.chip.link:h
 .kpi b { display:block; font-size:24px; line-height:1.2; letter-spacing:-.01em; } .kpi span { color:var(--text-3); font-size:11.5px; text-transform:uppercase; letter-spacing:.07em; }
 .focusbar { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2); color:var(--text-2); font-size:13px; margin:0 0 var(--s3); }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--s4); } .grid2 + .grid2 { margin-top:var(--s4); }
+.cmp-bar { display:flex; flex-wrap:wrap; gap:var(--s3); align-items:center; margin:0 0 var(--s3); }
+.seg { display:inline-flex; gap:0; } .seg .btn { border-radius:0; } .seg .btn:first-child { border-radius:var(--r-sm) 0 0 var(--r-sm); } .seg .btn:last-child { border-radius:0 var(--r-sm) var(--r-sm) 0; }
+.seg .btn[aria-pressed="true"] { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+.cmp-row + .cmp-row { margin-top:var(--s4); }
+.cmp-pair { display:grid; grid-template-columns:1fr 1fr; gap:var(--s4); }
+.cmp-side { font-size:13.5px; font-weight:650; margin:0 0 var(--s2); color:var(--text); } .cmp-side small { font-weight:400; }
+.cmp-sum { margin:var(--s2) 0 0; font-size:13.5px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; } .cmp-sum:empty { display:none; }
+@media (max-width:760px) { .cmp-pair { grid-template-columns:1fr; } }
 .chartbox { height:240px; position:relative; } .chartbox canvas { position:absolute; inset:0; }
 .probe-row { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s3); padding:var(--s2) 0; } .probe-row + .probe-row { border-top:1px solid var(--line); }
 .probe-row .pill { min-width:56px; justify-content:center; } .probe-row b { min-width:68px; }
@@ -293,10 +301,10 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 .scorewrap { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s3); }
 
 /* ================= Emergency stop ================= */
-#stop { position:fixed; right:var(--s5); bottom:calc(var(--s5) + env(safe-area-inset-bottom)); z-index:40; display:none; align-items:center; gap:var(--s3);
-  background:var(--bad-solid); border:2px solid #ff8a87; color:#fff; font-size:17px; font-weight:800; letter-spacing:.03em; padding:16px 30px; border-radius:var(--r-md);
-  box-shadow:0 10px 34px rgba(207,52,52,.5); transition:background-color var(--ease), transform .08s ease, box-shadow var(--ease); }
-#stop::before { content:""; width:14px; height:14px; border-radius:3px; background:#fff; flex:none; }
+#stop { position:fixed; right:var(--s5); bottom:calc(var(--s5) + env(safe-area-inset-bottom)); z-index:40; display:none; align-items:center; gap:var(--s2);
+  background:var(--bad-solid); border:2px solid #ff8a87; color:#fff; font-size:13px; font-weight:800; letter-spacing:.03em; padding:8px 16px; border-radius:var(--r-sm);
+  box-shadow:0 6px 20px rgba(207,52,52,.45); transition:background-color var(--ease), transform .08s ease, box-shadow var(--ease); }
+#stop::before { content:""; width:10px; height:10px; border-radius:2px; background:#fff; flex:none; }
 #stop:hover:not(:disabled) { background:var(--bad-hover); box-shadow:0 12px 40px rgba(224,69,69,.6); } #stop:active:not(:disabled) { transform:translateY(1px); }
 #stop:focus-visible { outline:3px solid #fff; outline-offset:3px; border-radius:var(--r-md); }
 #stop.show { display:inline-flex; }
@@ -329,7 +337,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
   .decision .btns { margin-left:0; width:100%; } .decision .btns .btn { flex:1; }
   .scorebar { padding:var(--s4); }
   th, td { padding:8px 10px; }
-  #stop { left:var(--s3); right:var(--s3); bottom:calc(var(--s3) + env(safe-area-inset-bottom)); justify-content:center; padding:15px 20px; }
+  #stop { left:var(--s3); right:var(--s3); bottom:calc(var(--s3) + env(safe-area-inset-bottom)); justify-content:center; padding:12px 16px; min-height:44px; }
 }
 @media (prefers-reduced-motion:reduce) {
   html { scroll-behavior:auto; }
@@ -451,10 +459,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
       </div>
       <div class="focusbar">Baseline and abort threshold (dashed) for <label class="field"><span class="sr">Service for baseline lines</span><select id="focus"></select></label></div>
       <p id="chartSummary" class="sr"></p>
-      <div class="grid2">
-        <div class="panel"><h3 class="sub">p95 latency (ms)</h3><div class="chartbox"><canvas id="chartP95" role="img" aria-label="p95 latency over time for the target and the services that depend on it" aria-describedby="chartSummary"></canvas></div></div>
-        <div class="panel"><h3 class="sub">Error rate (%)</h3><div class="chartbox"><canvas id="chartErr" role="img" aria-label="Error rate over time for the target and the services that depend on it" aria-describedby="chartSummary"></canvas></div></div>
-      </div>
+      <div id="liveCmpMount"></div>
       <div class="grid2">
         <div class="panel"><h3 class="sub">Shop probes <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(synthetic user requests, display only)</span></h3><div id="probes"></div></div>
         <div class="panel"><h3 class="sub">Event log</h3><pre id="events" role="log" aria-live="off" tabindex="0"></pre></div>
@@ -549,7 +554,7 @@ async function withBusy(btn, label, fn) {
   const original = btn.textContent; btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = label;
   try { await fn(); } finally { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = original; }
 }
-let offline = false, startupSeen = false, lastPhase = null;
+let offline = false, startupSeen = false, lastPhase = null, started = false;
 function phaseMessage(s) {
   const p = s.plan, r = s.result;
   switch (s.phase) {
@@ -559,6 +564,7 @@ function phaseMessage(s) {
     case 'recovering': return 'Rollback finished. Waiting for the system to recover.';
     case 'done': return r ? `Experiment finished, ${r.guard.aborted ? 'aborted' : 'completed'}. Resilience ${r.score ? r.score.resilience_score : 'unknown'} out of 100. Verdict: ${r.verdict.verdict}.` : 'Experiment finished.';
     case 'refused': case 'error': return `The experiment did not run: ${s.refused}`;
+    case 'proposing': return $('goalSel').value ? 'Making an LLM call to propose an experiment.' : 'The planning agent is running. It is making LLM calls and read-only tool calls.';
     case 'idle': return lastPhase === 'proposed' ? 'Plan rejected.' : '';
     default: return '';
   }
@@ -848,11 +854,34 @@ function rankingHtml(r) {
     ${pr.length ? `<h3 class="sub">Predictions</h3><ul>${pr.map(x => `<li>${esc(x.svc)} ${esc(x.metric)} ${esc(x.direction)} (&times;${esc(x.min_factor)})</li>`).join('')}</ul>` : ''}
     <p class="muted"><a href="#agentSec">Full ranking and the agent's steps</a></p></details>`;
 }
+const agentStats = { run: '', llm: 0, tools: 0, last: null, seen: new Set() };       // what the planning agent has done so far, from its events
+function noteAgentEvents(evs) {                                    // called by the feed for every batch of events
+  for (const e of evs) {
+    if ((e.mode || 'planning') !== 'planning') continue;
+    if (e.run_id !== agentStats.run) Object.assign(agentStats, { run: e.run_id, llm: 0, tools: 0, last: null, seen: new Set() });
+    const id = e.run_id + ':' + e.step; if (agentStats.seen.has(id)) continue;      // a feed reset re-reads events: count each step once
+    agentStats.seen.add(id);
+    if (e.type === 'llm' && /^answered by/.test(e.summary)) agentStats.llm++;
+    if (e.type === 'tool_call') agentStats.tools++;
+    agentStats.last = e;
+  }
+}
+function agentRunningHtml() {                                      // while POST /api/propose runs the agent
+  const a = agentStats, fresh = a.run && a.run !== (mainFeed.ignoreRun || ''), last = fresh ? a.last : null;
+  const now = !last ? 'about to make its first LLM call'
+    : last.type === 'llm' ? 'the model answered; running its read-only tool calls'
+    : last.type === 'decision' ? 'finishing up'
+    : 'LLM call in progress: waiting for the model';
+  return `<p class="plan-empty"><span class="spin"></span><b>The planning agent is running and making LLM calls.</b> It asks the model which of the top candidates to investigate,
+    runs read-only tool calls (at most ${AGENT_TOOL_CAP}) on what the model asks for, then asks it to choose.
+    <span class="muted">Now: ${esc(now)}. LLM calls so far: ${fresh ? a.llm : 0}, tool calls: ${fresh ? a.tools : 0} of ${AGENT_TOOL_CAP}. Every step is in the Planning agent card below.</span></p>`;
+}
+const AGENT_TOOL_CAP = 8;
 function renderPlan() {
   const s = status, p = s && s.plan, v = s && s.validation, running = s && s.running;
   const proposing = !!(s && s.phase === 'proposing');
   $('propose').disabled = !!running || proposing;
-  $('propose').innerHTML = proposing ? '<span class="spin"></span>Proposing…' : 'Propose experiment';
+  $('propose').innerHTML = proposing ? `<span class="spin"></span>${$('goalSel').value ? 'LLM call…' : 'Agent running…'}` : 'Propose experiment';
   const canDecide = s && s.phase === 'proposed' && p;
   const planKey = p ? JSON.stringify(p) : ''; if (planKey !== lastPlanKey) { lastPlanKey = planKey; $('reviewed').checked = false; }
   const trafficReady = p && p.fault === 'traffic_spike'
@@ -866,7 +895,9 @@ function renderPlan() {
     : !trafficReady ? 'Traffic spike is unavailable because the Locust executor or rollback path is not ready.'
     : !$('reviewed').checked ? 'Tick the box to confirm you reviewed the plan.' : '';
   if (!p) {
-    $('plan').innerHTML = proposing ? '<p class="plan-empty"><span class="spin"></span>The planner is thinking (an LLM call, up to a minute)…</p>'
+    $('plan').innerHTML = proposing ? ($('goalSel').value
+      ? '<p class="plan-empty"><span class="spin"></span><b>Making an LLM call.</b> The planner asks the model for one experiment that fits your goal (up to a minute).</p>'
+      : agentRunningHtml())
       : '<p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p>';
     return;
   }
@@ -900,39 +931,164 @@ function renderSteps(s) {
   $('steps').innerHTML = STEPS.map((n, i) => `<span class="step ${bad ? '' : i < cur || s.phase === 'done' ? 'done' : i === cur ? 'now' : ''}">${n.replace('_', ' ')}</span>`).join('')
     + (bad ? `<span class="step fail">${esc(s.phase)}: ${esc(s.refused)}</span>` : '');
 }
-function lineChart(id, unit) {
-  const rollback = { id: 'rollback', afterDraw(c) {
-      const x = status && status.rollback_at_s; if (x == null) return;
-      const px = c.scales.x.getPixelForValue(x), a = c.chartArea, g = c.ctx;
-      g.save(); g.strokeStyle = '#f5a524'; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(px, a.top); g.lineTo(px, a.bottom); g.stroke();
-      g.fillStyle = '#f5a524'; g.font = '11px sans-serif'; g.fillText('rollback', px + 4, a.top + 12); g.restore(); } };
-  return new Chart($(id), { type: 'line', data: { datasets: [] }, plugins: [rollback], options: { animation: false, maintainAspectRatio: false, parsing: false,
+/* cmp:pure begin (no DOM, no Chart.js: unit-tested from tests/test_ui_comparison.js) */
+const CMP_METRICS = [{ key: 'p95_ms', title: 'p95 latency', unit: 'ms', floor: 1 }, { key: 'error_rate', title: 'Error rate', unit: '%', floor: 0.1 }];
+const CMP_EXTRA = 3;                                         // the target plus this many most affected services by default
+function niceCeil(v) {
+  if (!(v > 0)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return Math.round(m * p * 1e9) / 1e9;
+  return 10 * p;
+}
+const medianOf = a => { const v = a.filter(x => x != null).sort((x, y) => x - y); return v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2) : null; };
+const cell = (row, svc, key) => { const v = row.services && row.services[svc]; return v && v[key] != null ? v[key] : null; };
+function cmpSpan(d) {                                        // one time span for both sides, in seconds
+  const last = Math.max(0, ...(d.attack || []).map(x => x.t));
+  return Math.min(180, Math.max(20, Math.ceil(Math.max((d.plan && d.plan.duration_s) || 60, last) / 5) * 5));
+}
+function normalSeries(d, svc, key) {                         // the last `span` seconds before injection, else the baseline average
+  const span = cmpSpan(d), pts = (d.normal || []).map(x => ({ x: x.t + span, y: cell(x, svc, key) })).filter(q => q.x >= 0);
+  if (pts.some(q => q.y != null)) return { points: pts, fallback: false };
+  const b = d.baseline && d.baseline[svc] ? d.baseline[svc][key] : null;
+  return { points: b == null ? [] : [{ x: 0, y: b }, { x: span, y: b }], fallback: true };
+}
+const attackSeries = (d, svc, key) => (d.attack || []).map(x => ({ x: x.t, y: cell(x, svc, key) }));
+const peakOf = pts => Math.max(-1, ...pts.map(q => q.y == null ? -1 : q.y));
+function affectedScore(d, svc) {                             // 1.0 = latency doubled, or +2 points of error rate
+  let score = 0;
+  for (const m of CMP_METRICS) {
+    const base = medianOf(normalSeries(d, svc, m.key).points.map(q => q.y)), peak = peakOf(attackSeries(d, svc, m.key));
+    if (peak < 0 || base == null) continue;
+    score = Math.max(score, m.key === 'p95_ms' ? (peak - base) / Math.max(base, 5) : (peak - base) / 2);
+  }
+  return score;
+}
+function pickServices(d, all) {
+  const names = d.services || [], target = d.plan && d.plan.target;
+  if (all) return names.slice();
+  const rest = names.filter(n => n !== target).map(n => [n, affectedScore(d, n)]).sort((a, b) => b[1] - a[1] || names.indexOf(a[0]) - names.indexOf(b[0]));
+  return [...(names.includes(target) ? [target] : []), ...rest.slice(0, CMP_EXTRA).map(r => r[0])];
+}
+function yRange(d, svcs, m, log) {                           // ONE range for both charts of a row, from the data of both sides
+  let top = 0;
+  for (const svc of svcs) for (const q of [...normalSeries(d, svc, m.key).points, ...attackSeries(d, svc, m.key)]) if (q.y != null && q.y > top) top = q.y;
+  if (!log) return { min: 0, max: niceCeil(top * 1.08) };
+  return { min: m.floor, max: Math.max(niceCeil(top * 1.08), m.floor * 10) };
+}
+function summaryLine(d, m) {                                 // the most affected service of the whole experiment, not just the visible ones
+  let best = null;
+  for (const svc of d.services || []) {
+    const base = medianOf(normalSeries(d, svc, m.key).points.map(q => q.y)), peak = peakOf(attackSeries(d, svc, m.key));
+    if (peak < 0 || base == null) continue;
+    const rise = m.key === 'p95_ms' ? peak / Math.max(base, 0.5) : peak - base;
+    if (!best || rise > best.rise) best = { svc, base, peak, rise };
+  }
+  if (!best) return `No ${m.title.toLowerCase()} data during the fault (too little traffic to measure).`;
+  if (m.key === 'p95_ms') {
+    const r = best.peak / Math.max(best.base, 0.5);
+    return `${best.svc}: ${Math.round(best.base)} ms → ${Math.round(best.peak)} ms (${r >= 1.1 ? (r >= 10 ? Math.round(r) : r.toFixed(1)) + '× slower' : 'no change'})`;
+  }
+  const diff = best.peak - best.base;
+  return `${best.svc}: ${best.base.toFixed(1)}% → ${best.peak.toFixed(1)}% (${diff >= 0.1 ? '+' + diff.toFixed(1) + ' points' : 'no change'})`;
+}
+function markersFor(d) {
+  const out = [{ x: 0, color: '#f0524f', label: 'fault injected' }];
+  if (d.rollback_at_s != null) out.push({ x: d.rollback_at_s, color: '#f5a524', label: d.stopped ? 'stop + rollback' : d.aborted ? 'auto-abort + rollback' : 'rollback' });
+  return out;
+}
+/* cmp:pure end */
+
+const cmpCharts = {}, cmpData = {}, cmpState = { all: false, log: false };
+const cmpId = (prefix, key, side) => `${prefix}_${key}_${side}`;
+function cmpHtml(prefix) {
+  const btn = (kind, v, label, on) => `<button type="button" class="btn btn-sm" data-cmp="${kind}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
+  const row = m => `<section class="cmp-row" aria-label="${m.title}"><h3 class="sub">${m.title} (${m.unit})</h3><div class="cmp-pair">
+    ${['normal', 'attack'].map(side => `<div class="panel"><h4 class="cmp-side">${side === 'normal' ? '✅ Normal' : '🔴 Under attack'} <small class="muted" id="${cmpId(prefix, m.key, side)}_note"></small></h4>
+      <div class="chartbox"><canvas id="${cmpId(prefix, m.key, side)}" role="img" aria-label="${m.title}, ${side === 'normal' ? 'normal operation before the fault' : 'during the experiment'}, same scale as the other chart in this row" aria-describedby="${prefix}_summary"></canvas></div></div>`).join('')}
+    </div><p class="cmp-sum" id="${prefix}_${m.key}_sum"></p></section>`;
+  return `<div id="${prefix}Cmp"><div class="cmp-bar">
+    <div class="seg" role="group" aria-label="Services shown">${btn('scope', 'top', 'Target + 3 most affected', 'true')}${btn('scope', 'all', 'All services', 'false')}</div>
+    <div class="seg" role="group" aria-label="Scale">${btn('scale', 'linear', 'Linear', 'true')}${btn('scale', 'log', 'Log scale', 'false')}</div></div>
+    <p id="${prefix}_summary" class="sr"></p>${CMP_METRICS.map(row).join('')}</div>`;
+}
+function cmpChart(canvas, log) {
+  let c = cmpCharts[canvas.id];
+  if (c && (c.canvas !== canvas || c.cmpLog !== log)) { c.destroy(); c = null; }          // the panel was re-rendered, or the scale type changed
+  if (c) return c;
+  const markers = { id: 'markers', afterDraw(ch) {
+    for (const mk of ch.cmpMarkers || []) {
+      const px = ch.scales.x.getPixelForValue(mk.x), a = ch.chartArea, g = ch.ctx; if (px < a.left - 1 || px > a.right + 1) continue;
+      const left = px > a.right - 110;
+      g.save(); g.strokeStyle = g.fillStyle = mk.color; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(px, a.top); g.lineTo(px, a.bottom); g.stroke();
+      g.setLineDash([]); g.font = '11px sans-serif'; g.textAlign = left ? 'right' : 'left'; g.fillText(mk.label, px + (left ? -4 : 4), a.top + 12); g.restore();
+    } } };
+  const axis = { color: '#8d96ac' };
+  c = new Chart(canvas, { type: 'line', data: { datasets: [] }, plugins: [markers], options: { animation: false, maintainAspectRatio: false, parsing: false,
     interaction: { mode: 'nearest', intersect: false }, elements: { point: { radius: 2 } },
-    scales: { x: { type: 'linear', title: { display: true, text: 'seconds', color: '#8d96ac' }, grid: { color: '#1d2539' }, ticks: { color: '#8d96ac' } },
-              y: { beginAtZero: true, title: { display: true, text: unit, color: '#8d96ac' }, grid: { color: '#1d2539' }, ticks: { color: '#8d96ac' } } },
-    plugins: { legend: { labels: { color: '#b3bbcd', boxWidth: 14, filter: i => !i.text.includes('~') || i.text.includes('baseline') || i.text.includes('abort') } } } } });
+    scales: { x: { type: 'linear', min: 0, title: { display: true, text: 'seconds', ...axis }, grid: { color: '#1d2539' }, ticks: axis },
+              y: { type: log ? 'logarithmic' : 'linear', grid: { color: '#1d2539' }, ticks: axis } },
+    plugins: { legend: { labels: { color: '#b3bbcd', boxWidth: 12, filter: i => !i.text.includes('~') || i.text.includes('baseline') || i.text.includes('abort') } } } } });
+  c.cmpLog = log; cmpCharts[canvas.id] = c;
+  return c;
+}
+function drawCmp(prefix, d) {
+  cmpData[prefix] = d;
+  const root = $(prefix + 'Cmp'); if (!root) return;
+  root.querySelectorAll('[data-cmp]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cmp === 'scope' ? (b.dataset.v === 'all') === cmpState.all : (b.dataset.v === 'log') === cmpState.log)));
+  const svcs = pickServices(d, cmpState.all), span = cmpSpan(d), markers = markersFor(d);
+  for (const m of CMP_METRICS) {
+    const range = yRange(d, svcs, m, cmpState.log), clamp = y => y == null ? null : cmpState.log ? Math.max(y, m.floor) : y;
+    let fallbacks = 0;
+    for (const side of ['normal', 'attack']) {
+      const canvas = $(cmpId(prefix, m.key, side));
+      if (typeof Chart === 'undefined') { canvas.parentElement.innerHTML = '<p class="muted">The chart library could not be loaded.</p>'; continue; }
+      const ds = svcs.map(svc => {
+        const color = COLORS[Math.max(0, d.services.indexOf(svc)) % COLORS.length];       // the same colour for a service on both sides
+        const sr = side === 'normal' ? normalSeries(d, svc, m.key) : { points: attackSeries(d, svc, m.key), fallback: false };
+        if (sr.fallback && side === 'normal') fallbacks++;
+        return { label: svc, borderColor: color, backgroundColor: color, borderWidth: svc === (d.plan && d.plan.target) ? 3 : 1.6, spanGaps: false,
+                 pointRadius: sr.fallback ? 0 : 2, borderDash: sr.fallback ? [6, 5] : [], data: sr.points.map(q => ({ x: q.x, y: clamp(q.y) })) };
+      });
+      const w = side === 'attack' && d.limits && d.focus ? d.limits[d.focus] : null;      // guard lines for the chosen service
+      if (w) for (const [lab, val, col] of [[`${d.focus} baseline`, w.baseline[m.key], '#8d96ac'], [`${d.focus} abort threshold`, w.abort[m.key], '#f0524f']])
+        if (val != null) ds.push({ label: lab, borderColor: col, borderDash: [6, 5], borderWidth: 1.4, pointRadius: 0, data: [{ x: 0, y: clamp(val) }, { x: span, y: clamp(val) }] });
+      const chart = cmpChart(canvas, cmpState.log);
+      chart.options.scales.x.max = span; chart.options.scales.y.min = range.min; chart.options.scales.y.max = range.max;   // identical on both sides
+      chart.cmpMarkers = side === 'attack' ? markers : [];
+      chart.data.datasets = ds; chart.update('none');
+      Object.assign(canvas.dataset, { ymin: range.min, ymax: range.max, xmax: span, scale: cmpState.log ? 'log' : 'linear' });
+    }
+    $(cmpId(prefix, m.key, 'normal') + '_note').textContent = fallbacks === svcs.length ? '(baseline average, no pre-fault history)'
+      : fallbacks ? `(last ${span} s before injection; dashed = baseline average where traffic was too low)` : `(last ${span} s before injection)`;
+    $(cmpId(prefix, m.key, 'attack') + '_note').textContent = `(${span} s, same scale)`;
+    $(`${prefix}_${m.key}_sum`).textContent = summaryLine(d, m);
+  }
+  $(prefix + '_summary').textContent = CMP_METRICS.map(m => summaryLine(d, m)).join('. ') + '.';
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-cmp]'); if (!b) return;
+  if (b.dataset.cmp === 'scope') cmpState.all = b.dataset.v === 'all'; else cmpState.log = b.dataset.v === 'log';
+  chartSig = ''; Object.entries(cmpData).forEach(([prefix, d]) => drawCmp(prefix, d));
+});
+const stoppedByUser = reason => /stopped by user|emergency stop/i.test(reason || '');
+function resultCmpData(r) {                                  // a saved result in the same shape as the live data
+  const base = {}; r.impact.forEach(i => { base[i.service] = { p95_ms: i.p95_ms.baseline, error_rate: i.error_rate.baseline }; });
+  return { plan: r.plan, services: r.impact.map(i => i.service), attack: (r.guard.timeline || []).map(x => ({ t: x.t, services: x.metrics })),
+           normal: r.normal || null, baseline: base, rollback_at_s: r.guard.elapsed_s, aborted: !!r.guard.aborted, stopped: stoppedByUser(r.guard.reason) };
 }
 function renderCharts(s) {
-  if (typeof Chart === 'undefined') { if ($('chartP95')) { $('chartP95').parentElement.innerHTML = '<p class="muted">The chart library could not be loaded.</p>'; $('chartErr').parentElement.innerHTML = '<p class="muted">The chart library could not be loaded.</p>'; } return; }
   const services = Object.keys(s.watch || {});
   const sel = $('focus'), focus = services.includes(sel.value) ? sel.value : (services.includes(s.plan && s.plan.target) ? s.plan.target : services[0]);
   if (sel.options.length !== services.length) sel.innerHTML = services.map(n => `<option>${esc(n)}</option>`).join('');
   sel.value = focus;
-  const sig = [s.samples.length, services.join(), focus, s.rollback_at_s].join('|'); if (sig === chartSig) return; chartSig = sig;
+  const sig = [s.samples.length, services.join(), focus, s.rollback_at_s, s.normal ? s.normal.length : 0, cmpState.all, cmpState.log].join('|'); if (sig === chartSig) return; chartSig = sig;
   const last = s.samples[s.samples.length - 1];                // text equivalent of the charts, for screen readers
   $('chartSummary').textContent = last ? `Latest sample at ${Math.round(last.t)} seconds. ` + services.map(n => { const v = last.services[n] || {};
     return `${n}: p95 ${v.p95_ms == null ? 'no data' : Math.round(v.p95_ms) + ' milliseconds'}, error rate ${v.error_rate == null ? 'no data' : v.error_rate.toFixed(1) + ' percent'}`; }).join('; ') + '.' : 'No samples yet.';
-  charts.p95 = charts.p95 || lineChart('chartP95', 'ms'); charts.err = charts.err || lineChart('chartErr', '%');
-  const xmax = Math.max(10, ...(s.samples.map(x => x.t)));
-  for (const [chart, key] of [[charts.p95, 'p95_ms'], [charts.err, 'error_rate']]) {
-    const ds = services.map((n, i) => ({ label: n, borderColor: COLORS[i % COLORS.length], backgroundColor: COLORS[i % COLORS.length],
-      borderWidth: s.plan && n === s.plan.target ? 3 : 1.6, spanGaps: false,
-      data: s.samples.map(x => ({ x: x.t, y: x.services[n] ? x.services[n][key] : null })) }));
-    const w = s.watch[focus];
-    if (w) for (const [lab, val, col] of [[`${focus} baseline`, w.baseline[key], '#8d96ac'], [`${focus} abort threshold`, w.abort[key], '#f0524f']])
-      if (val != null) ds.push({ label: lab, borderColor: col, borderDash: [6, 5], borderWidth: 1.4, pointRadius: 0, data: [{ x: 0, y: val }, { x: xmax, y: val }] });
-    chart.data.datasets = ds; chart.update('none');
-  }
+  const abort = (s.events || []).find(e => /ABORTED/.test(e.msg));
+  const baseline = {}; services.forEach(n => { baseline[n] = s.watch[n].baseline; });
+  drawCmp('live', { plan: s.plan || {}, services, attack: s.samples.map(x => ({ t: x.t, services: x.services })), normal: s.normal, baseline, limits: s.watch, focus,
+                    rollback_at_s: s.rollback_at_s, aborted: !!abort, stopped: !!abort && stoppedByUser(abort.msg) });
 }
 function renderProbes(s) {
   const names = [...new Set(s.probes.flatMap(p => p.results.map(r => r.name)))];
@@ -1000,6 +1156,7 @@ function renderResult(r, note) {
     <dt>Recovery</dt><dd>${rec.recovered
       ? `${esc(rec.seconds)} s after rollback, measured by probes (primary). Span metrics (secondary): ${rec.metrics_confirmed ? 'confirmed after ' + esc(rec.metrics_seconds) + ' s' : rec.metrics_confirmed === false ? 'not yet back within thresholds' : 'n/a'}`
       : `did not recover${rec.note ? ' (' + esc(rec.note) + ')' : ' (probes not healthy in time)'}`}</dd></dl>
+    <div class="block"><h3 class="sub">Normal vs under attack</h3>${cmpHtml('res')}</div>
     <div class="block"><h3 class="sub">Impact vs baseline <span style="text-transform:none;letter-spacing:0;font-weight:400">(baseline &rarr; peak, change)</span></h3>
       <div class="table-wrap"><table><tr><th>Service</th><th>Error rate %</th><th>p95 latency ms</th></tr>${r.impact.map(i =>
       `<tr><td>${esc(i.service)}</td><td class="num">${nd(i.error_rate.baseline)} &rarr; ${nd(i.error_rate.peak)} (${delta(i.error_rate.change)})</td>
@@ -1019,6 +1176,7 @@ function renderResult(r, note) {
     ${r.container_resources.length ? `<details class="block"><summary class="muted">Container CPU / memory (reference only)</summary><div class="table-wrap" style="margin-top:8px"><table>${r.container_resources.map(c =>
       `<tr><td>${esc(c.container)}</td><td class="num">cpu ${num(c.cpu_percent.baseline)}% &rarr; ${num(c.cpu_percent.peak)}%</td><td class="num">mem ${num(c.memory_mb.baseline, 0)} &rarr; ${num(c.memory_mb.peak, 0)}&nbsp;MB</td></tr>`).join('')}</table></div></details>` : ''}
     ${resultFindingsHtml(r.id)}`;
+  drawCmp('res', resultCmpData(r));
 }
 
 /* ---------- 7. history ---------- */
@@ -1417,6 +1575,7 @@ function makeFeed(o) {
       if (d.events.length) {
         const box = $(o.list), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
         box.insertAdjacentHTML('beforeend', d.events.map(e => eventHtml(e, f.mode === 'all' || o.alwaysTag)).join('')); f.after = d.last;
+        noteAgentEvents(d.events);
         if (atEnd || o.follow) box.scrollTop = box.scrollHeight;
         const c = [...d.events].reverse().find(e => e.call);
         if (c && o.calls) $(o.calls).textContent = 'tool call ' + c.call.replace('/', ' / ');
@@ -1469,6 +1628,7 @@ function syncNav() {                                      // nav links to sectio
   document.querySelectorAll('.steps-nav a').forEach(a => { const t = $(a.dataset.for); a.classList.toggle('hide', !!t && t.classList.contains('hide')); });
 }
 async function poll() {
+  if (!started) return;                                    // the fresh start below decides what the first screen shows
   try { status = await api('/api/status'); }
   catch (e) { offline = true; banner('Backend unreachable (' + e.message + '). Check that python app.py is still running; this page reconnects by itself.'); return; }
   if (offline) { offline = false; banner(''); }
@@ -1521,7 +1681,22 @@ $('stop').onclick = async () => {
   setTimeout(() => { $('stop').disabled = false; $('stop').textContent = 'STOP EXPERIMENT'; }, 1500);   // a second press skips the recovery wait
 };
 
-loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); loadSessions(); loadFindings(); poll();
+$('liveCmpMount').innerHTML = cmpHtml('live');
+loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); loadSessions(); loadFindings();
+/* Reloading the page (F5 / Ctrl+F5) starts from a clean screen: an unapproved plan, the last result card and the previous agent
+   sessions are put away (results stay in History, sessions in the replay menu). A running experiment is never touched. */
+async function freshStart() {
+  try {
+    const st = await api('/api/status');
+    if (!st.running && !['idle', 'proposing'].includes(st.phase)) await api('/api/reject', true);
+    for (const f of [mainFeed, aFeed]) {
+      const d = await api(`/api/agent-events?after=2147483647&mode=${f.mode}`);
+      if (!st.running) f.ignoreRun = d.run_id || '';
+    }
+  } catch (e) { /* the normal poll reports an unreachable backend */ }
+  started = true; poll();
+}
+freshStart();
 if ('ResizeObserver' in window) {                       // the sticky header's real height drives scroll padding and the banner position
   const tb = document.querySelector('.topbar');
   new ResizeObserver(() => document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight + 'px')).observe(tb);

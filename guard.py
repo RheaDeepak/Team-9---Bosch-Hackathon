@@ -27,6 +27,9 @@ POLL_S = 5
 WINDOW_S = 30             # spans newer than this count towards a sample
 RECOVERY_WINDOW_S = 15    # shorter, so old fault-time errors age out sooner
 TRACES_PER_SERVICE = 60
+HISTORY_S = 120           # how far back the 'normal' charts look
+HISTORY_STEP_S = 5        # one point per poll interval, like the live samples
+HISTORY_TRACES = 400      # a 2.5 minute lookback holds far more traces than one 30 s window
 MIN_SPANS_ERROR = 1       # smallest sample that still yields an error rate
 MIN_FAILED_REQUESTS = 3   # abort on error rate only with at least this many failed requests in the window
 MIN_SPANS_LATENCY = 5     # a p95 from fewer spans is noise
@@ -80,15 +83,32 @@ def live_metrics(services, window_s=WINDOW_S, since=None):
     spans = fetch_spans(lookback=timedelta(seconds=window_s + 5),
                         limits={s: TRACES_PER_SERVICE for s in services})
     cutoff = max((time.time() - window_s) * 1e9, (since or 0) * 1e9)
-    out = {}
-    for s in services:
-        mine = [x for x in spans.values() if x["svc"] == s and x["kind"] in (SERVER, CONSUMER)
-                and x["start"] >= cutoff and not _is_tooling(x)]
-        durs = sorted(x["dur"] for x in mine if x["dur"] < MAX_SPAN_MS)
-        errors = sum(x["status"] in ERROR_CODES for x in mine)
-        out[s] = {"n": len(mine), "errors": errors, "request_rate": len(mine) / max(window_s, 1),
-                  "error_rate": 100 * errors / len(mine) if len(mine) >= MIN_SPANS_ERROR else None,
-                  "p95_ms": durs[math.ceil(0.95 * len(durs)) - 1] if len(durs) >= MIN_SPANS_LATENCY else None}
+    return {s: _stats([x for x in spans.values() if x["svc"] == s and x["kind"] in (SERVER, CONSUMER)
+                       and x["start"] >= cutoff and not _is_tooling(x)], window_s) for s in services}
+
+
+def _stats(mine, window_s):
+    """{n, errors, request_rate, error_rate (%), p95_ms} of a list of server spans seen within window_s seconds."""
+    durs = sorted(x["dur"] for x in mine if x["dur"] < MAX_SPAN_MS)
+    errors = sum(x["status"] in ERROR_CODES for x in mine)
+    return {"n": len(mine), "errors": errors, "request_rate": len(mine) / max(window_s, 1),
+            "error_rate": 100 * errors / len(mine) if len(mine) >= MIN_SPANS_ERROR else None,
+            "p95_ms": durs[math.ceil(0.95 * len(durs)) - 1] if len(durs) >= MIN_SPANS_LATENCY else None}
+
+
+def history(services, seconds=HISTORY_S, step_s=HISTORY_STEP_S, window_s=WINDOW_S):
+    """The last `seconds` of normal operation, sampled exactly like the live guard (a sliding window_s window every
+    step_s): [{t (seconds before now, <= 0), services: {service: stats}}], oldest first. Taken just before the fault,
+    so the UI can put 'normal' next to 'under attack'."""
+    spans = fetch_spans(lookback=timedelta(seconds=seconds + window_s + 5),
+                        limits={s: HISTORY_TRACES for s in services})
+    now = time.time()
+    server = [x for x in spans.values() if x["kind"] in (SERVER, CONSUMER) and not _is_tooling(x)]
+    out = []
+    for age in range(seconds, -1, -step_s):
+        hi, lo = (now - age) * 1e9, (now - age - window_s) * 1e9
+        out.append({"t": -age, "services": {s: _stats([x for x in server if x["svc"] == s and lo <= x["start"] < hi], window_s)
+                                            for s in services}})
     return out
 
 
