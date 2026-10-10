@@ -1,0 +1,311 @@
+{
+  "nodes": [
+    "accounting",
+    "ad",
+    "astronomy-db",
+    "cart",
+    "checkout",
+    "currency",
+    "email",
+    "flagd",
+    "fraud-detection",
+    "frontend",
+    "frontend-proxy",
+    "frontend-web",
+    "image-provider",
+    "kafka",
+    "load-generator",
+    "payment",
+    "product-catalog",
+    "quote",
+    "recommendation",
+    "shipping",
+    "valkey-cart"
+  ],
+  "edges": [
+    {
+      "parent": "frontend",
+      "child": "recommendation",
+      "call_count": 657,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend",
+      "child": "cart",
+      "call_count": 1660,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend",
+      "child": "shipping",
+      "call_count": 73,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend",
+      "child": "ad",
+      "call_count": 357,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend",
+      "child": "currency",
+      "call_count": 523,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend",
+      "child": "product-catalog",
+      "call_count": 4264,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend",
+      "child": "checkout",
+      "call_count": 149,
+      "source": "trace"
+    },
+    {
+      "parent": "recommendation",
+      "child": "flagd",
+      "call_count": 6,
+      "source": "trace"
+    },
+    {
+      "parent": "recommendation",
+      "child": "product-catalog",
+      "call_count": 657,
+      "source": "trace"
+    },
+    {
+      "parent": "product-catalog",
+      "child": "astronomy-db",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "depends_on",
+        "env DB_CONNECTION_STRING"
+      ]
+    },
+    {
+      "parent": "payment",
+      "child": "flagd",
+      "call_count": 17,
+      "source": "trace"
+    },
+    {
+      "parent": "checkout",
+      "child": "shipping",
+      "call_count": 298,
+      "source": "trace"
+    },
+    {
+      "parent": "checkout",
+      "child": "currency",
+      "call_count": 428,
+      "source": "trace"
+    },
+    {
+      "parent": "checkout",
+      "child": "email",
+      "call_count": 149,
+      "source": "trace"
+    },
+    {
+      "parent": "checkout",
+      "child": "payment",
+      "call_count": 149,
+      "source": "trace"
+    },
+    {
+      "parent": "checkout",
+      "child": "product-catalog",
+      "call_count": 279,
+      "source": "trace"
+    },
+    {
+      "parent": "checkout",
+      "child": "cart",
+      "call_count": 298,
+      "source": "trace"
+    },
+    {
+      "parent": "checkout",
+      "child": "kafka",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "depends_on",
+        "env KAFKA_ADDR"
+      ]
+    },
+    {
+      "parent": "shipping",
+      "child": "quote",
+      "call_count": 222,
+      "source": "trace"
+    },
+    {
+      "parent": "fraud-detection",
+      "child": "flagd",
+      "call_count": 7,
+      "source": "trace"
+    },
+    {
+      "parent": "fraud-detection",
+      "child": "kafka",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "depends_on",
+        "env KAFKA_ADDR"
+      ]
+    },
+    {
+      "parent": "ad",
+      "child": "flagd",
+      "call_count": 8,
+      "source": "trace"
+    },
+    {
+      "parent": "accounting",
+      "child": "astronomy-db",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "env DB_CONNECTION_STRING"
+      ]
+    },
+    {
+      "parent": "accounting",
+      "child": "kafka",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "depends_on",
+        "env KAFKA_ADDR"
+      ]
+    },
+    {
+      "parent": "cart",
+      "child": "flagd",
+      "call_count": 260,
+      "source": "trace"
+    },
+    {
+      "parent": "cart",
+      "child": "valkey-cart",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "depends_on",
+        "env VALKEY_ADDR"
+      ]
+    },
+    {
+      "parent": "load-generator",
+      "child": "frontend-proxy",
+      "call_count": 25348,
+      "source": "trace"
+    },
+    {
+      "parent": "load-generator",
+      "child": "flagd",
+      "call_count": 342,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend-proxy",
+      "child": "image-provider",
+      "call_count": 2088,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend-proxy",
+      "child": "frontend",
+      "call_count": 31251,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend-proxy",
+      "child": "flagd",
+      "call_count": 296,
+      "source": "trace"
+    },
+    {
+      "parent": "frontend-web",
+      "child": "frontend-proxy",
+      "call_count": 3292,
+      "source": "trace"
+    }
+  ],
+  "stats": {
+    "fan_in": {
+      "frontend": 1,
+      "recommendation": 1,
+      "flagd": 7,
+      "product-catalog": 3,
+      "payment": 1,
+      "checkout": 1,
+      "shipping": 2,
+      "fraud-detection": 0,
+      "currency": 2,
+      "ad": 1,
+      "accounting": 0,
+      "email": 1,
+      "cart": 2,
+      "load-generator": 0,
+      "frontend-proxy": 2,
+      "frontend-web": 0,
+      "image-provider": 1,
+      "quote": 1,
+      "astronomy-db": 2,
+      "kafka": 3,
+      "valkey-cart": 1
+    },
+    "fan_out": {
+      "frontend": 7,
+      "recommendation": 2,
+      "flagd": 0,
+      "product-catalog": 1,
+      "payment": 1,
+      "checkout": 7,
+      "shipping": 1,
+      "fraud-detection": 2,
+      "currency": 0,
+      "ad": 1,
+      "accounting": 2,
+      "email": 0,
+      "cart": 2,
+      "load-generator": 2,
+      "frontend-proxy": 3,
+      "frontend-web": 1,
+      "image-provider": 0,
+      "quote": 0,
+      "astronomy-db": 0,
+      "kafka": 0,
+      "valkey-cart": 0
+    },
+    "checkout_path": [
+      "astronomy-db",
+      "cart",
+      "checkout",
+      "currency",
+      "email",
+      "flagd",
+      "kafka",
+      "payment",
+      "product-catalog",
+      "quote",
+      "shipping",
+      "valkey-cart"
+    ],
+    "top_fan_in": [
+      "flagd",
+      "kafka",
+      "product-catalog",
+      "astronomy-db",
+      "cart"
+    ]
+  }
+}
