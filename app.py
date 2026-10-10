@@ -30,6 +30,7 @@ import guard
 import inject
 import metrics
 import run_experiment as exp
+import traffic_spike
 from policy import PROTECTED, validate
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -173,9 +174,17 @@ def _readiness():
     busy = inject.ACTIVE_FILE.exists() or STATE["running"]
     add("No active experiment", not busy, "an experiment or leftover fault is active" if busy else "idle")
     add("Baseline available", baseline is not None, "baseline.json" if baseline else "run metrics.py first")
+    traffic = _traffic_capability()
+    add("Traffic spike", traffic["selectable"], traffic["detail"], optional=True)
     add("Grafana panels found", *grafana.check_panels(), optional=True)
     add("Grafana embedding enabled", *grafana.embedding_allowed(), optional=True)
     return {"ready": all(c["ok"] for c in checks if not c["optional"]), "checks": checks}
+
+
+def _traffic_capability():
+    capability = traffic_spike.capability()
+    capability["selectable"] = traffic_spike.candidate_ready(capability)
+    return capability
 
 
 # ---- app -------------------------------------------------------------------------------
@@ -258,7 +267,16 @@ def api_graph():
 
 @app.get("/api/goals")
 def api_goals():
-    return {key: label for key, (label, _) in planner.GOALS.items()}
+    goals = {key: label for key, (label, _) in planner.GOALS.items()}
+    if _traffic_capability()["selectable"]:
+        goals[planner.TRAFFIC_SPIKE_GOAL] = "Test bounded traffic capacity"
+    return goals
+
+
+@app.get("/api/fault-capabilities")
+def api_fault_capabilities():
+    traffic = _traffic_capability()
+    return {"capabilities": [traffic], "ready": traffic["selectable"]}
 
 
 @app.post("/api/propose")
@@ -302,6 +320,7 @@ def api_ranking():
     def view(c):
         a = by_id.get(c["id"], {})
         return {"id": c["id"], **{k: c[k] for k in CANDIDATE_FIELDS}, "in_top_k": c["id"] in by_id,
+                **{k: c[k] for k in ("parameters", "candidate_id", "capability_version") if k in c},
                 "adjusted_risk": a.get("adjusted_risk"), "adjusted_priority": a.get("adjusted_priority"),
                 "reason": a.get("reason"), "evidence": a.get("evidence") or []}
 
@@ -356,6 +375,10 @@ def api_approve():
     validation = validate(plan)  # re-checked server side; the UI's button state is not trusted
     if not validation["valid"]:
         raise HTTPException(422, "plan is invalid: " + "; ".join(validation["reasons"]))
+    if plan.get("fault") == traffic_spike.FAULT_TYPE:
+        traffic = _traffic_capability()
+        if not traffic["selectable"]:
+            raise HTTPException(409, "traffic spike is not ready: " + traffic["detail"])
     failing = [c for c in _readiness()["checks"] if not c["ok"] and not c["optional"]]
     if failing:
         raise HTTPException(409, "not ready: " + "; ".join(f"{c['name']} ({c['detail']})" for c in failing))
@@ -417,6 +440,7 @@ def api_results():
             d = _load_result(f)
             rows.append({"id": d["id"], "started_at": d["started_at"], "target": d["plan"]["target"],
                          "fault": d["plan"]["fault"], "magnitude": d["plan"]["magnitude"],
+                         "parameters": d["plan"].get("parameters"),
                          "aborted": d["guard"]["aborted"], "reason": d["guard"]["reason"],
                          "verdict": d["verdict"]["verdict"], "recovered": d["recovery"]["recovered"],
                          "rollback_verified": d["rollback_verified"]})

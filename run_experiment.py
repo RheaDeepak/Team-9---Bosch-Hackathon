@@ -29,6 +29,7 @@ FORCE_ABORT_TEST = False
 FORCE_THRESHOLDS = {"error_rate": 0.0, "p95_ms": 0.001}
 SOURCES = {"rank_agent": "RANK AGENT (LLM investigated the ranker's top candidates)",
            "ranker_fallback": "RANKER #1 (LLM investigation not used)",
+           "deterministic-capability": "TESTED DETERMINISTIC CAPABILITY",
            "fallback": "FALLBACK PLAN (ranking unavailable)"}
 
 
@@ -206,7 +207,7 @@ def score_experiment(impact, recovery, availability, elapsed_s=None):
 
 def propose(goal=None):
     """Planner + policy: {plan, source, note, validation}. `goal` optionally steers the planner."""
-    plan, source, note = propose_experiment(goal) if goal else propose_experiment()  # no goal -> ranker + agent
+    plan, source, note = propose_experiment(goal) if goal else propose_experiment()
     return {"plan": plan, "source": source, "note": note, "validation": validate(plan)}
 
 
@@ -215,6 +216,7 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
     ({"refused": reason} if nothing was injected).
     Hooks for the UI: on_phase(name), on_watch({service: {baseline, abort}}), on_sample(...), stop (Event)."""
     phase = on_phase or (lambda name: None)
+
     baseline = load_baseline()
     if baseline is None:
         emit("No baseline.json (run metrics.py first). Not injecting.")
@@ -247,16 +249,23 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
     g = {"aborted": True, "reason": "not started", "elapsed_s": 0, "timeline": [],
          "peaks": {s: {m: None for m in guard.METRICS} for s in services}}
     injected_at = None
+    active = None
+    fault_evidence = None
+    fault_recovery = None
     try:
         phase("injecting")
         active = inject.inject(plan)
-        emit(f"FAULT ACTIVE: {plan['fault']} on {active['container_name']} (rollback: {active['rollback']})")
+        fault_evidence = inject.verify_active(active)
+        if not fault_evidence.get("verified"):
+            raise RuntimeError("executor could not verify the approved fault is active")
+        target_name = active.get("container_name", active["target"])
+        emit(f"FAULT ACTIVE: {plan['fault']} on {target_name} (rollback: {active['rollback']})")
         injected_at = time.time()
         unit = f" ({plan['magnitude']} ms)" if plan["fault"] == "network_delay" else ""
         _annotate(emit, f"FAULT: {plan['fault']} on {plan['target']}{unit}", [plan["target"], plan["fault"]], injected_at)
         phase("monitoring")
-        g = guard.watch(plan, baseline, services, thresholds=thresholds, emit=emit, on_sample=on_sample, stop=stop,
-                        restart_limits=restart_limits)
+        g = guard.watch(plan, baseline, services, thresholds=thresholds, emit=emit,
+                        on_sample=on_sample, stop=stop, restart_limits=restart_limits)
     except KeyboardInterrupt:
         g["reason"] = "interrupted by user (Ctrl+C) during injection"
     except Exception as e:
@@ -264,6 +273,16 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
     finally:
         phase("rolling_back")
         rolled_back = _rollback(emit)
+        if rolled_back and active is not None:
+            try:
+                fault_recovery = inject.verify_recovered(active)
+                if not fault_recovery.get("verified"):
+                    rolled_back = False
+                    emit("Executor-specific recovery verification failed.")
+            except Exception as e:
+                rolled_back = False
+                fault_recovery = {"verified": False, "error": f"{type(e).__name__}: {e}"}
+                emit(f"Executor-specific recovery verification failed: {type(e).__name__}: {e}")
         if injected_at:
             _annotate(emit, f"rollback: {plan['target']} {'restored' if rolled_back else 'ROLLBACK FAILED'}",
                       [plan["target"], "rollback"], time.time())
@@ -276,8 +295,11 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         if stop is not None:
             stop.clear()  # STOP already did its job; pressing it again skips the recovery wait
         emit(f"Waiting up to {guard.RECOVERY_TIMEOUT_S}s for recovery...")
-        recovery = guard.wait_for_recovery(plan, baseline, services, emit=emit, on_sample=on_sample, stop=stop,
-                                           restart_limits=restart_limits)
+        recovery = guard.wait_for_recovery(plan, baseline, services, emit=emit,
+                                           on_sample=on_sample, stop=stop, restart_limits=restart_limits)
+        recovery.setdefault("metrics_confirmed", None)
+        recovery.setdefault("metrics_seconds", None)
+        recovery.setdefault("samples", [])
     ended_at = time.time()
     phase("analyzing")
     impact = guard.impact_table(baseline, g["peaks"])
@@ -301,6 +323,7 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         "started_at": started.isoformat(timespec="seconds"),
         "baseline": {"captured_at": baseline["captured_at"], "flags_enabled": baseline["flags_enabled"]},
         "forced_abort_test": FORCE_ABORT_TEST, "guard": g, "rollback_verified": rolled_back,
+        "fault_evidence": fault_evidence, "fault_recovery": fault_recovery,
         "recovery": recovery, "impact": impact, "amplification": amplified, "score": score,
         "container_resources": containers, "verdict": verdict,
         "grafana_window_ms": grafana.window_ms(injected_at, ended_at) if injected_at else None,

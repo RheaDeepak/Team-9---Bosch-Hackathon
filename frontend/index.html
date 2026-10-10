@@ -101,6 +101,9 @@
                 </select>
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg>
               </div>
+              <p id="trafficSpikeCapability" class="capability-note" aria-live="polite">
+                Checking bounded traffic-spike readiness…
+              </p>
               <button id="proposeButton" class="button button-dark button-full" type="submit">
                 <span>Generate safe proposal</span>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
@@ -123,11 +126,7 @@
               </div>
               <h3 id="proposalName">—</h3>
               <p id="proposalHypothesis">—</p>
-              <dl class="parameter-grid">
-                <div><dt>Duration</dt><dd id="proposalDuration">—</dd></div>
-                <div><dt>Blast radius</dt><dd id="proposalRadius">—</dd></div>
-                <div><dt>Rollback</dt><dd id="proposalRollback">—</dd></div>
-              </dl>
+              <dl id="proposalParameters" class="parameter-grid"></dl>
               <button id="validateButton" class="button button-outline button-full" type="button">Run policy validation</button>
             </div>
           </aside>

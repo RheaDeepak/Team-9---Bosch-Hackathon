@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from fixtures import baseline, flows, graph
+from fixtures import baseline, flows, graph, traffic_capability
 
 import rank_agent
 from policy import validate
@@ -163,6 +163,19 @@ class RankAgentTest(unittest.TestCase):
         self.assertEqual(len({c["target"] for c in top}), 3)
         self.assertEqual(top[:2], plain[:2])                                   # only the last slot changes
         self.assertEqual(len(rank_agent.top_k(ranking, 1)), 1)
+
+    def test_ready_traffic_candidate_reaches_top_k_with_typed_parameters(self):
+        g, base = self.g.copy(), baseline()
+        g.add_edge("frontend", "checkout", mode="sync", type="sync-http")
+        base["services"]["frontend"] = dict(base["services"]["web"])
+        base["containers"]["frontend"] = {"running": {"mean": 1}}
+        ranking = rank_agent.ranker.rank(g, base, flows(), [], traffic_capability=traffic_capability())
+        top = rank_agent.top_k(ranking, 3)
+        self.assertEqual({candidate["fault"] for candidate in top}, {"container_stop", "network_delay", "traffic_spike"})
+        traffic = next(candidate for candidate in top if candidate["fault"] == "traffic_spike")
+        plan = rank_agent._plan(traffic, "bounded capacity", "tested executor")
+        self.assertEqual(plan["parameters"]["peak_users"], 8)
+        self.assertTrue(validate(plan, g)["valid"])
 
 
 if __name__ == "__main__":

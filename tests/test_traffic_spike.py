@@ -133,6 +133,9 @@ class TrafficSpikeTests(unittest.TestCase):
         self.assertNotIn("traffic_spike", SYSTEM_PROMPT)
         ready = {
             "ready": True,
+            "executor_ready": True,
+            "rollback_ready": True,
+            "integration_test_evidence": "tests/test_traffic_spike_integration.py",
             "detail": "tested",
             "capability_version": "traffic-spike-v1",
             "current_state": {"user_count": 5},

@@ -334,3 +334,40 @@ def capability(controller: LocustController | None = None) -> dict[str, Any]:
     except (requests.RequestException, RuntimeError, ValueError, KeyError, json.JSONDecodeError) as exc:
         item["detail"] = f"Unavailable: {type(exc).__name__}: {exc}"[:300]
     return item
+
+
+def candidate_ready(item: dict[str, Any]) -> bool:
+    """A candidate is exposed only after its runtime, executor, rollback, and test evidence are ready."""
+    return bool(
+        item.get("ready")
+        and item.get("executor_ready")
+        and item.get("rollback_ready")
+        and item.get("integration_test_evidence")
+    )
+
+
+def candidate_plan(item: dict[str, Any]) -> dict[str, Any] | None:
+    """Build the single deterministic, bounded traffic-spike candidate from live capability state."""
+    if not candidate_ready(item):
+        return None
+    baseline_users = int((item.get("current_state") or {}).get("user_count", 0))
+    peak_users = min(MAX_PEAK_USERS, max(baseline_users + 1, 8))
+    duration_seconds = min(20, MAX_DURATION_SECONDS)
+    parameters = TrafficSpikeParameters.model_validate({
+        "baseline_users": baseline_users,
+        "peak_users": peak_users,
+        "spawn_rate_per_second": min(2, MAX_SPAWN_RATE),
+        "duration_seconds": duration_seconds,
+        "journey_profile": JOURNEY_PROFILE,
+    })
+    return {
+        "target": TARGET_SERVICE,
+        "fault": FAULT_TYPE,
+        "magnitude": parameters.peak_users,
+        "duration_s": parameters.duration_seconds,
+        "hypothesis": "Increasing the existing Astronomy Shop journey load reveals the frontend saturation response without changing the journey mix, then the original load is restored.",
+        "reasoning": "The load-generator is already running the fixed 9:1 user-class mix against the frontend ingress, so a bounded user-count increase exercises the full request path without targeting infrastructure.",
+        "parameters": parameters.model_dump(),
+        "candidate_id": "traffic-spike-core-v1",
+        "capability_version": item["capability_version"],
+    }
