@@ -3,7 +3,7 @@ import json
 import re
 
 from discovery import load_flows, load_graph
-from llm import API_KEY_VAR, MAX_TOKENS as LLM_MAX_TOKENS, PLACEHOLDER_KEY, load_api_key, post as _post_gemini
+from llm import API_KEY_VAR, MAX_TOKENS as LLM_MAX_TOKENS, load_api_key, post as _post_gemini
 from metrics import load_baseline
 from policy import MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECTED, REQUIRED_KEYS
 from traffic_spike import JOURNEY_PROFILE, MAX_PEAK_USERS, capability as traffic_spike_capability
