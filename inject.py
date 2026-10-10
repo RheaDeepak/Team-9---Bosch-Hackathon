@@ -1,14 +1,18 @@
 """Fault injection and rollback via the docker SDK. Only touches the demo's compose project."""
 import json
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 import docker
+from dotenv import load_dotenv
 
 from policy import ALLOWED_FAULTS
 
-COMPOSE_PROJECT = "opentelemetry-demo"
+load_dotenv()
+
+COMPOSE_PROJECT = os.getenv("TARGET_COMPOSE_PROJECT", "opentelemetry-demo")
 PROJECT_LABEL, SERVICE_LABEL = "com.docker.compose.project", "com.docker.compose.service"
 ACTIVE_FILE = Path("active_experiment.json")
 HELPER_IMAGE = "nicolaka/netshoot"

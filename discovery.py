@@ -1,5 +1,6 @@
 """Discovery: build the service dependency graph from Jaeger + compose config."""
 import json
+import os
 import re
 import statistics
 import time
@@ -14,9 +15,13 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import requests
 import yaml
+from dotenv import load_dotenv
 
-JAEGER_URL = "http://localhost:8080/jaeger/ui/api/dependencies"
-DEMO_DIR = Path(r"C:\Users\rhea\opentelemetry-demo")  # read-only
+load_dotenv()
+
+JAEGER_BASE_URL = os.getenv("JAEGER_URL", "http://localhost:16686").rstrip("/")
+JAEGER_URL = os.getenv("JAEGER_DEPENDENCY_URL", f"{JAEGER_BASE_URL}/api/dependencies")
+DEMO_DIR = Path(os.getenv("TARGET_REPOSITORY_PATH", "../opentelemetry-demo")).resolve()
 COMPOSE_FILES = ["compose.yaml", "compose.full.yaml"]
 ENV_FILE = ".env"
 OUT_JSON = Path("dependency_map.json")
@@ -28,7 +33,7 @@ EXCLUDED = {"otel-collector", "jaeger", "prometheus", "grafana", "opensearch"}
 # Config targets count as "hidden" only if untraced and they look like data infrastructure.
 HIDDEN_HINTS = ("kafka", "valkey", "redis", "postgres", "db")
 # Jaeger v2 has no /api/traces; it serves OTLP-JSON traces under /api/v3/traces.
-TRACES_URL = "http://localhost:8080/jaeger/ui/api/v3/traces"
+TRACES_URL = os.getenv("JAEGER_TRACES_URL", f"{JAEGER_BASE_URL}/api/v3/traces")
 # load-generator roots every user journey; the others are the Kafka consumers.
 TRACE_SERVICES = ("load-generator", "accounting", "fraud-detection")
 TRACE_LIMIT = 100          # traces per service above

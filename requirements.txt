@@ -4,3 +4,6 @@ pyyaml
 matplotlib
 docker
 python-dotenv
+fastapi
+uvicorn
+typing_extensions

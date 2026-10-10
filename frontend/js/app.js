@@ -1,4 +1,4 @@
-import { createApiClient, normalizeBaseline, normalizePolicy, normalizeReadiness, normalizeTopology } from "./api.js";
+import { createApiClient, normalizeBaseline, normalizePolicy, normalizeReadiness, normalizeTopology, resolveApiBaseUrl } from "./api.js";
 import {
   mockBaseline,
   mockPhaseMetrics,
@@ -12,7 +12,7 @@ import {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const svgNs = "http://www.w3.org/2000/svg";
-const api = createApiClient();
+const api = createApiClient({ baseUrl: resolveApiBaseUrl() });
 
 const state = {
   mode: "connecting",
@@ -92,7 +92,7 @@ function setMode(mode) {
   elements.environmentBadge.className = `environment-badge ${mode}`;
   if (mode === "live") {
     elements.environmentBadge.textContent = "Live sandbox";
-    elements.connectionDetail.textContent = "API connected";
+    elements.connectionDetail.textContent = `API connected · ${api.baseUrl || window.location.origin}`;
   } else if (mode === "demo") {
     elements.environmentBadge.textContent = "Demo data";
     elements.connectionDetail.textContent = "API offline · demo mode";
@@ -386,7 +386,7 @@ function extractExperiment(payload = {}) {
 function connectLiveExperiment() {
   const id = encodeURIComponent(state.experimentId);
   if (typeof EventSource !== "undefined") {
-    state.eventSource = new EventSource(`/api/experiments/${id}/events`);
+    state.eventSource = new EventSource(api.eventsUrl(id));
     state.eventSource.onmessage = (event) => {
       try { applyExperimentUpdate(JSON.parse(event.data)); } catch { updateEvent(event.data); }
     };
@@ -400,7 +400,8 @@ function connectLiveExperiment() {
 function applyExperimentUpdate(payload) {
   const update = extractExperiment(payload);
   updatePhase(update.phase, update.message, update.metrics);
-  if (update.phase.toLowerCase() === "completed") finishLiveExperiment();
+  const terminal = update.phase.toLowerCase();
+  if (["completed", "aborted", "failed"].includes(terminal)) finishLiveExperiment(terminal);
 }
 
 function simulateExperiment() {
@@ -422,11 +423,16 @@ function simulateExperiment() {
   });
 }
 
-async function finishLiveExperiment() {
+async function finishLiveExperiment(terminal = "completed") {
   clearLiveConnections();
   stopTimer();
+  if (terminal === "failed") {
+    toast("The experiment failed. Inspect the event message and verify recovery manually.", "warn");
+    return;
+  }
   try {
     renderResult(await api.report(state.experimentId));
+    toast(terminal === "aborted" ? "Emergency stop completed and recovery was verified." : "Rollback verified. The finding is ready.", "success");
   } catch {
     toast("Experiment completed, but the report is not available yet.", "warn");
   }
@@ -580,9 +586,13 @@ elements.approveButton.addEventListener("click", async () => {
 elements.stopButton.addEventListener("click", async () => {
   if (!activePhases.has(state.phase)) return;
   elements.stopButton.disabled = true;
-  clearLiveConnections();
   try {
-    if (state.mode === "live") await api.abort(state.experimentId);
+    if (state.mode === "live") {
+      await api.abort(state.experimentId);
+      updatePhase("rolling_back", "Emergency stop accepted. Waiting for verified backend rollback.", null);
+      return;
+    }
+    clearLiveConnections();
     updatePhase("rolling_back", "Emergency stop accepted. Rollback is running.", mockPhaseMetrics.rolling_back);
     const recoveryTimer = setTimeout(() => {
       updatePhase("recovering", "Rollback completed. Verifying target recovery.", mockPhaseMetrics.recovering);
