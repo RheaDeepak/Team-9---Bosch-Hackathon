@@ -206,7 +206,7 @@ def score_experiment(impact, recovery, availability, elapsed_s=None):
 
 def propose(goal=None):
     """Planner + policy: {plan, source, note, validation}. `goal` optionally steers the planner."""
-    plan, source, note = propose_experiment(goal) if goal else propose_experiment()  # no goal -> ranker + agent
+    plan, source, note = propose_experiment(goal)
     return {"plan": plan, "source": source, "note": note, "validation": validate(plan)}
 
 
@@ -215,6 +215,14 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
     ({"refused": reason} if nothing was injected).
     Hooks for the UI: on_phase(name), on_watch({service: {baseline, abort}}), on_sample(...), stop (Event)."""
     phase = on_phase or (lambda name: None)
+
+    def report_sample(sample_phase):
+        """Adapt the guard's telemetry callback to the legacy dashboard callback."""
+        def callback(metrics, containers):
+            if on_sample:
+                on_sample(sample_phase, time.monotonic(), metrics, containers, {})
+        return callback
+
     baseline = load_baseline()
     if baseline is None:
         emit("No baseline.json (run metrics.py first). Not injecting.")
@@ -239,10 +247,6 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         on_watch({s: {"baseline": {m: (baseline["services"][s][m] or {}).get("mean") for m in guard.METRICS},
                       "abort": {m: thr[s].get(m) for m in guard.METRICS}} for s in services})
 
-    try:  # restarts that already happened (e.g. a stack restart since the baseline) are not this experiment's damage
-        restart_limits = guard.restart_counts(set(services) | {plan["target"]})
-    except Exception:
-        restart_limits = None
     started = datetime.now(timezone.utc)
     g = {"aborted": True, "reason": "not started", "elapsed_s": 0, "timeline": [],
          "peaks": {s: {m: None for m in guard.METRICS} for s in services}}
@@ -255,7 +259,8 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         unit = f" ({plan['magnitude']} ms)" if plan["fault"] == "network_delay" else ""
         _annotate(emit, f"FAULT: {plan['fault']} on {plan['target']}{unit}", [plan["target"], plan["fault"]], injected_at)
         phase("monitoring")
-        g = guard.watch(plan, baseline, services, thresholds, emit, on_sample, stop, restart_limits)
+        g = guard.watch(plan, baseline, services, thresholds=thresholds,
+                        stop_event=stop, on_sample=report_sample("monitoring"))
     except KeyboardInterrupt:
         g["reason"] = "interrupted by user (Ctrl+C) during injection"
     except Exception as e:
@@ -275,7 +280,11 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         if stop is not None:
             stop.clear()  # STOP already did its job; pressing it again skips the recovery wait
         emit(f"Waiting up to {guard.RECOVERY_TIMEOUT_S}s for recovery...")
-        recovery = guard.wait_for_recovery(plan, baseline, services, emit, on_sample, stop, restart_limits)
+        recovery = guard.wait_for_recovery(plan, baseline, services,
+                                           on_sample=report_sample("recovering"))
+        recovery.setdefault("metrics_confirmed", None)
+        recovery.setdefault("metrics_seconds", None)
+        recovery.setdefault("samples", [])
     ended_at = time.time()
     phase("analyzing")
     impact = guard.impact_table(baseline, g["peaks"])
@@ -305,11 +314,6 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
     }
     (RESULTS_DIR / f"{result_id}.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     emit(f"Saved {RESULTS_DIR / (result_id + '.json')}")
-    try:  # cheap deterministic refresh for the Findings view; the AI analysis only runs when someone asks for it
-        import analysis  # here, not at the top: analysis imports this module
-        analysis.refresh()
-    except Exception as e:  # the findings view must never affect an experiment
-        emit(f"Findings refresh failed (ignored): {type(e).__name__}: {e}")
     phase("done")
     return result
 

@@ -35,6 +35,9 @@ RECOVERY_TIMEOUT_S = max(POLL_S, int(os.getenv("RECOVERY_TIMEOUT_SECONDS", "180"
 MAX_SPAN_MS = 60_000      # longer spans are streams (flagd EventStream), not request latency
 ERROR_CODES = (2, "STATUS_CODE_ERROR")  # OTLP status codes: 0 unset, 1 ok, 2 error
 METRICS = ("error_rate", "p95_ms")
+STORE_URL = os.getenv("STORE_URL", "http://localhost:8080")
+PROBES = (("products", "/api/products"), ("cart", "/api/cart?sessionId=chaos-probe&currencyCode=USD"))
+PROBE_TIMEOUT_S = 3
 
 
 def watched_services(plan, baseline, blast_radius):
@@ -42,6 +45,27 @@ def watched_services(plan, baseline, blast_radius):
     thr = baseline["thresholds"]["services"]
     return [s for s in [plan["target"], *blast_radius]
             if any(thr.get(s, {}).get(m) is not None for m in METRICS)]
+
+
+def probe_store():
+    """Run one round of dashboard-only synthetic store requests."""
+    results = []
+    for name, path in PROBES:
+        started = time.monotonic()
+        try:
+            response = requests.get(STORE_URL + path, timeout=PROBE_TIMEOUT_S)
+            ok, status = response.status_code < 400, response.status_code
+        except requests.RequestException as exc:
+            ok, status = False, type(exc).__name__
+        results.append({"name": name, "ok": ok, "status": status,
+                        "ms": round((time.monotonic() - started) * 1000)})
+    return results
+
+
+def probe_availability(timeline):
+    """Return synthetic-probe availability when probes were recorded in a timeline."""
+    results = [probe["ok"] for sample in timeline for probe in sample.get("probes", {}).values()]
+    return 100 * sum(results) / len(results) if results else None
 
 
 def live_metrics(services, window_s=WINDOW_S):
