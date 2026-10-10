@@ -1,22 +1,20 @@
-"""Experiment planner: asks an LLM to PROPOSE one experiment as JSON. It never runs anything."""
+"""Experiment planner: PROPOSES one experiment (ranker + investigating agent). It never runs anything."""
 import json
 import os
 import re
 
 import requests
 from dotenv import load_dotenv
-
 from discovery import load_flows, load_graph
 from metrics import load_baseline
-from policy import ALLOWED_FAULTS, MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECTED, REQUIRED_KEYS
+from policy import MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECTED, REQUIRED_KEYS
 from traffic_spike import JOURNEY_PROFILE, MAX_PEAK_USERS, capability as traffic_spike_capability
 
-AI_PROPOSABLE_FAULTS = ("container_stop", "network_delay")
 TRAFFIC_SPIKE_GOAL = "capacity"
+_RANKED_DEFAULT = object()
 
-# Tried in order: a model can be over its quota (HTTP 429), overloaded or retired, so one name is a single point
-# of failure. Set LLM_MODEL in .env to try a different model first. Failures are reported, never silent.
-LLM_MODELS = ("gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-lite-latest", "gemini-3-flash-preview")
+# Tried in order: Gemini models get overloaded or retired, so one name is a single point of failure.
+LLM_MODELS = ("gemini-3.8-flash", "gemini-3-flash-preview", "gemini-flash-lite-latest")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 LLM_MAX_TOKENS = 4096  # thinking models spend part of this on reasoning before the answer
 LLM_TIMEOUT_S = 20
@@ -48,41 +46,12 @@ Reply with a single JSON object and nothing else: no prose, no markdown, no code
 Schema: {{"target": str, "fault": str, "magnitude": number, "duration_s": integer,
 "hypothesis": str, "reasoning": str}}
 Rules:
-- fault is one of {list(AI_PROPOSABLE_FAULTS)}.
+- fault is one of ["container_stop", "network_delay"].
 - magnitude is the delay in ms for network_delay (1-{MAX_NETWORK_DELAY_MS}); use 0 for container_stop.
 - duration_s is at most {MAX_DURATION_S}.
 - target must be one of "candidate_targets" in the context. Never pick a protected service.
-- "optional_operator_goal", when present, is a hint rather than a constraint: prefer an experiment that serves
-  it, but the safety rules above still apply. When absent, independently choose the most informative safe fault.
-- hypothesis: what you expect to observe (which services/metrics degrade, and that it recovers).
-- reasoning: why this target is informative; cite the dependency map (fan-in, fan-out, checkout path,
-  who depends on it) and the baseline."""
-
-
-def build_context(g, stats, baseline, flows):
-    """Compact summary of the dependency map and baseline for the prompt."""
-    base = (baseline or {}).get("services", {})
-    services = {}
-    for n in sorted(g):
-        m = base.get(n, {})
-        mean = lambda k: round(m[k]["mean"], 2) if m.get(k) else None
-        services[n] = {"fan_in": stats["fan_in"][n], "fan_out": stats["fan_out"][n],
-                       "on_checkout_path": n in stats["checkout_path"], "protected": n in PROTECTED,
-                       "baseline": {"req_per_s": mean("request_rate"), "error_pct": mean("error_rate"),
-                                    "p95_ms": mean("p95_ms")}}
-    containers = set((baseline or {}).get("containers", g.nodes))
-    return {
-        "candidate_targets": [n for n in sorted(g) if n not in PROTECTED and n in containers],
-        "protected_services": sorted(PROTECTED),
-        "services": services,
-        "edges": [f"{u} -> {v} ({d.get('type', 'unknown')}{', topic ' + d['topic'] if d.get('topic') else ''})"
-                  for u, v, d in g.edges(data=True)],
-        "checkout_path": stats["checkout_path"],
-        "top_fan_in": stats["top_fan_in"],
-        "user_journeys": {k: sorted({s for st in f["steps"] for s in (st["from"], st["to"])})
-                          for k, f in flows.items()},
-        "baseline_flags_enabled": (baseline or {}).get("flags_enabled", []),
-    }
+- "optional_operator_goal", when present, is a hint rather than a constraint.
+- hypothesis and reasoning must be grounded in the supplied dependency map and baseline."""
 
 
 def _parse_json(text):
@@ -102,42 +71,92 @@ def _parse_json(text):
 
 def parse_plan(text):
     plan = _parse_json(text)
-    missing = [k for k in REQUIRED_KEYS if k not in plan]
+    missing = [key for key in REQUIRED_KEYS if key not in plan]
     if missing:
         raise ValueError(f"LLM plan missing fields: {', '.join(missing)}")
-    return {k: plan[k] for k in REQUIRED_KEYS}
+    return {key: plan[key] for key in REQUIRED_KEYS}
 
 
-def _call_llm(api_key, context, system=SYSTEM_PROMPT):
-    body = {"systemInstruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "user", "parts": [{"text": "Context:\n" + json.dumps(context, indent=1)}]}],
-            "generationConfig": {"maxOutputTokens": LLM_MAX_TOKENS, "responseMimeType": "application/json"}}
-    models = [m for m in (os.getenv("LLM_MODEL", "").strip(), *LLM_MODELS) if m]
-    skipped = []
-    for model in models:  # next model on timeout, quota, overload, or retired model
+def build_context(graph, stats, baseline, flows):
+    """Compact dependency and baseline evidence for the legacy goal-directed planner path."""
+    base = (baseline or {}).get("services", {})
+    services = {}
+    for name in sorted(graph):
+        metrics = base.get(name, {})
+        mean = lambda key: round(metrics[key]["mean"], 2) if metrics.get(key) else None
+        services[name] = {
+            "fan_in": stats["fan_in"][name], "fan_out": stats["fan_out"][name],
+            "on_checkout_path": name in stats["checkout_path"], "protected": name in PROTECTED,
+            "baseline": {"req_per_s": mean("request_rate"), "error_pct": mean("error_rate"),
+                         "p95_ms": mean("p95_ms")},
+        }
+    containers = set((baseline or {}).get("containers", graph.nodes))
+    return {
+        "candidate_targets": [name for name in sorted(graph) if name not in PROTECTED and name in containers],
+        "protected_services": sorted(PROTECTED), "services": services,
+        "edges": [f"{source} -> {target} ({data.get('type', 'unknown')})"
+                  for source, target, data in graph.edges(data=True)],
+        "checkout_path": stats["checkout_path"], "top_fan_in": stats["top_fan_in"],
+        "user_journeys": {name: sorted({service for step in flow["steps"] for service in (step["from"], step["to"])})
+                          for name, flow in flows.items()},
+        "baseline_flags_enabled": (baseline or {}).get("flags_enabled", []),
+    }
+
+
+def load_api_key():
+    """The Gemini API key from .env / the environment, or None if unset or still the placeholder."""
+    load_dotenv()
+    key = os.getenv(API_KEY_VAR, "").strip()
+    return None if not key or key == PLACEHOLDER_KEY else key
+
+
+def _post_gemini(api_key, body, models=LLM_MODELS):
+    """POST one generateContent request, trying each model in turn -> (candidate, model)."""
+    errors = []
+    for model in models:  # next model on timeout, overload, or retired model
         try:
             resp = requests.post(GEMINI_URL.format(model=model), json=body, timeout=LLM_TIMEOUT_S,
                                  headers={"x-goog-api-key": api_key})
         except requests.RequestException as e:
-            skipped.append(f"{model}: {type(e).__name__}")
+            errors.append(f"{model}: {type(e).__name__}")
             continue
         if resp.ok:
             cand = resp.json()["candidates"][0]
             if cand.get("finishReason") == "MAX_TOKENS":
-                skipped.append(f"{model}: reply truncated (MAX_TOKENS)")
+                errors.append(f"{model}: reply truncated (MAX_TOKENS)")
                 continue
-            return "".join(p.get("text", "") for p in cand["content"]["parts"]), model, skipped
-        try:
-            reason = resp.json()["error"].get("status") or resp.json()["error"]["message"][:40]
-        except (ValueError, KeyError, AttributeError):
-            reason = ""
-        skipped.append(f"{model}: HTTP {resp.status_code} {reason}".strip())
-    raise RuntimeError("all models failed (" + "; ".join(skipped) + ")")
+            return cand, model
+        errors.append(f"{model}: HTTP {resp.status_code}")
+    raise RuntimeError("all models failed (" + "; ".join(errors) + ")")
 
 
-def propose_experiment(goal=None):
-    """Return (plan, source, note); source is "llm" or "fallback" and note says why.
-    `goal` is an optional key of GOALS that steers (never constrains) the planner."""
+def _call_llm(api_key, content, system=SYSTEM_PROMPT):
+    body = {"systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": "Context:\n" + json.dumps(content, indent=1)}]}],
+            "generationConfig": {"maxOutputTokens": LLM_MAX_TOKENS, "responseMimeType": "application/json"}}
+    cand, model = _post_gemini(api_key, body)
+    return "".join(p.get("text", "") for p in cand["content"]["parts"]), model, []
+
+
+def _legacy_proposal(goal):
+    api_key = load_api_key()
+    if not api_key:
+        return dict(FALLBACK_PLAN), "fallback", f"{API_KEY_VAR} is not set (empty or still the placeholder)"
+    try:
+        graph, stats = load_graph()
+        context = build_context(graph, stats, load_baseline(), load_flows())
+        if goal in GOALS:
+            context["optional_operator_goal"] = GOALS[goal][1]
+        text, model, skipped = _call_llm(api_key, context)
+        return parse_plan(text), "llm", f"model {model}" + (f" (skipped: {'; '.join(skipped)})" if skipped else "")
+    except Exception as exc:
+        return dict(FALLBACK_PLAN), "fallback", f"LLM planning failed: {type(exc).__name__}: {exc}"[:300]
+
+
+def propose_experiment(goal=_RANKED_DEFAULT):
+    """Return (plan, source, note). source: "rank_agent" (LLM investigated the ranker's top-K),
+    "ranker_fallback" (ranker #1, LLM unavailable or invalid) or "fallback" (FALLBACK_PLAN).
+    The plan carries the top-K ranking and the agent's evidence under the extra "ranking" key."""
     if goal == TRAFFIC_SPIKE_GOAL:
         traffic = traffic_spike_capability()
         if traffic["ready"]:
@@ -162,19 +181,20 @@ def propose_experiment(goal=None):
                 "capability_version": traffic["capability_version"],
             }, "deterministic-capability", traffic["detail"]
         return dict(FALLBACK_PLAN), "fallback", f"Traffic-spike capability is not ready: {traffic['detail']}"
-    load_dotenv()
-    api_key = os.getenv(API_KEY_VAR, "").strip()
-    if not api_key or api_key == PLACEHOLDER_KEY:
+
+    if goal is not _RANKED_DEFAULT:
+        return _legacy_proposal(goal)
+    if not load_api_key():
         return dict(FALLBACK_PLAN), "fallback", f"{API_KEY_VAR} is not set (empty or still the placeholder)"
+    from rank_agent import run_agent  # imported here: rank_agent imports this module
     try:
-        g, stats = load_graph()
-        context = build_context(g, stats, load_baseline(), load_flows())
-        if goal in GOALS:
-            context["optional_operator_goal"] = GOALS[goal][1]
-        text, model, skipped = _call_llm(api_key, context)
-        return parse_plan(text), "llm", f"model {model}" + (f" (skipped: {'; '.join(skipped)})" if skipped else "")
-    except Exception as e:  # any LLM/network/parse/file failure must degrade to the safe plan
-        return dict(FALLBACK_PLAN), "fallback", f"LLM planning failed: {type(e).__name__}: {e}"[:300]
+        out = run_agent()
+    except Exception as e:  # no dependency map / baseline, or a bug: degrade to the safe plan
+        return dict(FALLBACK_PLAN), "fallback", f"ranking failed: {type(e).__name__}: {e}"[:300]
+    plan = dict(out["plan"])
+    plan["ranking"] = {k: out[k] for k in ("source", "note", "model", "run_id", "tool_calls", "chosen",
+                                           "predictions", "top_k")}
+    return plan, out["source"], out["note"]
 
 
 JUDGE_PROMPT = """You judge the outcome of a chaos engineering experiment.
@@ -219,11 +239,9 @@ def remediation_for(plan):
 
 def judge_hypothesis(plan, results):
     """Ask the same LLM whether the hypothesis held -> {verdict, explanation}; inconclusive on any failure."""
-    load_dotenv()
-    api_key = os.getenv(API_KEY_VAR, "").strip()
-    if not api_key or api_key == PLACEHOLDER_KEY:
-        return {"verdict": "inconclusive", "explanation": f"LLM unavailable: {API_KEY_VAR} is not set",
-                "recommendation": remediation_for(plan)}
+    api_key = load_api_key()
+    if not api_key:
+        return {"verdict": "inconclusive", "explanation": f"LLM unavailable: {API_KEY_VAR} is not set"}
     try:
         content = {"hypothesis": plan["hypothesis"], "experiment": {k: plan[k] for k in ("target", "fault", "magnitude", "duration_s")},
                    "results": results}
