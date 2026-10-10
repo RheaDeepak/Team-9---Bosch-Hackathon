@@ -10,7 +10,7 @@ import re
 import statistics
 import sys
 import uuid
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -33,7 +33,7 @@ MAX_MATCHES = 20
 MAX_LINE_CHARS = 160
 MAX_PATTERN_CHARS = 200
 MAX_FILE_BYTES = 1_000_000
-SKIP_DIRS = {".git", "node_modules", "genproto", "vendor", "target", "bin", "obj", "dist", ".next",
+SKIP_DIRS = {".git", "node_modules", "genproto", "protos", "vendor", "target", "bin", "obj", "dist", ".next",
              "__pycache__", "test", "tests", "cypress"}
 SOURCE_EXT = {".go", ".py", ".js", ".mjs", ".ts", ".tsx", ".cs", ".rs", ".java", ".kt", ".rb", ".php", ".ex",
               ".exs", ".erl", ".cpp", ".cc", ".h", ".hpp", ".lua", ".yaml", ".yml", ".json", ".toml",
@@ -141,7 +141,7 @@ def search_source(service, pattern):
         rx = re.compile(pattern, re.I)
     except re.error as e:
         raise ToolError(f"bad regex: {e}")
-    matches, files = [], 0
+    matches, files, more = [], 0, Counter()  # more: files holding matches beyond MAX_MATCHES, to narrow the next search
     for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
         dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS and not os.path.islink(os.path.join(dirpath, d)))
         for name in sorted(filenames):
@@ -156,12 +156,17 @@ def search_source(service, pattern):
             except OSError:
                 continue
             files += 1
+            rel = p.relative_to(root).as_posix()
             for i, line in enumerate(lines, 1):
                 if rx.search(line[:500]):
-                    matches.append({"at": f"{p.relative_to(root).as_posix()}:{i}", "line": line.strip()[:MAX_LINE_CHARS]})
-                    if len(matches) >= MAX_MATCHES:
-                        return {"service": service, "pattern": pattern, "matches": matches, "truncated": True}
-    return {"service": service, "pattern": pattern, "files_searched": files, "matches": matches, "truncated": False}
+                    if len(matches) < MAX_MATCHES:
+                        matches.append({"at": f"{rel}:{i}", "line": line.strip()[:MAX_LINE_CHARS]})
+                    else:
+                        more[rel] += 1
+    out = {"service": service, "pattern": pattern, "files_searched": files, "matches": matches, "truncated": bool(more)}
+    if more:
+        out["more_matches_in"] = dict(more.most_common(10))
+    return out
 
 
 def get_service_env(service):
@@ -231,7 +236,9 @@ def retry_evidence(caller, callee, spans=None):
 
 
 class Toolbox:
-    """Dispatches the LLM's tool calls to the read-only functions above. Never raises."""
+    """Dispatches the LLM's tool calls to the read-only functions above. Never raises.
+    Only methods named in `decls` can be called (analysis_agent.py subclasses this with its own list)."""
+    decls = TOOL_DECLS
 
     def __init__(self, g, baseline, history, ranking):
         self.g, self.baseline, self.history = g, baseline or {}, history
@@ -281,7 +288,7 @@ class Toolbox:
         return retry_evidence(self._service(caller), self._service(callee))
 
     def call(self, name, args):
-        fn = getattr(self, name, None) if name in {d["name"] for d in TOOL_DECLS} else None
+        fn = getattr(self, name, None) if name in {d["name"] for d in self.decls} else None
         if fn is None:
             return {"error": f"unknown tool {name!r}"}
         try:
@@ -300,47 +307,54 @@ def _compact(result):
 # ---- log -------------------------------------------------------------------------------
 
 class AgentLog:
-    """Appends one JSON line per step to agent_log.jsonl so the UI can replay the reasoning."""
+    """Appends one JSON line per step to agent_log.jsonl so the UI can replay the reasoning.
+    `mode` tells the agents apart: "planning" (this file) or "analysis" (analysis_agent.py)."""
 
-    def __init__(self, path=AGENT_LOG):
-        self.path, self.run_id, self.step = Path(path), uuid.uuid4().hex[:8], 0
+    def __init__(self, path=AGENT_LOG, mode="planning"):
+        self.path, self.mode, self.run_id, self.step = Path(path), mode, uuid.uuid4().hex[:8], 0
 
     def __call__(self, type_, summary, tool=None):
         self.step += 1
-        rec = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "run_id": self.run_id,
-               "step": self.step, "type": type_, "tool": tool, "summary": " ".join(str(summary).split())[:240]}
+        rec = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "mode": self.mode,
+               "run_id": self.run_id, "step": self.step, "type": type_, "tool": tool,
+               "summary": " ".join(str(summary).split())[:240]}
         try:
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
         except OSError:
-            pass  # logging must never break planning
+            pass  # logging must never break an agent
 
 
-# ---- the agent -------------------------------------------------------------------------
+def read_log(mode=None, run_id=None, path=AGENT_LOG, limit=200):
+    """The last `limit` log records, optionally of one mode / run (for the UI)."""
+    try:
+        lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for line in lines:
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if (mode is None or rec.get("mode", "planning") == mode) and (run_id is None or rec.get("run_id") == run_id):
+            out.append(rec)
+    return out[-limit:]
 
-def _brief(top, g):
-    """First user message: the candidates and the edges into each target."""
-    cands = []
-    for c in top:
-        t = c["target"]
-        cands.append({"id": c["id"], "risk": c["risk"], "info": c["info"], "priority": c["priority"], "why": c["why"],
-                      "callers": {u: ranker._mode(d) + (f" {d['type']}" if d.get("type") else "")
-                                  for u, _, d in g.in_edges(t, data=True)},
-                      "blast_radius": blast_radius(g, t)})
-    return ("Candidates (ranker scores are 0..1, higher priority = run first):\n" + json.dumps(cands, indent=1)
-            + f"\nProtected services (never targets): {sorted(PROTECTED)}")
 
+# ---- the tool-calling loop (shared with analysis_agent.py) -----------------------------
 
-def _investigate(api_key, top, g, toolbox, log, post):
-    """Bounded tool-calling loop. Returns (final text, model, tool calls used)."""
-    contents = [{"role": "user", "parts": [{"text": _brief(top, g)}]}]
-    used, model = 0, None
-    for _ in range(MAX_LLM_CALLS):
-        body = {"systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]}, "contents": contents,
-                "tools": [{"functionDeclarations": TOOL_DECLS}],
-                "toolConfig": {"functionCallingConfig": {"mode": "AUTO" if used < MAX_TOOL_CALLS else "NONE"}},
+def tool_loop(api_key, system, contents, decls, toolbox, log, post, max_tool_calls, max_llm_calls,
+              used=0, model=None):
+    """Bounded Gemini function-calling loop. `contents` is the conversation and is extended in place,
+    so a caller can append a follow-up message and call again (with the `used` and `model` returned).
+    Returns (final text, model, tool calls used so far)."""
+    for _ in range(max_llm_calls):
+        body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents,
+                "tools": [{"functionDeclarations": decls}],
+                "toolConfig": {"functionCallingConfig": {"mode": "AUTO" if used < max_tool_calls else "NONE"}},
                 "generationConfig": {"maxOutputTokens": planner.LLM_MAX_TOKENS}}
-        cand, model = post(api_key, body, (model,) if model else planner.LLM_MODELS)  # keep one model per conversation
+        cand, model = post(api_key, body, [model] if model else planner.LLM_MODELS)[:2]  # keep one model per conversation
         parts = (cand.get("content") or {}).get("parts") or []
         contents.append({"role": "model", "parts": parts})  # verbatim: Gemini needs its thought signatures back
         text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
@@ -352,7 +366,7 @@ def _investigate(api_key, top, g, toolbox, log, post):
         replies = []
         for fc in calls:
             name, args = fc.get("name"), fc.get("args") or {}
-            if used >= MAX_TOOL_CALLS:
+            if used >= max_tool_calls:
                 result = {"error": "tool budget used up; give your final JSON answer now"}
             else:
                 used += 1
@@ -361,10 +375,32 @@ def _investigate(api_key, top, g, toolbox, log, post):
                 log("tool_result", json.dumps(result, default=str), tool=name)
             replies.append({"functionResponse": {"name": name, "response": {"result": result},
                                                  **({"id": fc["id"]} if fc.get("id") else {})}})
-        if used >= MAX_TOOL_CALLS:
+        if used >= max_tool_calls:
             replies.append({"text": "Tool budget used up. Reply now with the final JSON only."})
         contents.append({"role": "user", "parts": replies})
-    raise RuntimeError(f"no final answer within {MAX_LLM_CALLS} LLM calls")
+    raise RuntimeError(f"no final answer within {max_llm_calls} LLM calls")
+
+
+# ---- the agent -------------------------------------------------------------------------
+
+def _brief(top, g, goal=None):
+    """First user message: the candidates and the edges into each target."""
+    cands = []
+    for c in top:
+        t = c["target"]
+        cands.append({"id": c["id"], "risk": c["risk"], "info": c["info"], "priority": c["priority"], "why": c["why"],
+                      "callers": {u: ranker._mode(d) + (f" {d['type']}" if d.get("type") else "")
+                                  for u, _, d in g.in_edges(t, data=True)},
+                      "blast_radius": blast_radius(g, t)})
+    return ("Candidates (ranker scores are 0..1, higher priority = run first):\n" + json.dumps(cands, indent=1)
+            + f"\nProtected services (never targets): {sorted(PROTECTED)}"
+            + (f"\nOptional operator goal (a hint, not a constraint): {goal}" if goal else ""))
+
+
+def _investigate(api_key, top, g, toolbox, log, post, goal=None):
+    """Planning conversation over the top-K. Returns (final text, model, tool calls used)."""
+    contents = [{"role": "user", "parts": [{"text": _brief(top, g, goal)}]}]
+    return tool_loop(api_key, SYSTEM_PROMPT, contents, TOOL_DECLS, toolbox, log, post, MAX_TOOL_CALLS, MAX_LLM_CALLS)
 
 
 def _num(x):
@@ -447,7 +483,7 @@ def top_k(ranking, k):
 
 
 def run_agent(k=TOP_K, api_key=None, post=None, graph=None, baseline=None, flows=None, history=None,
-              log_path=AGENT_LOG):
+              log_path=AGENT_LOG, goal=None):
     """Rank, investigate the top-k, choose one. Raises only if ranking itself is impossible
     (no dependency map / baseline); every LLM problem falls back to the ranker's #1."""
     if graph is None:
@@ -476,7 +512,7 @@ def run_agent(k=TOP_K, api_key=None, post=None, graph=None, baseline=None, flows
         return fallback(f"{planner.API_KEY_VAR} is not set")
     try:
         text, model, used = _investigate(api_key, top, graph, Toolbox(graph, baseline, history, ranking), log,
-                                         post or planner._post_gemini)
+                                         post or planner._post_gemini, goal)
         answer = _check_answer(planner._parse_json(text), top, graph)
     except Exception as e:  # LLM/network failure or invalid output
         return fallback(f"LLM investigation failed: {type(e).__name__}: {e}"[:300])
