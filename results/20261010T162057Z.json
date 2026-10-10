@@ -1,0 +1,483 @@
+{
+  "id": "20261010T162057Z",
+  "plan": {
+    "target": "product-catalog",
+    "fault": "network_delay",
+    "magnitude": 250,
+    "duration_s": 60,
+    "hypothesis": "Injecting a 250ms network delay into product-catalog will increase the p95 latency of frontend and checkout services due to high fan-in and direct dependencies, but error rates should remain low and metrics will recover after fault removal.",
+    "reasoning": "product-catalog is on the checkout path, has a high fan_in of 3, and a fan_out of 1 (depending on astronomy-db). It is called synchronously by both frontend and checkout, making it a critical bottleneck. Testing a network delay here will reveal propagation latency in user browsing and checkout journeys without causing outright cascading crashes."
+  },
+  "plan_source": "llm",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator",
+      "recommendation"
+    ],
+    "checks": [
+      {
+        "name": "Plan is complete",
+        "passed": true,
+        "detail": "all fields present"
+      },
+      {
+        "name": "Fault type is allowed",
+        "passed": true,
+        "detail": "network_delay is on the allowlist"
+      },
+      {
+        "name": "Magnitude within cap",
+        "passed": true,
+        "detail": "250 ms delay (cap 1000 ms)"
+      },
+      {
+        "name": "Duration within cap",
+        "passed": true,
+        "detail": "60 s (cap 120 s)"
+      },
+      {
+        "name": "Target exists in the dependency map",
+        "passed": true,
+        "detail": "product-catalog is a discovered service"
+      },
+      {
+        "name": "Target is not protected",
+        "passed": true,
+        "detail": "product-catalog is not on the protected list"
+      }
+    ]
+  },
+  "started_at": "2026-10-10T16:20:57+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: frontend-proxy p95_ms (516.1ms > 132.7ms); product-catalog p95_ms (256.1ms > 119.6ms)",
+    "elapsed_s": 12.5,
+    "peaks": {
+      "product-catalog": {
+        "error_rate": 0.0,
+        "p95_ms": 256.107007
+      },
+      "checkout": {
+        "error_rate": null,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 505.521174
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 516.076
+      },
+      "recommendation": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 2.7220999999999997,
+        "memory_mb": 35.6171875
+      },
+      "frontend": {
+        "cpu_percent": 1.5510834371108344,
+        "memory_mb": 158.6328125
+      },
+      "checkout": {
+        "cpu_percent": 1.9461301775147928,
+        "memory_mb": 11.30859375
+      },
+      "recommendation": {
+        "cpu_percent": 0.9351861042183622,
+        "memory_mb": 57.82421875
+      },
+      "product-catalog": {
+        "cpu_percent": 0.9266666666666666,
+        "memory_mb": 15.66015625
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 16,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 8.943714
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 30,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 22.487542
+          },
+          "frontend-proxy": {
+            "n": 13,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 22.273
+          },
+          "recommendation": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 516
+          },
+          "cart": {
+            "ok": true,
+            "ms": 19
+          }
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 19,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 256.107007
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 30,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 22.487542
+          },
+          "frontend-proxy": {
+            "n": 25,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 506.522
+          },
+          "recommendation": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {
+          "product-catalog p95_ms": "256.1ms > 119.6ms",
+          "frontend-proxy p95_ms": "506.5ms > 132.7ms"
+        },
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 526
+          },
+          "cart": {
+            "ok": true,
+            "ms": 39
+          }
+        }
+      },
+      {
+        "t": 10.0,
+        "metrics": {
+          "product-catalog": {
+            "n": 16,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 256.107007
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 44,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 505.521174
+          },
+          "frontend-proxy": {
+            "n": 32,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 516.076
+          },
+          "recommendation": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          }
+        },
+        "breaches": {
+          "product-catalog p95_ms": "256.1ms > 119.6ms",
+          "frontend p95_ms": "505.5ms > 133.6ms",
+          "frontend-proxy p95_ms": "516.1ms > 132.7ms"
+        },
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 521
+          },
+          "cart": {
+            "ok": true,
+            "ms": 19
+          }
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": false,
+    "seconds": null,
+    "metrics_confirmed": false,
+    "metrics_seconds": null,
+    "samples": [
+      {
+        "t": 0.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 17
+          },
+          "cart": {
+            "ok": true,
+            "ms": 12
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      }
+    ],
+    "note": "recovery wait stopped by user"
+  },
+  "impact": [
+    {
+      "service": "product-catalog",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 19.622380952380894,
+        "peak": 256.107007,
+        "change": 236.48462604761912
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": null,
+        "change": null
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 505.521174,
+        "change": 471.89383134265734
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 516.076,
+        "change": 483.39039393939396
+      }
+    },
+    {
+      "service": "recommendation",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 4.58,
+        "peak": null,
+        "change": null
+      }
+    }
+  ],
+  "amplification": [
+    {
+      "service": "product-catalog",
+      "role": "target",
+      "increase_ms": 236.5,
+      "delay_ms": 250,
+      "ratio": 0.9,
+      "amplified": false
+    },
+    {
+      "service": "frontend",
+      "role": "caller",
+      "increase_ms": 471.9,
+      "delay_ms": 250,
+      "ratio": 1.9,
+      "amplified": true
+    },
+    {
+      "service": "frontend-proxy",
+      "role": "caller",
+      "increase_ms": 483.4,
+      "delay_ms": 250,
+      "ratio": 1.9,
+      "amplified": true
+    }
+  ],
+  "score": {
+    "impact_score": 45.0,
+    "resilience_score": 55,
+    "severity": "High",
+    "confidence": "Medium confidence",
+    "availability_pct": 100.0,
+    "components": {
+      "error_impact": 0.0,
+      "latency_impact": 1.0,
+      "availability_loss": 0.0,
+      "recovery_impact": 1.0
+    },
+    "limitations": [
+      "No data for: checkout",
+      "Stopped after 12s, so the evidence covers only the start of the fault"
+    ]
+  },
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 2.7220999999999997
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 35.6171875
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 1.5510834371108344
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 158.6328125
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 1.9461301775147928
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 11.30859375
+      }
+    },
+    {
+      "container": "recommendation",
+      "cpu_percent": {
+        "baseline": 2.7665186252937053,
+        "peak": 0.9351861042183622
+      },
+      "memory_mb": {
+        "baseline": 48.0232421875,
+        "peak": 57.82421875
+      }
+    },
+    {
+      "container": "product-catalog",
+      "cpu_percent": {
+        "baseline": 0.7358883746434256,
+        "peak": 0.9266666666666666
+      },
+      "memory_mb": {
+        "baseline": 11.0890625,
+        "peak": 15.66015625
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "partially held",
+    "explanation": "The experiment successfully demonstrated that injecting a 250ms delay into product-catalog increases frontend and frontend-proxy p95 latency while keeping error rates at 0%. However, checkout had no data due to the early abort triggered by the safety threshold, and recovery was not confirmed because the recovery wait was stopped by the user.",
+    "claims": [
+      {
+        "claim": "frontend p95 increases",
+        "evidence": "frontend p95_ms baseline was 33.63 and peak reached 505.52 (change: 471.89).",
+        "status": "supported"
+      },
+      {
+        "claim": "checkout p95 increases",
+        "evidence": "checkout p95_ms peak and change are null due to lack of traffic during the early abort.",
+        "status": "no data"
+      },
+      {
+        "claim": "error rates remain low",
+        "evidence": "product-catalog, frontend, and frontend-proxy error rates all had a baseline and peak of 0.0 with 0.0 change.",
+        "status": "supported"
+      },
+      {
+        "claim": "metrics recover after fault removal",
+        "evidence": "recovery.recovered is false and recovery wait was stopped by user with metrics_confirmed as false.",
+        "status": "contradicted"
+      }
+    ],
+    "recommendation": "Implement a circuit breaker and fallback response in the frontend service when calling product-catalog to prevent latency amplification and protect upstream proxies during catalog degradation.",
+    "model": "gemini-3.5-flash-lite",
+    "skipped_models": []
+  },
+  "grafana_window_ms": [
+    1791649138312,
+    1791649323205
+  ]
+}

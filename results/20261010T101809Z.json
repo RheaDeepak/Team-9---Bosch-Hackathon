@@ -1,0 +1,198 @@
+{
+  "id": "20261010T101809Z",
+  "plan": {
+    "target": "checkout",
+    "fault": "container_stop",
+    "magnitude": 0,
+    "duration_s": 60,
+    "hypothesis": "Stopping the checkout service will result in a 100% failure rate for all checkout-related user journeys, and the frontend will exhibit error responses for purchase attempts. All services should recover to baseline error rates once the container is restarted.",
+    "reasoning": "The checkout service is a central orchestrator on the critical path with a fan-out of 7, including dependencies like payment, shipping, and product-catalog. As the only consumer of the checkout journey from the frontend (fan-in of 1), its unavailability is expected to completely halt order processing, providing a clear test of system resilience and recovery for the most critical business flow."
+  },
+  "plan_source": "llm",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ]
+  },
+  "started_at": "2026-10-10T10:18:09+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "stopped by user (STOP button)",
+    "elapsed_s": 7.0,
+    "peaks": {
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 30.983994
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 32.169
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 1.058636926889715,
+        "memory_mb": 34.4453125
+      },
+      "frontend": {
+        "cpu_percent": 4.628114856429463,
+        "memory_mb": 125.86328125
+      },
+      "checkout": {
+        "cpu_percent": null,
+        "memory_mb": null
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "checkout": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 51,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 28.302595
+          },
+          "frontend-proxy": {
+            "n": 30,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 29.306
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "checkout": {
+            "n": 1,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 36,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 30.983994
+          },
+          "frontend-proxy": {
+            "n": 26,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 32.169
+          }
+        },
+        "breaches": {}
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 0.0
+  },
+  "impact": [
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 30.983994,
+        "change": -2.6433486573426315
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 32.169,
+        "change": -0.5166060606060654
+      }
+    }
+  ],
+  "amplification": [],
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 1.058636926889715
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 34.4453125
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 4.628114856429463
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 125.86328125
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": null
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": null
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "inconclusive",
+    "explanation": "The experiment was aborted by the user after only 7 seconds of the intended 60-second duration. No increase in error rates was observed in the telemetry during this short window, which is insufficient time to validate the hypothesis that the checkout service failure would cause a 100% failure rate.",
+    "model": "gemini-3-flash-preview"
+  }
+}

@@ -91,26 +91,20 @@
             </div>
 
             <form id="proposalForm" class="proposal-form">
-              <p class="explore-copy">Let the AI inspect topology, baseline telemetry, and blast radius to choose one informative failure test.</p>
+              <label for="goalSelect">What do you want to learn?</label>
+              <div class="select-wrap">
+                <select id="goalSelect" name="goal">
+                  <option value="graceful_degradation">Test graceful degradation</option>
+                  <option value="critical_dependency">Find a critical dependency</option>
+                  <option value="recovery_time">Measure recovery time</option>
+                  <option value="timeout_behavior">Expose timeout and retry behavior</option>
+                </select>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg>
+              </div>
               <button id="proposeButton" class="button button-dark button-full" type="submit">
-                <span>Explore failures with AI</span>
+                <span>Generate safe proposal</span>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
               </button>
-              <details class="goal-options">
-                <summary>Optional: guide the AI</summary>
-                <label for="goalSelect">Learning goal</label>
-                <div class="select-wrap">
-                  <select id="goalSelect" name="goal">
-                    <option value="" selected>No preference — let AI explore</option>
-                    <option value="graceful_degradation">Test graceful degradation</option>
-                    <option value="critical_dependency">Find a critical dependency</option>
-                    <option value="recovery_time">Measure recovery time</option>
-                    <option value="timeout_behavior">Expose timeout and retry behavior</option>
-                    <option value="capacity">Test bounded traffic capacity</option>
-                  </select>
-                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg>
-                </div>
-              </details>
             </form>
 
             <div id="proposalEmpty" class="proposal-empty">
@@ -131,7 +125,6 @@
               <p id="proposalHypothesis">—</p>
               <dl class="parameter-grid">
                 <div><dt>Duration</dt><dd id="proposalDuration">—</dd></div>
-                <div><dt>Load</dt><dd id="proposalLoad">—</dd></div>
                 <div><dt>Blast radius</dt><dd id="proposalRadius">—</dd></div>
                 <div><dt>Rollback</dt><dd id="proposalRollback">—</dd></div>
               </dl>
@@ -227,39 +220,6 @@
               </div>
               <p class="no-data-note"><span></span> Missing telemetry is shown as “No data”, never zero.</p>
             </div>
-          </div>
-
-          <div class="telemetry-observatory" aria-labelledby="telemetryTitle">
-            <div class="telemetry-toolbar">
-              <div>
-                <p class="kicker">LIVE TELEMETRY / GRAFANA</p>
-                <h3 id="telemetryTitle">What the system is experiencing</h3>
-                <p>Charts update from the same span metrics used by the guard. Open any panel in Grafana for deeper inspection.</p>
-              </div>
-              <div class="telemetry-controls">
-                <span id="telemetryPhase" class="telemetry-phase">IDLE</span>
-                <label for="telemetryServiceSelect">Service</label>
-                <select id="telemetryServiceSelect"><option value="frontend">frontend</option></select>
-              </div>
-            </div>
-            <div class="telemetry-chart-grid">
-              <article class="telemetry-chart-card" data-chart="throughputRps">
-                <div class="telemetry-chart-heading"><span>TRAFFIC</span><strong id="throughputChartValue">No data</strong></div>
-                <svg viewBox="0 0 320 120" role="img" aria-label="Live request rate"><g class="chart-grid-lines"></g><polyline id="throughputChartLine"></polyline></svg>
-                <div class="telemetry-chart-footer"><span>Request rate</span><a id="throughputGrafanaLink" target="_blank" rel="noreferrer">Open in Grafana ↗</a></div>
-              </article>
-              <article class="telemetry-chart-card" data-chart="errorRate">
-                <div class="telemetry-chart-heading"><span>FAILURES</span><strong id="errorChartValue">No data</strong></div>
-                <svg viewBox="0 0 320 120" role="img" aria-label="Live error rate"><g class="chart-grid-lines"></g><polyline id="errorChartLine"></polyline></svg>
-                <div class="telemetry-chart-footer"><span>Error rate</span><a id="errorGrafanaLink" target="_blank" rel="noreferrer">Open in Grafana ↗</a></div>
-              </article>
-              <article class="telemetry-chart-card" data-chart="p95LatencyMs">
-                <div class="telemetry-chart-heading"><span>PERFORMANCE</span><strong id="latencyChartValue">No data</strong></div>
-                <svg viewBox="0 0 320 120" role="img" aria-label="Live p95 latency"><g class="chart-grid-lines"></g><polyline id="latencyChartLine"></polyline></svg>
-                <div class="telemetry-chart-footer"><span>p95 latency</span><a id="latencyGrafanaLink" target="_blank" rel="noreferrer">Open in Grafana ↗</a></div>
-              </article>
-            </div>
-            <div id="telemetryPhaseLegend" class="telemetry-phase-legend" aria-label="Experiment phase history"></div>
           </div>
         </section>
 
