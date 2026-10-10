@@ -30,7 +30,7 @@
   --ease:.15s ease;
 }
 * { box-sizing:border-box; }
-html { background:var(--bg); scroll-padding-top:84px; scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+html { background:var(--bg); scroll-padding-top:calc(var(--topbar-h,64px) + 12px); scroll-padding-bottom:110px; scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
 body { margin:0; color:var(--text); font:14px/1.55 var(--font); -webkit-font-smoothing:antialiased; }
 button, select, input { font:inherit; color:inherit; }
 button { cursor:pointer; }
@@ -39,6 +39,9 @@ h1, h2, h3, p { margin:0; }
 .muted { color:var(--text-3); }
 .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+.skip { position:absolute; left:var(--s3); top:-72px; z-index:60; padding:8px 16px; border-radius:var(--r-sm); background:var(--accent-solid); color:#fff; font-weight:600; text-decoration:none; }
+.skip:focus { top:var(--s3); }
+main:focus { outline:none; }
 .num, .kpi b, table, .pill, .ring { font-variant-numeric:tabular-nums; }
 
 /* ================= Top bar and step navigation ================= */
@@ -48,7 +51,7 @@ h1, h2, h3, p { margin:0; }
 .brand svg { width:30px; height:30px; flex:none; }
 .brand h1 { font-size:16px; font-weight:650; letter-spacing:-.01em; line-height:1.2; }
 .brand p { font-size:11.5px; color:var(--text-3); line-height:1.2; margin-top:2px; }
-.steps-nav { display:flex; gap:2px; overflow-x:auto; scrollbar-width:none; }
+.steps-nav { display:flex; gap:2px; overflow-x:auto; scrollbar-width:none; padding:4px; margin:-4px; }   /* room for the focus ring inside the scroller */
 .steps-nav::-webkit-scrollbar { display:none; }
 .steps-nav a { padding:6px 11px; border-radius:var(--r-sm); color:var(--text-2); text-decoration:none; font-size:13px; white-space:nowrap; transition:background-color var(--ease), color var(--ease); }
 .steps-nav a:hover { background:var(--surface-2); color:var(--text); }
@@ -116,8 +119,13 @@ button.chip.link { transition:background-color var(--ease); } button.chip.link:h
 .is-live .live-dot { display:inline-block; }
 
 /* ================= Notices ================= */
-#banner { display:none; padding:var(--s3) var(--s4); border-radius:var(--r-md); background:var(--bad-soft); color:#ffc4c2; border:1px solid #6b2a2d; }
-#banner.show { display:block; } #banner.note { background:var(--accent-soft); color:#bcd2ff; border-color:#27407a; }
+/* The banner is a toast under the top bar, so an error from a button halfway down the page is never out of sight. */
+#banner { display:none; position:fixed; z-index:45; top:calc(var(--topbar-h,64px) + 8px); left:50%; transform:translateX(-50%); width:min(1192px, calc(100% - 24px));
+  align-items:flex-start; gap:var(--s3); padding:var(--s3) var(--s4); border-radius:var(--r-md); background:var(--bad-soft); color:#ffc4c2; border:1px solid #6b2a2d; box-shadow:0 12px 32px rgba(0,0,0,.55); }
+#banner.show { display:flex; } #banner.note { background:var(--accent-soft); color:#bcd2ff; border-color:#27407a; }
+#bannerText { flex:1; min-width:0; overflow-wrap:anywhere; }
+.banner-x { flex:none; width:28px; height:28px; display:grid; place-items:center; border:0; border-radius:6px; background:transparent; color:inherit; font-size:20px; line-height:1; opacity:.8; transition:background-color var(--ease), opacity var(--ease); }
+.banner-x:hover { opacity:1; background:rgba(255,255,255,.1); }
 
 /* ================= 1. Readiness ================= */
 #readyDetails summary { display:flex; align-items:center; gap:var(--s2); cursor:pointer; color:var(--text-2); list-style:none; padding:2px 0; }
@@ -203,7 +211,9 @@ table { width:100%; border-collapse:collapse; font-size:13px; }
 th, td { text-align:left; padding:9px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
 tr:last-child td { border-bottom:0; }
 th { position:sticky; top:0; background:var(--surface-2); color:var(--text-3); font-size:11px; font-weight:650; letter-spacing:.07em; text-transform:uppercase; white-space:nowrap; z-index:1; }
-tr.click { cursor:pointer; transition:background-color var(--ease); } tr.click:hover { background:var(--surface-2); } tr.click:focus-visible { outline-offset:-2px; }
+tr.click { cursor:pointer; transition:background-color var(--ease); } tr.click:hover, tr.click:focus-within { background:var(--surface-2); }
+.rowbtn { padding:0; border:0; background:none; color:var(--text); font:inherit; text-align:left; cursor:pointer; text-decoration:underline; text-decoration-color:var(--line-2); text-underline-offset:3px; transition:color var(--ease), text-decoration-color var(--ease); }
+.rowbtn:hover { color:var(--accent); text-decoration-color:var(--accent); }
 .neg { color:var(--ok); } .pos { color:var(--bad); }
 .history-more { margin-top:var(--s3); }
 .scorebar { display:flex; gap:var(--s5); align-items:center; flex-wrap:wrap; padding:var(--s4) var(--s5); margin-bottom:var(--s5); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); }
@@ -216,7 +226,19 @@ tr.click { cursor:pointer; transition:background-color var(--ease); } tr.click:h
 .verdict { padding:var(--s3) var(--s4); border-radius:var(--r-md); background:var(--surface-2); border:1px solid var(--line); border-left:4px solid var(--text-3); }
 .verdict.ok { border-left-color:var(--ok); } .verdict.warn { border-left-color:var(--warn); } .verdict.bad { border-left-color:var(--bad); }
 .next { margin-top:var(--s4); padding:var(--s3) var(--s4); border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 var(--r-md) var(--r-md) 0; }
-details > summary.muted { cursor:pointer; }
+details > summary { min-height:32px; }
+details > summary.muted { cursor:pointer; display:flex; align-items:center; }
+
+/* ================= Accessibility and touch ================= */
+.field select { min-width:0; max-width:100%; } .toolbar .field { min-width:0; }
+.zoom { display:inline-flex; gap:4px; }
+.btn-icon { min-width:34px; padding:4px 0; font-size:17px; line-height:1; }
+a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-tap-highlight-color:rgba(107,151,255,.22); }
+@media (pointer:coarse) {                                  /* touch screens: comfortable targets */
+  .btn, select, .chk, .btn-sm { min-height:44px; } .btn-icon { min-width:44px; }
+  .steps-nav a { min-height:44px; display:inline-flex; align-items:center; padding:0 13px; } .skip { min-height:44px; display:inline-flex; align-items:center; } button.chip.link { padding:7px 13px; margin:3px 5px 3px 0; } .rowbtn { padding:8px 0; } details > summary { min-height:44px; }
+  .check, .gate li { min-height:40px; }
+}
 
 /* ================= Emergency stop ================= */
 #stop { position:fixed; right:var(--s5); bottom:calc(var(--s5) + env(safe-area-inset-bottom)); z-index:40; display:none; align-items:center; gap:var(--s3);
@@ -239,7 +261,7 @@ details > summary.muted { cursor:pointer; }
 @media (max-width:860px) {
   .grid2 { grid-template-columns:1fr; }
   .topbar-in { flex-wrap:wrap; gap:var(--s2) var(--s4); }
-  .steps-nav { order:3; flex-basis:100%; margin:0 -6px; }
+  .steps-nav { order:3; flex-basis:100%; margin:0 -6px; padding:4px 6px; }
   #phasePill { margin-left:auto; }
   .toolbar .hint { margin-left:0; flex-basis:100%; }
 }
@@ -248,6 +270,7 @@ details > summary.muted { cursor:pointer; }
   .topbar-in { padding:var(--s2) var(--s3); }
   .card-head { padding:var(--s4) var(--s4) var(--s3); } .card-body { padding:var(--s4); }
   .card-actions { width:100%; } .card-actions select { flex:1 1 180px; }
+  .toolbar .field { flex:1 1 100%; } .toolbar .field select { flex:1; }
   .kv { grid-template-columns:1fr; gap:0; } .kv dd { margin-bottom:var(--s2); }
   .kpis { width:100%; } .kpi { flex:1; min-width:0; }
   .plan-target { font-size:22px; }
@@ -263,6 +286,7 @@ details > summary.muted { cursor:pointer; }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to main content</a>
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">
@@ -277,8 +301,9 @@ details > summary.muted { cursor:pointer; }
   </div>
 </header>
 <button id="stop" type="button" aria-label="Emergency stop: abort the experiment and roll the fault back">STOP EXPERIMENT</button>
-<main data-mode="idle">
-  <div id="banner" role="alert"></div>
+<div id="srStatus" class="sr" role="status" aria-live="polite"></div>
+<main id="main" tabindex="-1" data-mode="idle">
+  <div id="banner" role="alert"><span id="bannerText"></span><button id="bannerClose" class="banner-x" type="button" aria-label="Dismiss message">&times;</button></div>
 
   <section id="readiness" class="card">
     <header class="card-head">
@@ -296,13 +321,15 @@ details > summary.muted { cursor:pointer; }
     </header>
     <div class="card-body">
       <div class="toolbar">
+        <label class="field">Inspect service <select id="nodeSel"><option value="">none</option></select></label>
         <label class="field">Journey <select id="journeySel"><option value="">none</option></select></label>
         <label class="chk"><input type="checkbox" id="checkoutPath"> Checkout path</label>
+        <span class="zoom" role="group" aria-label="Graph zoom"><button id="zoomOut" class="btn btn-sm btn-icon" type="button" aria-label="Zoom out">&minus;</button><button id="zoomIn" class="btn btn-sm btn-icon" type="button" aria-label="Zoom in">+</button></span>
         <button id="fitGraph" class="btn btn-sm" type="button">Fit</button>
         <span class="hint">Click a service to inspect it · hover an edge for details · scroll to zoom · drag to pan</span>
       </div>
       <div class="gwrap">
-        <div class="stage"><div id="cy"><p class="muted" style="padding:16px">Loading graph…</p></div><span class="stage-note" id="graphInfo"></span></div>
+        <div class="stage"><div id="cy" role="img" aria-label="Service dependency graph. To explore it with the keyboard, use the Inspect service menu above."><p class="muted" style="padding:16px">Loading graph…</p></div><span class="stage-note" id="graphInfo"></span></div>
         <div id="edgeTip" class="tip hide"></div>
       </div>
       <div id="nodeDetail" class="detail muted">Select a service to see its role, health, safety status and dependencies.</div>
@@ -324,10 +351,10 @@ details > summary.muted { cursor:pointer; }
       </div>
     </header>
     <div class="card-body">
-      <div id="plan" aria-live="polite"><p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p></div>
+      <div id="plan"><p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p></div>
       <div id="decision" class="decision hide">
-        <label class="chk"><input type="checkbox" id="reviewed" disabled> I reviewed the hypothesis and blast radius</label>
-        <div class="btns"><button id="reject" class="btn btn-quiet-danger" type="button" disabled>Reject</button><button id="approve" class="btn btn-go" type="button" disabled>Approve and run</button></div>
+        <label class="chk"><input type="checkbox" id="reviewed" disabled aria-describedby="approveHint"> I reviewed the hypothesis and blast radius</label>
+        <div class="btns"><button id="reject" class="btn btn-quiet-danger" type="button" disabled>Reject</button><button id="approve" class="btn btn-go" type="button" disabled aria-describedby="approveHint">Approve and run</button></div>
         <span id="approveHint" class="muted" aria-live="polite"></span>
       </div>
     </div>
@@ -335,7 +362,7 @@ details > summary.muted { cursor:pointer; }
 
   <section id="live" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>04</b>Observe</span><h2><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>04</b>Observe</span><h2 id="liveTitle" tabindex="-1"><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
       <div class="card-actions"><span id="faultPill" class="pill warn"></span></div>
     </header>
     <div class="card-body">
@@ -344,9 +371,10 @@ details > summary.muted { cursor:pointer; }
         <div class="kpis"><div class="kpi"><span>Elapsed</span><b id="elapsed">0s</b></div><div class="kpi"><span>Active fault</span><b id="fault" style="font-size:15px;line-height:1.5">-</b></div></div>
       </div>
       <div class="focusbar">Baseline and abort threshold (dashed) for <label class="field"><span class="sr">Service for baseline lines</span><select id="focus"></select></label></div>
+      <p id="chartSummary" class="sr"></p>
       <div class="grid2">
-        <div class="panel"><h3 class="sub">p95 latency (ms)</h3><div class="chartbox"><canvas id="chartP95" role="img" aria-label="p95 latency over time for the target and the services that depend on it"></canvas></div></div>
-        <div class="panel"><h3 class="sub">Error rate (%)</h3><div class="chartbox"><canvas id="chartErr" role="img" aria-label="Error rate over time for the target and the services that depend on it"></canvas></div></div>
+        <div class="panel"><h3 class="sub">p95 latency (ms)</h3><div class="chartbox"><canvas id="chartP95" role="img" aria-label="p95 latency over time for the target and the services that depend on it" aria-describedby="chartSummary"></canvas></div></div>
+        <div class="panel"><h3 class="sub">Error rate (%)</h3><div class="chartbox"><canvas id="chartErr" role="img" aria-label="Error rate over time for the target and the services that depend on it" aria-describedby="chartSummary"></canvas></div></div>
       </div>
       <div class="grid2">
         <div class="panel"><h3 class="sub">Shop probes <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(synthetic user requests, display only)</span></h3><div id="probes"></div></div>
@@ -376,7 +404,7 @@ details > summary.muted { cursor:pointer; }
 
   <section id="resultPanel" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>06</b>Learn</span><h2>Result</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>06</b>Learn</span><h2 id="resultTitle" tabindex="-1">Result</h2></div>
       <div class="card-actions"><span id="resultNote" class="muted"></span></div>
     </header>
     <div class="card-body"><div id="result"></div></div>
@@ -407,13 +435,40 @@ async function api(path, post, payload) {
   if (!r.ok) throw new Error(body.detail || r.statusText);
   return body;
 }
-function banner(msg, note) { const b = $('banner'); b.textContent = msg || ''; b.className = msg ? 'show' + (note ? ' note' : '') : ''; }
-async function act(path, label, body) { try { banner(''); return await api(path, true, body); } catch (e) { banner(`${label} failed: ${e.message}`); } }
+function banner(msg, note) { const b = $('banner'); $('bannerText').textContent = msg || ''; b.className = msg ? 'show' + (note ? ' note' : '') : ''; }
+const setText = (el, t) => { if (el.textContent !== t) el.textContent = t; };      // do not re-announce identical text
+let lastAnnounced = '';
+function announce(msg) { if (msg && msg !== lastAnnounced) { lastAnnounced = msg; $('srStatus').textContent = msg; } }   // short messages for screen readers
+// A request in flight disables its button (no double submit) and marks it busy; the next poll restores the right state.
+async function act(path, label, body, btn) {
+  if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+  try { banner(''); return await api(path, true, body); }
+  catch (e) { banner(`${label} failed: ${e.message}`); }
+  finally { if (btn) btn.removeAttribute('aria-busy'); }
+}
+async function withBusy(btn, label, fn) {
+  const original = btn.textContent; btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = label;
+  try { await fn(); } finally { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = original; }
+}
+let offline = false, startupSeen = false, lastPhase = null;
+function phaseMessage(s) {
+  const p = s.plan, r = s.result;
+  switch (s.phase) {
+    case 'proposed': return p ? `Plan proposed: ${p.fault.replace('_', ' ')} on ${p.target}. Safety gate ${s.validation && s.validation.valid ? 'passed' : 'blocked'}. Review it, then approve or reject.` : '';
+    case 'monitoring': return 'Fault active. The red emergency stop button is near the top of the page.';
+    case 'rolling_back': return 'Rolling back the fault.';
+    case 'recovering': return 'Rollback finished. Waiting for the system to recover.';
+    case 'done': return r ? `Experiment finished, ${r.guard.aborted ? 'aborted' : 'completed'}. Resilience ${r.score ? r.score.resilience_score : 'unknown'} out of 100. Verdict: ${r.verdict.verdict}.` : 'Experiment finished.';
+    case 'refused': case 'error': return `The experiment did not run: ${s.refused}`;
+    case 'idle': return lastPhase === 'proposed' ? 'Plan rejected.' : '';
+    default: return '';
+  }
+}
 
 /* ---------- 1. readiness ---------- */
 let lastReadyState = '';
-async function loadReadiness() {
-  $('readyPill').textContent = 'checking'; $('readyPill').className = 'pill';
+async function loadReadiness(quiet = false) {
+  if (!quiet) { $('readyPill').textContent = 'checking'; $('readyPill').className = 'pill'; }   // the 30 s background refresh stays silent
   try { readiness = await api('/api/readiness'); } catch (e) { readiness = { ready: false, checks: [{ name: 'Backend', ok: false, detail: e.message }] }; }
   const passed = readiness.checks.filter(c => c.ok).length, blocking = readiness.checks.filter(c => !c.ok && !c.optional).length;
   $('checks').innerHTML = readiness.checks.map(c => {
@@ -427,7 +482,7 @@ async function loadReadiness() {
   const embed = readiness.checks.find(c => c.name === 'Grafana embedding enabled');
   $('gWarn').textContent = embed && !embed.ok ? 'Grafana panels will stay blank: ' + embed.detail + ' (see README).' : '';
   $('gWarn').classList.toggle('hide', !(embed && !embed.ok));
-  $('readyPill').textContent = busy ? 'experiment running' : readiness.ready ? 'ready' : 'not ready';
+  setText($('readyPill'), busy ? 'experiment running' : readiness.ready ? 'ready' : 'not ready');
   $('readyPill').className = 'pill ' + (busy ? 'warn' : readiness.ready ? 'ok' : 'bad');
   renderPlan();
 }
@@ -558,6 +613,7 @@ async function loadGraph() {
   cy.on('mouseover', 'edge', ev => { const t = $('edgeTip'); t.innerHTML = ev.target.data('tip'); t.classList.remove('hide'); });
   cy.on('mousemove', 'edge', ev => { const t = $('edgeTip'); t.style.left = Math.min(ev.renderedPosition.x + 14, $('cy').clientWidth - 300) + 'px'; t.style.top = ev.renderedPosition.y + 14 + 'px'; });
   cy.on('mouseout', 'edge', () => $('edgeTip').classList.add('hide'));
+  $('nodeSel').innerHTML = '<option value="">none</option>' + graph.nodes.slice().sort().map(n => `<option value="${esc(n)}">${esc(n)}${(info[n] || {}).protected ? ' (protected)' : ''}</option>`).join('');
   $('journeySel').innerHTML = '<option value="">none</option>' + Object.entries(graph.flows || {}).map(([k, f]) => `<option value="${esc(k)}">${esc(k)} (${f.traces} traces)</option>`).join('');
   $('graphInfo').textContent = `${graph.nodes.length} services, ${graph.edges.length} dependencies`;
   if (width < 640) {                                 // phones: start readable (zoomed in at the left), pan to explore
@@ -595,8 +651,12 @@ function showNode(n) {
 }
 function selectNode(n) {
   selNode = n; if (!cy) return;
+  $('nodeSel').value = n || '';
   cy.nodes().removeClass('sel'); if (n) cy.getElementById(n).addClass('sel');
-  if (n) showNode(n); else { $('nodeDetail').classList.add('muted'); $('nodeDetail').textContent = 'Select a service to see its role, health, safety status and dependencies.'; }
+  if (n) {
+    showNode(n); const i = info[n] || {};
+    announce(`Inspecting ${n}: ${i.role || 'service'}, ${i.health || 'unknown'}, ${i.protected ? 'protected, cannot be targeted' : 'eligible target'}. Details are below the graph.`);
+  } else { $('nodeDetail').classList.add('muted'); $('nodeDetail').textContent = 'Select a service to see its role, health, safety status and dependencies.'; }
   applyFocus();
 }
 
@@ -703,6 +763,9 @@ function renderCharts(s) {
   if (sel.options.length !== services.length) sel.innerHTML = services.map(n => `<option>${esc(n)}</option>`).join('');
   sel.value = focus;
   const sig = [s.samples.length, services.join(), focus, s.rollback_at_s].join('|'); if (sig === chartSig) return; chartSig = sig;
+  const last = s.samples[s.samples.length - 1];                // text equivalent of the charts, for screen readers
+  $('chartSummary').textContent = last ? `Latest sample at ${Math.round(last.t)} seconds. ` + services.map(n => { const v = last.services[n] || {};
+    return `${n}: p95 ${v.p95_ms == null ? 'no data' : Math.round(v.p95_ms) + ' milliseconds'}, error rate ${v.error_rate == null ? 'no data' : v.error_rate.toFixed(1) + ' percent'}`; }).join('; ') + '.' : 'No samples yet.';
   charts.p95 = charts.p95 || lineChart('chartP95', 'ms'); charts.err = charts.err || lineChart('chartErr', '%');
   const xmax = Math.max(10, ...(s.samples.map(x => x.t)));
   for (const [chart, key] of [[charts.p95, 'p95_ms'], [charts.err, 'error_rate']]) {
@@ -808,16 +871,14 @@ function renderHistory() {
   $('history').className = '';
   $('history').innerHTML = !historyRows.length ? '<p class="muted">No saved results yet.</p>' :
     `<div class="table-wrap${historyAll ? ' scroll' : ''}"><table><tr><th>Started (UTC)</th><th>Experiment</th><th>Outcome</th><th>Verdict</th><th>Recovered</th><th>Rollback</th></tr>${rows.map(r =>
-      `<tr class="click" tabindex="0" data-id="${esc(r.id)}"><td>${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))}</td>
+      `<tr class="click" data-id="${esc(r.id)}"><td><button type="button" class="rowbtn" aria-label="Open the ${esc(r.fault.replace('_', ' '))} on ${esc(r.target)} result from ${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))} UTC">${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))}</button></td>
        <td>${esc(r.fault)} on <b>${esc(r.target)}</b>${r.fault === 'network_delay' ? ` ${esc(r.magnitude)}&nbsp;ms` : ''}</td>
        <td><span class="pill ${r.aborted ? 'warn' : 'ok'}">${r.aborted ? 'aborted' : 'completed'}</span></td>
        <td><span class="pill ${verdictClass(r.verdict)}">${esc(r.verdict)}</span></td>
        <td>${r.recovered ? 'yes' : 'no'}</td><td>${r.rollback_verified ? 'verified' : '<b class="pos">FAILED</b>'}</td></tr>`).join('')}</table></div>`
     + (historyRows.length > 8 ? `<button id="historyMore" class="btn btn-sm history-more" type="button">${historyAll ? 'Show latest 8' : `Show all ${historyRows.length}`}</button>` : '');
-  document.querySelectorAll('#history tr.click').forEach(tr => {
-    tr.onclick = () => openResult(tr.dataset.id);
-    tr.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openResult(tr.dataset.id); } };
-  });
+  document.querySelectorAll('#history tr.click').forEach(tr => { tr.onclick = () => openResult(tr.dataset.id); });      // mouse: the whole row
+  document.querySelectorAll('#history .rowbtn').forEach(b => { b.onclick = ev => { ev.stopPropagation(); openResult(b.closest('tr').dataset.id); }; });   // keyboard: the button
   if ($('historyMore')) $('historyMore').onclick = () => { historyAll = !historyAll; renderHistory(); };
 }
 
@@ -857,21 +918,30 @@ function updateGrafana() {
 }
 
 /* ---------- polling ---------- */
-let lastMode = 'idle';
+let lastMode = 'idle', modeReady = false;
 function setMode(s) {
   const mode = s.running ? 'run' : ['done', 'refused', 'error'].includes(s.phase) ? 'review' : 'idle';
   document.querySelector('main').dataset.mode = mode;
-  if (mode !== lastMode && mode !== 'idle') window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  lastMode = mode;
+  if (mode !== lastMode && mode !== 'idle') {
+    window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (modeReady) {                                      // keyboard users follow the content that moved to the top
+      const h = mode === 'review' && !$('resultPanel').classList.contains('hide') ? $('resultTitle') : $('liveTitle');
+      if (h) h.focus({ preventScroll: true });
+    }
+  }
+  lastMode = mode; modeReady = true;
 }
 function syncNav() {                                      // nav links to sections that are hidden right now are hidden too
   document.querySelectorAll('.steps-nav a').forEach(a => { const t = $(a.dataset.for); a.classList.toggle('hide', !!t && t.classList.contains('hide')); });
 }
 async function poll() {
-  try { status = await api('/api/status'); } catch (e) { banner('Backend unreachable: ' + e.message); return; }
-  if (status.startup_note) banner(status.startup_note, true); else if ($('banner').classList.contains('note')) banner('');
+  try { status = await api('/api/status'); }
+  catch (e) { offline = true; banner('Backend unreachable (' + e.message + '). Check that python app.py is still running; this page reconnects by itself.'); return; }
+  if (offline) { offline = false; banner(''); }
+  if (status.startup_note && !startupSeen) { startupSeen = true; banner(status.startup_note, true); }
   $('phasePill').textContent = status.phase.replace('_', ' ');
   $('phasePill').className = 'pill ' + (status.running ? 'warn' : status.phase === 'done' ? 'ok' : ['refused', 'error'].includes(status.phase) ? 'bad' : status.phase === 'proposed' ? 'info' : '');
+  if (status.phase !== lastPhase) { if (lastPhase !== null) announce(phaseMessage(status)); lastPhase = status.phase; }
   document.title = status.running ? `● ${status.phase.replace('_', ' ')} · Chaos Copilot` : 'Chaos Copilot';
   renderPlan(); renderLive(status); highlight(); setMode(status); syncNav();
   if (cy && Date.now() - lastHealth > (status.running ? 4000 : 30000)) refreshHealth();
@@ -883,22 +953,27 @@ async function poll() {
   syncNav();
 }
 
-$('refreshReady').onclick = loadReadiness; $('refreshHistory').onclick = loadHistory;
+$('refreshReady').onclick = () => withBusy($('refreshReady'), 'Refreshing…', () => loadReadiness());
+$('refreshHistory').onclick = () => withBusy($('refreshHistory'), 'Refreshing…', loadHistory);
+$('bannerClose').onclick = () => banner('');
 $('focus').onchange = () => { chartSig = ''; renderCharts(status); };
 $('gService').onchange = () => { gSel = $('gService').value; updateGrafana(); };
 $('propose').onclick = async () => { $('propose').disabled = true; chartSig = ''; viewedResult = null; renderResult(null);
-  await act('/api/propose', 'Propose', { goal: $('goalSel').value || null }); await poll(); };
+  await act('/api/propose', 'Propose', { goal: $('goalSel').value || null }, $('propose')); await poll(); };
 $('reviewed').onchange = renderPlan;
 $('journeySel').onchange = () => { if ($('journeySel').value) { $('checkoutPath').checked = false; } applyFocus(); };
 $('checkoutPath').onchange = () => { if ($('checkoutPath').checked) $('journeySel').value = ''; applyFocus(); };
 $('fitGraph').onclick = () => { if (cy) cy.fit(undefined, 30); };
+const zoomBy = f => { if (cy) cy.zoom({ level: Math.max(cy.minZoom(), Math.min(cy.maxZoom(), cy.zoom() * f)), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }); };
+$('zoomIn').onclick = () => zoomBy(1.25); $('zoomOut').onclick = () => zoomBy(0.8);
+$('nodeSel').onchange = () => selectNode($('nodeSel').value || null);
 $('nodeDetail').onclick = ev => { const c = ev.target.closest('[data-node]'); if (c) selectNode(c.dataset.node); };
 async function loadGoals() {
   try { const g = await api('/api/goals'); $('goalSel').innerHTML = '<option value="">no preference: let the AI explore</option>' + Object.entries(g).map(([k, label]) => `<option value="${esc(k)}">${esc(label)}</option>`).join(''); }
   catch (e) { /* the selector simply stays at "no preference" */ }
 }
-$('approve').onclick = async () => { await act('/api/approve', 'Approve'); await poll(); };
-$('reject').onclick = async () => { await act('/api/reject', 'Reject'); await poll(); };
+$('approve').onclick = async () => { await act('/api/approve', 'Approve', undefined, $('approve')); await poll(); };
+$('reject').onclick = async () => { await act('/api/reject', 'Reject', undefined, $('reject')); await poll(); };
 $('stop').onclick = async () => {
   $('stop').disabled = true; $('stop').textContent = 'Stopping…';
   await act('/api/stop', 'Stop'); await poll();
@@ -906,6 +981,10 @@ $('stop').onclick = async () => {
 };
 
 loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); poll();
+if ('ResizeObserver' in window) {                       // the sticky header's real height drives scroll padding and the banner position
+  const tb = document.querySelector('.topbar');
+  new ResizeObserver(() => document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight + 'px')).observe(tb);
+}
 if ('IntersectionObserver' in window) {                 // highlight the step you are looking at in the top navigation
   const links = [...document.querySelectorAll('.steps-nav a')];
   const spy = new IntersectionObserver(entries => entries.forEach(en => { if (en.isIntersecting) links.forEach(a => {
@@ -913,7 +992,7 @@ if ('IntersectionObserver' in window) {                 // highlight the step yo
   document.querySelectorAll('main > section').forEach(sec => spy.observe(sec));
 }
 setInterval(poll, 1000);
-setInterval(() => { if (status && !status.running && document.visibilityState === 'visible') loadReadiness(); }, 30000);
+setInterval(() => { if (status && !status.running && document.visibilityState === 'visible') loadReadiness(true); }, 30000);
 </script>
 </body>
 </html>
