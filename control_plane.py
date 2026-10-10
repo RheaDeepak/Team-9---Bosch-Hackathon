@@ -379,8 +379,8 @@ class ExperimentManager:
                 plan,
                 baseline_data,
                 services,
-                stop_event=abort_event,
-                on_sample=lambda metrics, containers: self._set_guard_metrics(experiment_id, metrics, containers),
+                stop=abort_event,
+                on_sample=lambda phase, t, metrics, containers, breaches: self._set_guard_metrics(experiment_id, metrics, containers),
             )
         except InterruptedError as exc:
             run_error = str(exc)
@@ -425,7 +425,7 @@ class ExperimentManager:
             plan,
             baseline_data,
             services,
-            on_sample=lambda metrics, containers: self._set_guard_metrics(experiment_id, metrics, containers),
+            on_sample=lambda phase, t, metrics, containers, breaches: self._set_guard_metrics(experiment_id, metrics, containers),
             on_progress=lambda progress: self._record_recovery_progress(experiment_id, progress),
         )
         recovery_seconds = float(recovery.get("seconds") or guard.RECOVERY_TIMEOUT_S)
