@@ -24,110 +24,96 @@
   ],
   "edges": [
     {
-      "parent": "frontend",
-      "child": "recommendation",
-      "call_count": 657,
-      "source": "trace"
+      "parent": "checkout",
+      "child": "shipping",
+      "call_count": 350,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "POST /get-quote",
+        "POST /ship-order"
+      ],
+      "topic": null,
+      "avg_latency_ms": 9.03,
+      "samples": 40
     },
     {
-      "parent": "frontend",
+      "parent": "checkout",
       "child": "cart",
-      "call_count": 1660,
-      "source": "trace"
-    },
-    {
-      "parent": "frontend",
-      "child": "shipping",
-      "call_count": 73,
-      "source": "trace"
-    },
-    {
-      "parent": "frontend",
-      "child": "ad",
-      "call_count": 357,
-      "source": "trace"
-    },
-    {
-      "parent": "frontend",
-      "child": "currency",
-      "call_count": 523,
-      "source": "trace"
-    },
-    {
-      "parent": "frontend",
-      "child": "product-catalog",
-      "call_count": 4264,
-      "source": "trace"
-    },
-    {
-      "parent": "frontend",
-      "child": "checkout",
-      "call_count": 149,
-      "source": "trace"
-    },
-    {
-      "parent": "recommendation",
-      "child": "flagd",
-      "call_count": 6,
-      "source": "trace"
-    },
-    {
-      "parent": "recommendation",
-      "child": "product-catalog",
-      "call_count": 657,
-      "source": "trace"
-    },
-    {
-      "parent": "product-catalog",
-      "child": "astronomy-db",
-      "call_count": 0,
-      "source": "config",
-      "via": [
-        "depends_on",
-        "env DB_CONNECTION_STRING"
-      ]
-    },
-    {
-      "parent": "payment",
-      "child": "flagd",
-      "call_count": 17,
-      "source": "trace"
-    },
-    {
-      "parent": "checkout",
-      "child": "shipping",
-      "call_count": 298,
-      "source": "trace"
-    },
-    {
-      "parent": "checkout",
-      "child": "currency",
-      "call_count": 428,
-      "source": "trace"
-    },
-    {
-      "parent": "checkout",
-      "child": "email",
-      "call_count": 149,
-      "source": "trace"
+      "call_count": 350,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "EmptyCart",
+        "GetCart"
+      ],
+      "topic": null,
+      "avg_latency_ms": 6.74,
+      "samples": 40
     },
     {
       "parent": "checkout",
       "child": "payment",
-      "call_count": 149,
-      "source": "trace"
+      "call_count": 175,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "Charge"
+      ],
+      "topic": null,
+      "avg_latency_ms": 8.9,
+      "samples": 20
+    },
+    {
+      "parent": "checkout",
+      "child": "currency",
+      "call_count": 512,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "Convert"
+      ],
+      "topic": null,
+      "avg_latency_ms": 3.31,
+      "samples": 59
     },
     {
       "parent": "checkout",
       "child": "product-catalog",
-      "call_count": 279,
-      "source": "trace"
+      "call_count": 337,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "GetProduct"
+      ],
+      "topic": null,
+      "avg_latency_ms": 10.41,
+      "samples": 39
     },
     {
       "parent": "checkout",
-      "child": "cart",
-      "call_count": 298,
-      "source": "trace"
+      "child": "email",
+      "call_count": 175,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "POST /send_order_confirmation"
+      ],
+      "topic": null,
+      "avg_latency_ms": 13.65,
+      "samples": 20
     },
     {
       "parent": "checkout",
@@ -137,60 +123,62 @@
       "via": [
         "depends_on",
         "env KAFKA_ADDR"
-      ]
+      ],
+      "protocol": "kafka",
+      "type": "async-messaging",
+      "mode": "async",
+      "operations": [
+        "publish orders"
+      ],
+      "topic": "orders",
+      "avg_latency_ms": 0.52,
+      "samples": 20
     },
     {
       "parent": "shipping",
       "child": "quote",
-      "call_count": 222,
-      "source": "trace"
-    },
-    {
-      "parent": "fraud-detection",
-      "child": "flagd",
-      "call_count": 7,
-      "source": "trace"
-    },
-    {
-      "parent": "fraud-detection",
-      "child": "kafka",
-      "call_count": 0,
-      "source": "config",
-      "via": [
-        "depends_on",
-        "env KAFKA_ADDR"
-      ]
+      "call_count": 229,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "POST /getquote"
+      ],
+      "topic": null,
+      "avg_latency_ms": 8.25,
+      "samples": 21
     },
     {
       "parent": "ad",
       "child": "flagd",
-      "call_count": 8,
-      "source": "trace"
-    },
-    {
-      "parent": "accounting",
-      "child": "astronomy-db",
-      "call_count": 0,
-      "source": "config",
-      "via": [
-        "env DB_CONNECTION_STRING"
-      ]
-    },
-    {
-      "parent": "accounting",
-      "child": "kafka",
-      "call_count": 0,
-      "source": "config",
-      "via": [
-        "depends_on",
-        "env KAFKA_ADDR"
-      ]
+      "call_count": 5,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "EventStream"
+      ],
+      "topic": null,
+      "avg_latency_ms": null,
+      "samples": 1
     },
     {
       "parent": "cart",
       "child": "flagd",
-      "call_count": 260,
-      "source": "trace"
+      "call_count": 295,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "ResolveBoolean",
+        "ResolveFloat"
+      ],
+      "topic": null,
+      "avg_latency_ms": 2.77,
+      "samples": 22
     },
     {
       "parent": "cart",
@@ -200,88 +188,424 @@
       "via": [
         "depends_on",
         "env VALKEY_ADDR"
-      ]
+      ],
+      "protocol": "redis",
+      "type": "cache",
+      "mode": "sync",
+      "operations": [
+        "EXPIRE",
+        "HGET",
+        "HMSET"
+      ],
+      "topic": null,
+      "avg_latency_ms": 0.97,
+      "samples": 265
     },
     {
-      "parent": "load-generator",
-      "child": "frontend-proxy",
-      "call_count": 25348,
-      "source": "trace"
+      "parent": "payment",
+      "child": "flagd",
+      "call_count": 12,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "ResolveBoolean",
+        "ResolveFloat"
+      ],
+      "topic": null,
+      "avg_latency_ms": 6.45,
+      "samples": 2
+    },
+    {
+      "parent": "frontend",
+      "child": "ad",
+      "call_count": 333,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "GetAds"
+      ],
+      "topic": null,
+      "avg_latency_ms": 10.12,
+      "samples": 20
+    },
+    {
+      "parent": "frontend",
+      "child": "product-catalog",
+      "call_count": 3942,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "GetProduct",
+        "ListProducts"
+      ],
+      "topic": null,
+      "avg_latency_ms": 19.22,
+      "samples": 201
+    },
+    {
+      "parent": "frontend",
+      "child": "currency",
+      "call_count": 385,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "Convert",
+        "GetSupportedCurrencies"
+      ],
+      "topic": null,
+      "avg_latency_ms": 4.09,
+      "samples": 3
+    },
+    {
+      "parent": "frontend",
+      "child": "cart",
+      "call_count": 1677,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "AddItem",
+        "GetCart"
+      ],
+      "topic": null,
+      "avg_latency_ms": 6.26,
+      "samples": 111
+    },
+    {
+      "parent": "frontend",
+      "child": "shipping",
+      "call_count": 54,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "POST /get-quote"
+      ],
+      "topic": null,
+      "avg_latency_ms": 14.48,
+      "samples": 1
+    },
+    {
+      "parent": "frontend",
+      "child": "checkout",
+      "call_count": 175,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "PlaceOrder"
+      ],
+      "topic": null,
+      "avg_latency_ms": 93.55,
+      "samples": 20
+    },
+    {
+      "parent": "frontend",
+      "child": "recommendation",
+      "call_count": 545,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "ListRecommendations"
+      ],
+      "topic": null,
+      "avg_latency_ms": 16.93,
+      "samples": 20
     },
     {
       "parent": "load-generator",
       "child": "flagd",
-      "call_count": 342,
-      "source": "trace"
+      "call_count": 360,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "POST /ofrep/v1/evaluate/flags/loadGeneratorFloodHomepage"
+      ],
+      "topic": null,
+      "avg_latency_ms": 3.66,
+      "samples": 12
     },
     {
-      "parent": "frontend-proxy",
-      "child": "image-provider",
-      "call_count": 2088,
-      "source": "trace"
+      "parent": "load-generator",
+      "child": "frontend-proxy",
+      "call_count": 30445,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "GET /",
+        "GET /api/cart",
+        "GET /api/data",
+        "GET /api/data/",
+        "GET /api/products/0PUK6V6EV0",
+        "GET /api/products/1YMWWN1N4O",
+        "GET /api/products/2ZYFJ3GM2N",
+        "GET /api/products/66VCHSJNUP",
+        "GET /api/products/6E92ZMYYFZ",
+        "GET /api/products/9SIQT8TOJO",
+        "GET /api/products/HQTGWGPNH4",
+        "GET /api/products/L9ECAV7KIM",
+        "GET /api/products/LS4PSXUNUM",
+        "GET /api/products/OLJCESPC7Z",
+        "GET /api/recommendations",
+        "POST /api/cart",
+        "POST /api/checkout"
+      ],
+      "topic": null,
+      "avg_latency_ms": 23.08,
+      "samples": 1315
     },
     {
       "parent": "frontend-proxy",
       "child": "frontend",
-      "call_count": 31251,
-      "source": "trace"
+      "call_count": 34906,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "GET /",
+        "GET /api/cart",
+        "GET /api/currency",
+        "GET /api/data",
+        "GET /api/data/",
+        "GET /api/products/[productId]/index",
+        "GET /api/products/index",
+        "GET /api/recommendations",
+        "GET /api/shipping",
+        "POST /api/cart",
+        "POST /api/checkout"
+      ],
+      "topic": null,
+      "avg_latency_ms": 16.04,
+      "samples": 1218
+    },
+    {
+      "parent": "frontend-proxy",
+      "child": "image-provider",
+      "call_count": 1534,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "GET"
+      ],
+      "topic": null,
+      "avg_latency_ms": 0.75,
+      "samples": 5
     },
     {
       "parent": "frontend-proxy",
       "child": "flagd",
-      "call_count": 296,
+      "call_count": 218,
       "source": "trace"
+    },
+    {
+      "parent": "recommendation",
+      "child": "product-catalog",
+      "call_count": 545,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "ListProducts"
+      ],
+      "topic": null,
+      "avg_latency_ms": 7.22,
+      "samples": 20
+    },
+    {
+      "parent": "recommendation",
+      "child": "flagd",
+      "call_count": 5,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "EventStream"
+      ],
+      "topic": null,
+      "avg_latency_ms": null,
+      "samples": 1
+    },
+    {
+      "parent": "product-catalog",
+      "child": "astronomy-db",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "depends_on",
+        "env DB_CONNECTION_STRING"
+      ],
+      "protocol": "postgresql",
+      "type": "database",
+      "mode": "sync",
+      "operations": [
+        "SELECT"
+      ],
+      "topic": null,
+      "avg_latency_ms": 2.94,
+      "samples": 260
+    },
+    {
+      "parent": "fraud-detection",
+      "child": "flagd",
+      "call_count": 5,
+      "source": "trace",
+      "protocol": "grpc",
+      "type": "sync-grpc",
+      "mode": "sync",
+      "operations": [
+        "EventStream"
+      ],
+      "topic": null,
+      "avg_latency_ms": null,
+      "samples": 3
+    },
+    {
+      "parent": "fraud-detection",
+      "child": "kafka",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "depends_on",
+        "env KAFKA_ADDR"
+      ],
+      "protocol": "kafka",
+      "type": "async-messaging",
+      "mode": "async",
+      "operations": [
+        "process orders",
+        "receive orders"
+      ],
+      "topic": "orders",
+      "avg_latency_ms": null,
+      "samples": 194
     },
     {
       "parent": "frontend-web",
       "child": "frontend-proxy",
-      "call_count": 3292,
-      "source": "trace"
+      "call_count": 2427,
+      "source": "trace",
+      "protocol": "http",
+      "type": "sync-http",
+      "mode": "sync",
+      "operations": [
+        "GET /api/cart",
+        "GET /api/currency",
+        "GET /api/data",
+        "GET /api/products",
+        "GET /api/recommendations",
+        "GET /api/shipping",
+        "GET /images/products/NationalParkFoundationExplorascope.jpg",
+        "GET /images/products/RedFlashlight.jpg",
+        "GET /images/products/StarsenseExplorer.jpg",
+        "GET /images/products/TheCometBook.jpg"
+      ],
+      "topic": null,
+      "avg_latency_ms": 40.13,
+      "samples": 15
+    },
+    {
+      "parent": "accounting",
+      "child": "astronomy-db",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "env DB_CONNECTION_STRING"
+      ],
+      "protocol": "postgresql",
+      "type": "database",
+      "mode": "sync",
+      "operations": [
+        "INSERT"
+      ],
+      "topic": null,
+      "avg_latency_ms": 4.35,
+      "samples": 105
+    },
+    {
+      "parent": "accounting",
+      "child": "kafka",
+      "call_count": 0,
+      "source": "config",
+      "via": [
+        "depends_on",
+        "env KAFKA_ADDR"
+      ],
+      "protocol": "kafka",
+      "type": "async-messaging",
+      "mode": "async",
+      "operations": [
+        "receive orders"
+      ],
+      "topic": "orders",
+      "avg_latency_ms": null,
+      "samples": 100
     }
   ],
   "stats": {
     "fan_in": {
-      "frontend": 1,
-      "recommendation": 1,
-      "flagd": 7,
-      "product-catalog": 3,
-      "payment": 1,
       "checkout": 1,
       "shipping": 2,
-      "fraud-detection": 0,
-      "currency": 2,
       "ad": 1,
-      "accounting": 0,
-      "email": 1,
       "cart": 2,
+      "payment": 1,
+      "frontend": 1,
       "load-generator": 0,
+      "flagd": 7,
       "frontend-proxy": 2,
-      "frontend-web": 0,
+      "recommendation": 1,
+      "product-catalog": 3,
+      "currency": 2,
+      "fraud-detection": 0,
       "image-provider": 1,
+      "email": 1,
+      "frontend-web": 0,
       "quote": 1,
+      "accounting": 0,
       "astronomy-db": 2,
       "kafka": 3,
       "valkey-cart": 1
     },
     "fan_out": {
-      "frontend": 7,
-      "recommendation": 2,
-      "flagd": 0,
-      "product-catalog": 1,
-      "payment": 1,
       "checkout": 7,
       "shipping": 1,
-      "fraud-detection": 2,
-      "currency": 0,
       "ad": 1,
-      "accounting": 2,
-      "email": 0,
       "cart": 2,
+      "payment": 1,
+      "frontend": 7,
       "load-generator": 2,
+      "flagd": 0,
       "frontend-proxy": 3,
-      "frontend-web": 1,
+      "recommendation": 2,
+      "product-catalog": 1,
+      "currency": 0,
+      "fraud-detection": 2,
       "image-provider": 0,
+      "email": 0,
+      "frontend-web": 1,
       "quote": 0,
+      "accounting": 2,
       "astronomy-db": 0,
       "kafka": 0,
       "valkey-cart": 0
@@ -307,5 +631,687 @@
       "astronomy-db",
       "cart"
     ]
+  },
+  "flows": {
+    "add_to_cart": {
+      "traces": 10,
+      "steps": [
+        {
+          "from": "frontend-proxy",
+          "operation": "GET /api/products/[productId]/index",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "GetProduct",
+          "to": "product-catalog",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "product-catalog",
+          "operation": "SELECT",
+          "to": "astronomy-db",
+          "protocol": "postgresql",
+          "share": 1.0
+        },
+        {
+          "from": "load-generator",
+          "operation": "POST /api/cart",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "POST /api/cart",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "HGET",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 0.9
+        },
+        {
+          "from": "frontend",
+          "operation": "AddItem",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "HMSET",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 0.9
+        },
+        {
+          "from": "cart",
+          "operation": "EXPIRE",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 0.9
+        },
+        {
+          "from": "frontend",
+          "operation": "GetCart",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        }
+      ],
+      "path": [
+        "frontend-proxy -GET /api/products/[productId]/index-> frontend",
+        "frontend -GetProduct-> product-catalog",
+        "product-catalog -SELECT-> astronomy-db",
+        "load-generator -POST /api/cart-> frontend-proxy",
+        "frontend-proxy -POST /api/cart-> frontend",
+        "cart -HGET-> valkey-cart",
+        "frontend -AddItem-> cart",
+        "cart -HMSET-> valkey-cart",
+        "cart -EXPIRE-> valkey-cart",
+        "frontend -GetCart-> cart"
+      ]
+    },
+    "browse_product": {
+      "traces": 30,
+      "steps": [
+        {
+          "from": "frontend-proxy",
+          "operation": "GET /api/products/[productId]/index",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "GetProduct",
+          "to": "product-catalog",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "product-catalog",
+          "operation": "SELECT",
+          "to": "astronomy-db",
+          "protocol": "postgresql",
+          "share": 1.0
+        }
+      ],
+      "path": [
+        "frontend-proxy -GET /api/products/[productId]/index-> frontend",
+        "frontend -GetProduct-> product-catalog",
+        "product-catalog -SELECT-> astronomy-db"
+      ]
+    },
+    "checkout_multi": {
+      "traces": 11,
+      "steps": [
+        {
+          "from": "frontend-proxy",
+          "operation": "GET /api/products/[productId]/index",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "GetProduct",
+          "to": "product-catalog",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "product-catalog",
+          "operation": "SELECT",
+          "to": "astronomy-db",
+          "protocol": "postgresql",
+          "share": 1.0
+        },
+        {
+          "from": "load-generator",
+          "operation": "POST /api/cart",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "POST /api/cart",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "AddItem",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "HGET",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "HMSET",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "EXPIRE",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "GetCart",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "load-generator",
+          "operation": "POST /api/checkout",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "POST /api/checkout",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "PlaceOrder",
+          "to": "checkout",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "GetCart",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "GetProduct",
+          "to": "product-catalog",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "Convert",
+          "to": "currency",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "POST /get-quote",
+          "to": "shipping",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "Charge",
+          "to": "payment",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "POST /ship-order",
+          "to": "shipping",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "EmptyCart",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "ResolveFloat",
+          "to": "flagd",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "POST /send_order_confirmation",
+          "to": "email",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "publish orders",
+          "to": "kafka",
+          "protocol": "kafka",
+          "share": 1.0
+        },
+        {
+          "from": "shipping",
+          "operation": "POST /getquote",
+          "to": "quote",
+          "protocol": "http",
+          "share": 1.0
+        }
+      ],
+      "path": [
+        "frontend-proxy -GET /api/products/[productId]/index-> frontend",
+        "frontend -GetProduct-> product-catalog",
+        "product-catalog -SELECT-> astronomy-db",
+        "load-generator -POST /api/cart-> frontend-proxy",
+        "frontend-proxy -POST /api/cart-> frontend",
+        "frontend -AddItem-> cart",
+        "cart -HGET-> valkey-cart",
+        "cart -HMSET-> valkey-cart",
+        "cart -EXPIRE-> valkey-cart",
+        "frontend -GetCart-> cart",
+        "load-generator -POST /api/checkout-> frontend-proxy",
+        "frontend-proxy -POST /api/checkout-> frontend",
+        "frontend -PlaceOrder-> checkout",
+        "checkout -GetCart-> cart",
+        "checkout -GetProduct-> product-catalog",
+        "checkout -Convert-> currency",
+        "checkout -POST /get-quote-> shipping",
+        "checkout -Charge-> payment",
+        "checkout -POST /ship-order-> shipping",
+        "checkout -EmptyCart-> cart",
+        "cart -ResolveFloat-> flagd",
+        "checkout -POST /send_order_confirmation-> email",
+        "checkout -publish orders-> kafka",
+        "shipping -POST /getquote-> quote"
+      ]
+    },
+    "checkout_single": {
+      "traces": 9,
+      "steps": [
+        {
+          "from": "frontend-proxy",
+          "operation": "GET /api/products/[productId]/index",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "GetProduct",
+          "to": "product-catalog",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "product-catalog",
+          "operation": "SELECT",
+          "to": "astronomy-db",
+          "protocol": "postgresql",
+          "share": 1.0
+        },
+        {
+          "from": "load-generator",
+          "operation": "POST /api/cart",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "POST /api/cart",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "AddItem",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "HGET",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "HMSET",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "EXPIRE",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "GetCart",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "load-generator",
+          "operation": "POST /api/checkout",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "POST /api/checkout",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "PlaceOrder",
+          "to": "checkout",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "GetCart",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "GetProduct",
+          "to": "product-catalog",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "Convert",
+          "to": "currency",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "POST /get-quote",
+          "to": "shipping",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "Charge",
+          "to": "payment",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "POST /ship-order",
+          "to": "shipping",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "EmptyCart",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "ResolveFloat",
+          "to": "flagd",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "POST /send_order_confirmation",
+          "to": "email",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "checkout",
+          "operation": "publish orders",
+          "to": "kafka",
+          "protocol": "kafka",
+          "share": 1.0
+        },
+        {
+          "from": "shipping",
+          "operation": "POST /getquote",
+          "to": "quote",
+          "protocol": "http",
+          "share": 1.0
+        }
+      ],
+      "path": [
+        "frontend-proxy -GET /api/products/[productId]/index-> frontend",
+        "frontend -GetProduct-> product-catalog",
+        "product-catalog -SELECT-> astronomy-db",
+        "load-generator -POST /api/cart-> frontend-proxy",
+        "frontend-proxy -POST /api/cart-> frontend",
+        "frontend -AddItem-> cart",
+        "cart -HGET-> valkey-cart",
+        "cart -HMSET-> valkey-cart",
+        "cart -EXPIRE-> valkey-cart",
+        "frontend -GetCart-> cart",
+        "load-generator -POST /api/checkout-> frontend-proxy",
+        "frontend-proxy -POST /api/checkout-> frontend",
+        "frontend -PlaceOrder-> checkout",
+        "checkout -GetCart-> cart",
+        "checkout -GetProduct-> product-catalog",
+        "checkout -Convert-> currency",
+        "checkout -POST /get-quote-> shipping",
+        "checkout -Charge-> payment",
+        "checkout -POST /ship-order-> shipping",
+        "checkout -EmptyCart-> cart",
+        "cart -ResolveFloat-> flagd",
+        "checkout -POST /send_order_confirmation-> email",
+        "checkout -publish orders-> kafka",
+        "shipping -POST /getquote-> quote"
+      ]
+    },
+    "flood_home": {
+      "traces": 11,
+      "steps": [
+        {
+          "from": "load-generator",
+          "operation": "GET /",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "GET /",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        }
+      ],
+      "path": [
+        "load-generator -GET /-> frontend-proxy",
+        "frontend-proxy -GET /-> frontend"
+      ]
+    },
+    "get_ads": {
+      "traces": 19,
+      "steps": [
+        {
+          "from": "load-generator",
+          "operation": "GET /api/data/",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "GET /api/data/",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "load-generator",
+          "operation": "GET /api/data",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "GET /api/data",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "GetAds",
+          "to": "ad",
+          "protocol": "grpc",
+          "share": 1.0
+        }
+      ],
+      "path": [
+        "load-generator -GET /api/data/-> frontend-proxy",
+        "frontend-proxy -GET /api/data/-> frontend",
+        "load-generator -GET /api/data-> frontend-proxy",
+        "frontend-proxy -GET /api/data-> frontend",
+        "frontend -GetAds-> ad"
+      ]
+    },
+    "get_recommendations": {
+      "traces": 19,
+      "steps": [
+        {
+          "from": "load-generator",
+          "operation": "GET /api/recommendations",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "GET /api/recommendations",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "ListRecommendations",
+          "to": "recommendation",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "recommendation",
+          "operation": "ListProducts",
+          "to": "product-catalog",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "product-catalog",
+          "operation": "SELECT",
+          "to": "astronomy-db",
+          "protocol": "postgresql",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "GetProduct",
+          "to": "product-catalog",
+          "protocol": "grpc",
+          "share": 1.0
+        }
+      ],
+      "path": [
+        "load-generator -GET /api/recommendations-> frontend-proxy",
+        "frontend-proxy -GET /api/recommendations-> frontend",
+        "frontend -ListRecommendations-> recommendation",
+        "recommendation -ListProducts-> product-catalog",
+        "product-catalog -SELECT-> astronomy-db",
+        "frontend -GetProduct-> product-catalog"
+      ]
+    },
+    "view_cart": {
+      "traces": 10,
+      "steps": [
+        {
+          "from": "load-generator",
+          "operation": "GET /api/cart",
+          "to": "frontend-proxy",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend-proxy",
+          "operation": "GET /api/cart",
+          "to": "frontend",
+          "protocol": "http",
+          "share": 1.0
+        },
+        {
+          "from": "frontend",
+          "operation": "GetCart",
+          "to": "cart",
+          "protocol": "grpc",
+          "share": 1.0
+        },
+        {
+          "from": "cart",
+          "operation": "HGET",
+          "to": "valkey-cart",
+          "protocol": "redis",
+          "share": 1.0
+        }
+      ],
+      "path": [
+        "load-generator -GET /api/cart-> frontend-proxy",
+        "frontend-proxy -GET /api/cart-> frontend",
+        "frontend -GetCart-> cart",
+        "cart -HGET-> valkey-cart"
+      ]
+    }
   }
 }

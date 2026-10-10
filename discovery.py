@@ -1,8 +1,12 @@
 """Discovery: build the service dependency graph from Jaeger + compose config."""
 import json
 import re
+import statistics
 import time
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 import matplotlib
 matplotlib.use("Agg")
@@ -23,6 +27,19 @@ TOP_N = 5
 EXCLUDED = {"otel-collector", "jaeger", "prometheus", "grafana", "opensearch"}
 # Config targets count as "hidden" only if untraced and they look like data infrastructure.
 HIDDEN_HINTS = ("kafka", "valkey", "redis", "postgres", "db")
+# Jaeger v2 has no /api/traces; it serves OTLP-JSON traces under /api/v3/traces.
+TRACES_URL = "http://localhost:8080/jaeger/ui/api/v3/traces"
+# load-generator roots every user journey; the others are the Kafka consumers.
+TRACE_SERVICES = ("load-generator", "accounting", "fraud-detection")
+TRACE_LIMIT = 100          # traces per service above
+EXTRA_LIMIT = 20           # traces per remaining service, to cover rarely-hit edges
+MAX_LATENCY_MS = 60_000    # longer spans are streams (e.g. flagd EventStream), not request latency
+TRACE_LOOKBACK = timedelta(hours=1)
+JOURNEY_PREFIX = "user_"   # root span names of the load generator's user tasks
+MIN_STEP_SHARE = 0.5       # a step must appear in this share of a journey's traces
+CACHE_SYSTEMS = {"redis", "valkey"}
+SERVER, CLIENT, PRODUCER, CONSUMER = 2, 3, 4, 5  # OTLP span kinds
+EDGE_COLORS = {"sync": "#1f77b4", "async": "#c2185b", "data": "#2a9d6f"}
 
 
 def fetch_dependencies(lookback_ms=3_600_000, url=JAEGER_URL):
@@ -109,10 +126,161 @@ def add_hidden(g, links):
     return [(u, v) for u, v, d in g.edges(data=True) if d["source"] == "config"]
 
 
-def save_graph(g, stats, path=OUT_JSON):
+def _attrs(obj):
+    """OTLP attribute list -> {key: value}."""
+    return {a["key"]: next(iter(a["value"].values()), None) for a in obj.get("attributes", [])}
+
+
+def fetch_spans(extra_services=(), url=TRACES_URL):
+    """Sample traces from Jaeger (OTLP JSON) -> {(trace_id, span_id): span dict}."""
+    now = datetime.now(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    spans = {}
+    limits = {**{s: EXTRA_LIMIT for s in extra_services}, **{s: TRACE_LIMIT for s in TRACE_SERVICES}}
+    for svc, limit in limits.items():
+        params = {"query.service_name": svc, "query.num_traces": limit,
+                  "query.start_time_min": (now - TRACE_LOOKBACK).strftime(fmt),
+                  "query.start_time_max": now.strftime(fmt)}
+        resp = requests.get(url, params=params, timeout=60)
+        resp.raise_for_status()
+        for rs in resp.json().get("result", {}).get("resourceSpans", []):
+            svc_name = _attrs(rs.get("resource", {})).get("service.name", "unknown")
+            for ss in rs.get("scopeSpans", []):
+                for s in ss.get("spans", []):
+                    start, end = int(s["startTimeUnixNano"]), int(s["endTimeUnixNano"])
+                    spans[(s["traceId"], s["spanId"])] = {
+                        "trace": s["traceId"], "parent": s.get("parentSpanId", ""),
+                        "svc": svc_name, "name": s["name"], "kind": s.get("kind", 0),
+                        "start": start, "dur": (end - start) / 1e6, "attrs": _attrs(s)}
+    return spans
+
+
+def _classify(a):
+    """(protocol, type) from span attributes; instrumentations use old and new semconv names."""
+    if "messaging.system" in a:
+        return a["messaging.system"], "async-messaging"
+    db = a.get("db.system") or a.get("db.system.name")
+    if db:
+        return db, "cache" if db in CACHE_SYSTEMS else "database"
+    rpc = a.get("rpc.system") or a.get("rpc.system.name")
+    if rpc:
+        return rpc, f"sync-{rpc}"
+    if "http.request.method" in a or "http.method" in a:
+        return "http", "sync-http"
+    return None
+
+
+def _operation(a):
+    if a.get("rpc.method"):
+        return a["rpc.method"].split("/")[-1]
+    if "messaging.system" in a:
+        return f"{a.get('messaging.operation', '')} {a.get('messaging.destination.name', '')}".strip()
+    stmt = a.get("db.query.text") or a.get("db.statement") or ""
+    if a.get("db.operation.name") or stmt.strip():
+        return a.get("db.operation.name") or stmt.split()[0].upper()
+    method = a.get("http.request.method") or a.get("http.method")
+    if method:
+        url = a.get("url.full") or a.get("http.url") or ""
+        return f"{method} {a.get('http.route') or a.get('url.path') or urlparse(url).path}".strip()
+    return None
+
+
+def extract_edges(spans):
+    """One record per cross-service call, store access or Kafka hop seen in the traces."""
+    recs = []
+    for s in spans.values():
+        a, p = s["attrs"], spans.get((s["trace"], s["parent"]))
+        topic, lat = None, s["dur"]
+        if s["kind"] == SERVER and p and p["svc"] != s["svc"]:
+            src, dst = p["svc"], s["svc"]
+            cls = _classify(p["attrs"]) or _classify(a)
+            # prefer the gRPC method name from the client span over the server's HTTP/2 route
+            op = (_operation(p["attrs"]) if "rpc.method" in p["attrs"] else None)                 or _operation(a) or _operation(p["attrs"])
+            lat = p["dur"] if p["kind"] == CLIENT else s["dur"]
+        elif s["kind"] == CLIENT and ("db.system" in a or "db.system.name" in a):
+            src, dst, cls, op = s["svc"], a.get("server.address"), _classify(a), _operation(a)
+        elif s["kind"] in (PRODUCER, CONSUMER) and "messaging.system" in a:
+            src, dst, cls, op = s["svc"], a.get("peer.service") or a["messaging.system"], _classify(a), _operation(a)
+            topic = a.get("messaging.destination.name")
+            if s["kind"] == CONSUMER:
+                lat = None  # a receive span times the poll, not the hop
+        else:
+            continue
+        if cls and dst:
+            recs.append({"trace": s["trace"], "start": s["start"], "src": src, "dst": dst,
+                         "protocol": cls[0], "type": cls[1], "op": op, "topic": topic, "lat": lat})
+    return recs
+
+
+def annotate_edges(g, recs):
+    """Add protocol/type/mode/operations/topic/avg latency to the matching graph edges."""
+    by_edge = defaultdict(list)
+    for r in recs:
+        by_edge[(r["src"], r["dst"])].append(r)
+    for (u, v), rs in by_edge.items():
+        if not g.has_edge(u, v):
+            continue
+        protocol, typ = Counter((r["protocol"], r["type"]) for r in rs).most_common(1)[0][0]
+        lats = [r["lat"] for r in rs if r["lat"] is not None and r["lat"] < MAX_LATENCY_MS]
+        g[u][v].update(
+            protocol=protocol, type=typ, mode="async" if typ == "async-messaging" else "sync",
+            operations=sorted({r["op"] for r in rs if r["op"]}),
+            topic=",".join(sorted({r["topic"] for r in rs if r["topic"]})) or None,
+            avg_latency_ms=round(statistics.mean(lats), 2) if lats else None, samples=len(rs))
+
+
+def build_flows(spans, recs):
+    """Group traces by root operation (user_*) -> ordered service/operation steps."""
+    roots = {s["trace"]: s for s in spans.values()
+             if not s["parent"] and s["name"].startswith(JOURNEY_PREFIX)}
+    runs = defaultdict(list)  # journey -> [{step: offset_ms of first occurrence}, ...]
+    by_trace = defaultdict(dict)
+    for r in sorted(recs, key=lambda r: r["start"]):
+        if r["trace"] in roots:
+            step = (r["src"], r["op"], r["dst"], r["protocol"])
+            by_trace[r["trace"]].setdefault(step, (r["start"] - roots[r["trace"]]["start"]) / 1e6)
+    for t, steps in by_trace.items():
+        runs[roots[t]["name"][len(JOURNEY_PREFIX):]].append(steps)
+    flows = {}
+    for name, rs in sorted(runs.items()):
+        offsets = defaultdict(list)
+        for steps in rs:
+            for step, off in steps.items():
+                offsets[step].append(off)
+        keep = sorted(((statistics.mean(o), st, len(o) / len(rs)) for st, o in offsets.items()
+                       if len(o) / len(rs) >= MIN_STEP_SHARE), key=lambda k: k[0])
+        steps = [{"from": st[0], "operation": st[1], "to": st[2], "protocol": st[3],
+                  "share": round(sh, 2)} for _, st, sh in keep]
+        flows[name] = {"traces": len(rs), "steps": steps,
+                       "path": [f"{x['from']} -{x['operation']}-> {x['to']}" for x in steps]}
+    return flows
+
+
+def print_dataflow(g, flows):
+    print("\nUser journeys:")
+    for name, f in flows.items():
+        print(f"  {name} ({f['traces']} traces)")
+        for i, step in enumerate(f["path"], 1):
+            print(f"    {i:>2}. {step}")
+    edges = sorted(g.edges(data=True), key=lambda e: (e[0], e[1]))
+    print("\nAsync (messaging) edges:")
+    for u, v, d in edges:
+        if d.get("mode") == "async":
+            print(f"  {u} -> {v}  topic={d['topic']}  ops={', '.join(d['operations'])}")
+    print("\nSync edges (type, avg latency, operations):")
+    for u, v, d in edges:
+        if d.get("mode") == "sync":
+            lat = f"{d['avg_latency_ms']:.1f}ms" if d["avg_latency_ms"] is not None else "-"
+            print(f"  {u:>16} -> {v:<16} {d['type']:<10} {lat:>9}  {', '.join(d['operations'][:4])}")
+    untyped = [f"{u}->{v}" for u, v, d in edges if "mode" not in d]
+    if untyped:
+        print(f"No span data for: {', '.join(untyped)}")
+
+
+def save_graph(g, stats, flows, path=OUT_JSON):
     data = {"nodes": sorted(g.nodes),
             "edges": [{"parent": u, "child": v, **d} for u, v, d in g.edges(data=True)],
-            "stats": stats}
+            "stats": stats, "flows": flows}
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -125,6 +293,11 @@ def load_graph(path=OUT_JSON):
         g.add_edge(e["parent"], e["child"],
                    **{k: v for k, v in e.items() if k not in ("parent", "child")})
     return g, data["stats"]
+
+
+def load_flows(path=OUT_JSON):
+    """Read the user journeys back from dependency_map.json."""
+    return json.loads(Path(path).read_text(encoding="utf-8")).get("flows", {})
 
 
 def draw_graph(g, stats, path=OUT_PNG):
@@ -142,17 +315,31 @@ def draw_graph(g, stats, path=OUT_PNG):
     sizes = [700 + 350 * fan_in[n] for n in g]
     nodes = nx.draw_networkx_nodes(g, pos, node_size=sizes, node_color=[fan_in[n] for n in g],
                                    cmap="YlOrRd", edgecolors="#333", ax=ax)
-    for src, style, color in (("trace", "solid", "#1f77b4"), ("config", "dashed", "#7b3fa0")):
-        es = [(u, v) for u, v, d in g.edges(data=True) if d["source"] == src]
-        nx.draw_networkx_edges(g, pos, edgelist=es, style=style, edge_color=color, width=1.4,
-                               arrowsize=16, node_size=sizes, alpha=0.8, ax=ax,
-                               connectionstyle="arc3,rad=0.12")
+    # colour = kind of data flow, line style = where we learned about it
+    groups = defaultdict(list)
+    for u, v, d in g.edges(data=True):
+        kind = ("async" if d.get("mode") == "async"
+                else "data" if d.get("type") in ("database", "cache") else "sync")
+        if d["source"] == "config" and kind == "sync":
+            kind = "data"  # untraced config edges only point at data stores
+        groups[(kind, "dashed" if d["source"] == "config" else "solid")].append((u, v))
+    style = dict(connectionstyle="arc3,rad=0.12")
+    for (kind, ls), es in groups.items():
+        nx.draw_networkx_edges(g, pos, edgelist=es, style=ls, edge_color=EDGE_COLORS[kind], width=1.4,
+                               arrowsize=16, node_size=sizes, alpha=0.85, ax=ax, **style)
+    topics = {(u, v): d["topic"] for u, v, d in g.edges(data=True) if d.get("topic")}
+    nx.draw_networkx_edge_labels(g, pos, topics, font_size=8, font_color=EDGE_COLORS["async"],
+                                 bbox=dict(fc="white", ec="none", alpha=0.8), ax=ax, **style)
     nx.draw_networkx_labels(g, pos, font_size=9, font_weight="bold", ax=ax,
                             bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.75))
     fig.colorbar(nodes, ax=ax, shrink=0.5, label="fan-in (services calling it)")
-    ax.legend(handles=[plt.Line2D([], [], color="#1f77b4", label="trace dependency"),
-                       plt.Line2D([], [], color="#7b3fa0", ls="--", label="config (hidden) dependency")],
-              loc="lower left")
+    line = plt.Line2D
+    ax.legend(handles=[
+        line([], [], color=EDGE_COLORS["sync"], label="sync call (gRPC / HTTP)"),
+        line([], [], color=EDGE_COLORS["async"], label="async messaging (Kafka, label = topic)"),
+        line([], [], color=EDGE_COLORS["data"], label="database / cache"),
+        line([], [], color="#444", label="seen in traces"),
+        line([], [], color="#444", ls="--", label="config only (hidden)")], loc="lower left")
     ax.set_title("Service dependency map")
     ax.axis("off")
     fig.tight_layout()
@@ -190,7 +377,22 @@ def main():
     print(f"\n{ROOT_SERVICE} path ({len(stats['checkout_path'])}): {', '.join(stats['checkout_path'])}")
     print(f"Top {TOP_N} by fan-in: " + ", ".join(f"{n} ({stats['fan_in'][n]})" for n in stats["top_fan_in"]))
 
-    save_graph(g, stats)
+    flows = {}
+    try:
+        traced = {n for u, v, d in g.edges(data=True) if d["source"] == "trace" for n in (u, v)}
+        spans = fetch_spans(traced - EXCLUDED)
+        recs = extract_edges(spans)
+        annotate_edges(g, recs)
+        flows = build_flows(spans, recs)
+        print(f"\nData flow: {len(spans)} spans sampled, {len(recs)} edge observations")
+        if flows:
+            print_dataflow(g, flows)
+        else:
+            print(f"No '{JOURNEY_PREFIX}*' journeys found in the sampled traces.")
+    except (requests.RequestException, ValueError, KeyError) as e:
+        print(f"\nCould not fetch/parse traces from {TRACES_URL}: {e}; skipping data-flow details.")
+
+    save_graph(g, stats, flows)
     draw_graph(g, stats)
     print(f"\nSaved {OUT_JSON} and {OUT_PNG}")
 
