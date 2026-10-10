@@ -1,0 +1,406 @@
+{
+  "id": "20261010T111058Z",
+  "plan": {
+    "target": "cart",
+    "fault": "network_delay",
+    "magnitude": 250,
+    "duration_s": 60,
+    "hypothesis": "Adding network delay to the cart service will increase the p95 latency of the checkout and frontend services during the experiment, and requests will recover fully once the network delay is removed.",
+    "reasoning": "regression test of the recovery logic"
+  },
+  "plan_source": "fallback",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ]
+  },
+  "started_at": "2026-10-10T11:10:58+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: cart p95_ms (751.4ms > 102.0ms); frontend-proxy p95_ms (1510.3ms > 132.7ms)",
+    "elapsed_s": 16.6,
+    "peaks": {
+      "cart": {
+        "error_rate": 0.0,
+        "p95_ms": 751.4074
+      },
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 1505.088271
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 1510.304
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 1.9032209737827717,
+        "memory_mb": 34.84765625
+      },
+      "frontend": {
+        "cpu_percent": 1.1526913580246914,
+        "memory_mb": 127.0390625
+      },
+      "checkout": {
+        "cpu_percent": 0.08589473684210526,
+        "memory_mb": 11.046875
+      },
+      "cart": {
+        "cpu_percent": 0.34034229828850854,
+        "memory_mb": 53.296875
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "cart": {
+            "n": 25,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 2.9127
+          },
+          "checkout": {
+            "n": 2,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 62,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 67.355138
+          },
+          "frontend-proxy": {
+            "n": 34,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 69.508
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "cart": {
+            "n": 26,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 2.9531
+          },
+          "checkout": {
+            "n": 3,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 65,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 82.133744
+          },
+          "frontend-proxy": {
+            "n": 35,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 93.351
+          }
+        },
+        "breaches": {}
+      },
+      {
+        "t": 10.0,
+        "metrics": {
+          "cart": {
+            "n": 26,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 250.962
+          },
+          "checkout": {
+            "n": 3,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 57,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 83.401257
+          },
+          "frontend-proxy": {
+            "n": 36,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 1505.729
+          }
+        },
+        "breaches": {
+          "cart p95_ms": "251.0ms > 102.0ms",
+          "frontend-proxy p95_ms": "1505.7ms > 132.7ms"
+        }
+      },
+      {
+        "t": 15.0,
+        "metrics": {
+          "cart": {
+            "n": 29,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 751.4074
+          },
+          "checkout": {
+            "n": 4,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 68,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 1505.088271
+          },
+          "frontend-proxy": {
+            "n": 39,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 1510.304
+          }
+        },
+        "breaches": {
+          "cart p95_ms": "751.4ms > 102.0ms",
+          "frontend p95_ms": "1505.1ms > 133.6ms",
+          "frontend-proxy p95_ms": "1510.3ms > 132.7ms"
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 0.0,
+    "metrics_confirmed": true,
+    "metrics_seconds": 0.0,
+    "samples": [
+      {
+        "t": 0.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 25
+          },
+          "cart": {
+            "ok": true,
+            "ms": 0
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      },
+      {
+        "t": 5.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 7
+          },
+          "cart": {
+            "ok": true,
+            "ms": 10
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      },
+      {
+        "t": 10.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 10
+          },
+          "cart": {
+            "ok": true,
+            "ms": 21
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      }
+    ]
+  },
+  "impact": [
+    {
+      "service": "cart",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 2.017674418604651,
+        "peak": 751.4074,
+        "change": 749.3897255813954
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 1505.088271,
+        "change": 1471.4609283426576
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 1510.304,
+        "change": 1477.618393939394
+      }
+    }
+  ],
+  "amplification": [
+    {
+      "service": "cart",
+      "role": "target",
+      "increase_ms": 749.4,
+      "delay_ms": 250,
+      "ratio": 3.0,
+      "amplified": true
+    },
+    {
+      "service": "frontend",
+      "role": "caller",
+      "increase_ms": 1471.5,
+      "delay_ms": 250,
+      "ratio": 5.9,
+      "amplified": true
+    },
+    {
+      "service": "frontend-proxy",
+      "role": "caller",
+      "increase_ms": 1477.6,
+      "delay_ms": 250,
+      "ratio": 5.9,
+      "amplified": true
+    }
+  ],
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 1.9032209737827717
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 34.84765625
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 1.1526913580246914
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 127.0390625
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 0.08589473684210526
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 11.046875
+      }
+    },
+    {
+      "container": "cart",
+      "cpu_percent": {
+        "baseline": 0.14628476840824492,
+        "peak": 0.34034229828850854
+      },
+      "memory_mb": {
+        "baseline": 55.3525390625,
+        "peak": 53.296875
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "partially held",
+    "explanation": "The hypothesis stated that adding network delay to the cart service would increase the p95 latency of both checkout and frontend services, and requests would recover fully. The frontend service p95 latency increased significantly, and the system recovered successfully. However, the checkout service had no data (peak was null) during the experiment window.",
+    "claims": [
+      {
+        "claim": "p95 latency of the checkout service increases during the experiment",
+        "evidence": "checkout service p95_ms peak was null (baseline 62.8, peak null)",
+        "status": "no data"
+      },
+      {
+        "claim": "p95 latency of the frontend service increases during the experiment",
+        "evidence": "frontend service p95_ms increased from a baseline of 33.63 to a peak of 1505.09 (change: 1471.46)",
+        "status": "supported"
+      },
+      {
+        "claim": "requests recover fully once the network delay is removed",
+        "evidence": "recovery.recovered was true with metrics_confirmed true",
+        "status": "supported"
+      }
+    ],
+    "model": "gemini-3.5-flash-lite",
+    "skipped_models": []
+  },
+  "grafana_window_ms": [
+    1791630539442,
+    1791630735090
+  ]
+}
