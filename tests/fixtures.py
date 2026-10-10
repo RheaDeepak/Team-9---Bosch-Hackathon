@@ -49,3 +49,19 @@ def flows():
 def run(target, fault, magnitude, verdict="held", guard_aborted=False, recovery_s=10.0):
     return {"file": "x.json", "target": target, "fault": fault, "magnitude": magnitude, "verdict": verdict,
             "guard_aborted": guard_aborted, "reason": "", "recovery_s": recovery_s}
+
+
+def traffic_capability(users=5, **overrides):
+    item = {
+        "failure_type": "traffic_spike",
+        "capability_version": "traffic-spike-v1",
+        "executor_ready": True,
+        "rollback_ready": True,
+        "runtime_ready": True,
+        "ready": True,
+        "integration_test_evidence": "tests/test_traffic_spike_integration.py",
+        "current_state": {"running": True, "user_count": users},
+        "detail": f"Locust running with {users} users",
+    }
+    item.update(overrides)
+    return item
