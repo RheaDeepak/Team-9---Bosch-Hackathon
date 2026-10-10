@@ -23,7 +23,6 @@ import analysis
 import analysis_agent
 import discovery
 import planner
-import rank_agent
 import ranker
 import report
 import grafana
@@ -132,6 +131,7 @@ def _worker(plan, source, validation):
         probes_done.set()
         with LOCK:
             STATE["running"] = False
+        _maybe_auto_analyse()
 
 
 # ---- readiness -------------------------------------------------------------------------
@@ -320,17 +320,28 @@ def api_ranking():
             "chosen_reason": next((r["reason"] for r in rows if r["id"] == chosen), None) or plan.get("reasoning")}
 
 
+FEED_MODES = ("", "planning", "analysis", "all")
+
+
+def _feed_mode(mode):
+    if mode not in FEED_MODES:
+        raise HTTPException(400, "mode must be one of: planning, analysis, all")
+    return mode or None
+
+
 @app.get("/api/agent-events")
-def api_agent_events(run: str = "", after: int = 0):
-    """Structured agent steps for the activity feed: the newest run unless `run` is given, only those after `after`."""
-    run_id, evs, last = activity.events(run or None, after)
+def api_agent_events(run: str = "", after: int = 0, mode: str = ""):
+    """Structured agent steps for the activity feed: the newest run (of `mode`, if given) unless `run` is given,
+    only those after `after`. mode=all streams every agent's steps of this server session."""
+    run_id, evs, last = activity.events(run or None, after, mode=_feed_mode(mode))
     return {"run_id": run_id, "events": evs, "last": last}
 
 
 @app.get("/api/agent-sessions")
-def api_agent_sessions():
-    """Saved agent sessions (sessions/<run_id>.jsonl), newest first, for replay."""
-    return activity.list_sessions()
+def api_agent_sessions(mode: str = ""):
+    """Saved agent sessions (sessions/<run_id>.jsonl), newest first, for replay; optionally of one agent."""
+    m = _feed_mode(mode)
+    return activity.list_sessions(mode=None if m == "all" else m)
 
 
 @app.post("/api/approve", status_code=202)
@@ -390,6 +401,7 @@ def api_status():
         s = {k: (list(v) if isinstance(v, list) else v) for k, v in STATE.items()}
         s["elapsed_s"] = _elapsed()
         s["server_time"] = time.time()
+        s["analysis"] = dict(ANALYSIS)
         return s
 
 
@@ -423,44 +435,78 @@ def api_result(rid: str):
 
 # ---- analysis (findings) ---------------------------------------------------------------
 
-ANALYSIS = {"running": False, "started_at": None, "error": None, "source": None, "note": None}
-ANALYSIS_LOG_LINES = 80
+ANALYSIS = {"running": False, "started_at": None, "trigger": None, "error": None, "source": None, "note": None,
+            "run_id": None, "auto": False}
 
 
 def _analysis_worker():
     try:
         out = analysis_agent.run_analysis()
         with LOCK:
-            ANALYSIS.update(running=False, source=out["source"], note=out["note"])
+            ANALYSIS.update(running=False, source=out["source"], note=out["note"], run_id=out.get("run_id"))
     except Exception as e:  # e.g. no dependency map; the agent itself never raises for LLM problems
         with LOCK:
             ANALYSIS.update(running=False, error=f"{type(e).__name__}: {e}"[:300])
 
 
+def _start_analysis(trigger):
+    """Start the analysis agent in the background. Returns None, or why it did not start
+    ("experiment" while one runs, "running" while an analysis runs). Read-only: it never touches Docker."""
+    with LOCK:
+        if STATE["running"]:
+            return "experiment"
+        if ANALYSIS["running"]:
+            return "running"
+        ANALYSIS.update(running=True, started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                        trigger=trigger, error=None, source=None, note=None, run_id=None)
+    threading.Thread(target=_analysis_worker, name="analysis", daemon=True).start()
+    return None
+
+
+def _maybe_auto_analyse():
+    """After an experiment: analyse automatically when the operator switched that on. Never while one runs."""
+    with LOCK:
+        wanted = ANALYSIS["auto"] and STATE["phase"] == "done"
+    return _start_analysis("auto") is None if wanted else False
+
+
 @app.post("/api/analysis/run", status_code=202)
 def api_analysis_run():
-    """Start the analysis agent in the background (read-only: it never touches Docker)."""
-    with LOCK:
-        if ANALYSIS["running"]:
-            raise HTTPException(409, "an analysis is already running")
-        ANALYSIS.update(running=True, started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                        error=None, source=None, note=None)
-    threading.Thread(target=_analysis_worker, name="analysis", daemon=True).start()
+    why = _start_analysis("manual")
+    if why == "experiment":
+        raise HTTPException(409, "an experiment is running; analyse after it finishes")
+    if why == "running":
+        raise HTTPException(409, "an analysis is already running")
     return {"started": True}
+
+
+@app.post("/api/analysis/auto")
+def api_analysis_auto(body: dict = Body(default=None)):
+    """Switch the automatic analysis after each completed experiment on or off (server state, off by default)."""
+    enabled = (body or {}).get("enabled")
+    if not isinstance(enabled, bool):
+        raise HTTPException(422, "body must be {\"enabled\": true|false}")
+    with LOCK:
+        ANALYSIS["auto"] = enabled
+    return {"auto": enabled}
 
 
 @app.get("/api/analysis/latest")
 def api_analysis_latest():
-    """Latest findings (agent output if it covers the current results, else deterministic), status and agent log."""
-    log = rank_agent.read_log(mode="analysis", limit=ANALYSIS_LOG_LINES)
-    last = log[-1]["run_id"] if log else None
+    """Latest findings (agent output if it covers the current results, else deterministic) plus how fresh they are:
+    run_id of the analysis session (the live one while it runs), stale / covered_runs / new_runs, generated_at."""
     with LOCK:
         status = dict(ANALYSIS)
     try:
-        data = analysis_agent.latest_or_deterministic()
+        data, latest = analysis.current(), analysis_agent.load_latest()
+        cov = analysis_agent.coverage(data, latest)
+        out = analysis_agent.latest_or_deterministic(data, latest)
     except (OSError, ValueError, KeyError) as e:
         raise HTTPException(503, f"analysis unavailable: {e}")
-    return {"status": status, "analysis": data, "log": [r for r in log if r["run_id"] == last]}
+    run_id = (activity.latest_run_id("analysis") if status["running"] else None) or status["run_id"] or cov["run_id"]
+    return {"status": status, "analysis": out, "run_id": run_id, "stale": cov["stale"], "analysed": cov["analysed"],
+            "covered_runs": cov["covered_runs"], "new_runs": cov["new_runs"],
+            "generated_at": cov["generated_at"] or out["generated_at"]}
 
 
 @app.get("/api/report", response_class=HTMLResponse)

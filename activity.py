@@ -11,6 +11,7 @@ from pathlib import Path
 
 SESSIONS_DIR = Path("sessions")
 MAX_EVENTS = 3000
+MAX_STREAM = 300      # events returned at once by the "all" stream
 RUN_ID = re.compile(r"[0-9a-f]{8}")   # also what keeps a run id from being a path
 
 _lock = threading.Lock()
@@ -62,9 +63,17 @@ def latest_run_id(mode=None):
 
 
 def events(run_id=None, after=0, sessions_dir=None, mode=None):
-    """(run_id, events after seq `after`, last seq) for a run; the newest run (of `mode`, if given) when run_id
-    is empty. A run no longer in memory (earlier server session) is read from its file."""
-    run_id = run_id or latest_run_id(mode)
+    """(run_id, events after seq `after`, last seq) for a run; the newest run when run_id is empty.
+    With `mode` ("planning"/"analysis") the newest run of that agent, falling back to its newest saved session
+    after a restart; with mode "all" every agent's events of this server session, interleaved (run_id None).
+    A run no longer in memory (earlier server session) is read from its file."""
+    if not run_id and mode == "all":
+        with _lock:
+            new = [e for e in _events if e["seq"] > after][-MAX_STREAM:]
+        return None, new, (new[-1]["seq"] if new else after)
+    if not run_id and mode:
+        run_id = latest_run_id(mode) or next((r["run_id"] for r in list_sessions(sessions_dir, 1, mode)), None)
+    run_id = run_id or latest_run_id()
     if not run_id or not valid_run_id(run_id):
         return run_id, [], after
     with _lock:

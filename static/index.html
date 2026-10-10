@@ -87,10 +87,20 @@ tr.chosen-row > * { background:var(--ok-soft); }
 .factors { list-style:none; margin:6px 0 0; padding:0; font-size:12.5px; color:var(--text-2); } .factors li { display:flex; gap:8px; justify-content:space-between; }
 .factors .pos { color:var(--ok); } .factors .neg { color:var(--bad); } .factors b { font-variant-numeric:tabular-nums; font-weight:600; }
 .why-box { margin-top:var(--s3); } .why-box p { color:var(--text-2); overflow-wrap:anywhere; margin:0 0 var(--s2); }
-#feed { list-style:none; margin:0; padding:0; max-height:480px; overflow:auto; display:flex; flex-direction:column; gap:6px; }
-#feed details { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); padding:6px 10px; }
-#feed summary { cursor:pointer; display:flex; gap:8px; align-items:baseline; overflow-wrap:anywhere; } #feed summary > span:nth-child(2) { flex:1; min-width:0; } #feed summary small { white-space:nowrap; }
-#feed pre { white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0 0; font-size:12px; color:var(--text-2); max-height:260px; overflow:auto; }
+.feed { list-style:none; margin:0; padding:0; max-height:480px; overflow:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:6px; }
+.feed.compact { max-height:280px; margin-top:var(--s2); }
+.feed details { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); padding:6px 10px; }
+.feed summary { cursor:pointer; display:flex; gap:8px; align-items:baseline; overflow-wrap:anywhere; } .feed summary > .ftext { flex:1; min-width:0; } .feed summary small { white-space:nowrap; }
+.feed pre { white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0 0; font-size:12px; color:var(--text-2); max-height:260px; overflow:auto; }
+.feedbar { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s3); margin-bottom:var(--s2); }
+.seg { display:inline-flex; border:1px solid var(--line-2); border-radius:var(--r-sm); overflow:hidden; }
+.seg button { border:0; background:var(--surface-2); color:var(--text-2); font:inherit; font-size:12.5px; padding:4px 12px; min-height:30px; cursor:pointer; transition:background-color var(--ease), color var(--ease); }
+.seg button + button { border-left:1px solid var(--line-2); }
+.seg button:hover { background:var(--surface-3); color:var(--text); }
+.seg button[aria-pressed="true"] { background:var(--accent-soft); color:var(--accent); font-weight:650; }
+.mtag { flex:none; font-size:10.5px; font-weight:650; letter-spacing:.05em; text-transform:uppercase; padding:0 6px; border-radius:4px; background:var(--surface-3); color:var(--accent); }
+.mtag.analysis { color:var(--warn); }
+.calls { font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; }
 @media (max-width:980px) { .agent-grid { grid-template-columns:minmax(0,1fr); } }
 .panel { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3) var(--s4); min-width:0; }
 .panel > .sub { margin-bottom:var(--s3); }
@@ -263,7 +273,23 @@ a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-
 .finding[open] > summary::before { transform:rotate(90deg); }
 .finding > summary b { flex:1 1 260px; } .finding .fbody { padding:0 var(--s4) var(--s4); }
 .finding .pill { min-width:70px; justify-content:center; }
-#analysisLog { max-height:220px; overflow:auto; overscroll-behavior:contain; background:var(--well); border:1px solid var(--line); border-radius:var(--r-sm); padding:var(--s2) var(--s3); margin:0; font:12px/1.55 var(--mono); color:var(--text-2); white-space:pre-wrap; overflow-wrap:anywhere; }
+.finding.flash { box-shadow:0 0 0 2px var(--accent-solid); }
+.finding .fsum { display:flex; flex-wrap:wrap; gap:var(--s2); align-items:center; }
+.finding .retest { margin-top:var(--s3); display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s3); }
+tr.hl > * { background:var(--accent-soft); }
+button.chip.ev { font-family:var(--mono); font-size:11px; cursor:pointer; padding:0 8px; margin:0 2px; vertical-align:baseline; }
+button.chip.ev:hover, button.chip.ev:focus-visible { background:var(--accent-soft); color:var(--accent); }
+button.pill { border:0; font:inherit; font-size:12px; font-weight:600; cursor:pointer; }
+button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
+.notice { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s3); padding:var(--s3) var(--s4); margin-bottom:var(--s3); border-radius:var(--r-md); border:1px solid var(--line); background:var(--surface-2); color:var(--text-2); }
+.notice > span { flex:1 1 300px; min-width:0; overflow-wrap:anywhere; }
+.notice.warn { background:var(--warn-soft); border-color:rgba(246,173,55,.35); color:#ffd89a; }
+.notice.info { background:var(--accent-soft); border-color:rgba(107,151,255,.35); color:#c9d9ff; }
+.notice.bad { background:var(--bad-soft); border-color:#6b2a2d; color:#ffc4c2; }
+.ftools { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s3); margin:var(--s4) 0 var(--s3); }
+.ftools .counts { display:inline-flex; flex-wrap:wrap; gap:6px; }
+.svc-table td:nth-child(2) { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.scorewrap { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s3); }
 
 /* ================= Emergency stop ================= */
 #stop { position:fixed; right:var(--s5); bottom:calc(var(--s5) + env(safe-area-inset-bottom)); z-index:40; display:none; align-items:center; gap:var(--s3);
@@ -349,6 +375,7 @@ a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-
         <label class="field">Inspect service <select id="nodeSel"><option value="">none</option></select></label>
         <label class="field">Journey <select id="journeySel"><option value="">none</option></select></label>
         <label class="chk"><input type="checkbox" id="checkoutPath"> Checkout path</label>
+        <label class="chk" title="Colour services by their resilience score from the findings"><input type="checkbox" id="showFindings"> Show findings</label>
         <span class="zoom" role="group" aria-label="Graph zoom"><button id="zoomOut" class="btn btn-sm btn-icon" type="button" aria-label="Zoom out">&minus;</button><button id="zoomIn" class="btn btn-sm btn-icon" type="button" aria-label="Zoom in">+</button></span>
         <button id="fitGraph" class="btn btn-sm" type="button">Fit</button>
         <span class="hint">Click a service to inspect it · hover an edge for details · scroll to zoom · drag to pan</span>
@@ -362,6 +389,7 @@ a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-
       <div class="legend">
         <div class="legend-group"><b>Edges</b><span><i style="border-color:#5b8cff"></i>sync call</span><span><i style="border-color:#e0589a"></i>async (Kafka)</span><span><i style="border-color:#2fbf9b"></i>database / cache</span><span><i style="border-color:#8d96ac;border-top-style:dashed"></i>config (hidden)</span><span>width = call volume</span></div>
         <div class="legend-group"><b>Nodes</b><span>height = fan-in</span><span>rounded = service</span><span>barrel = data store</span><span style="color:#e8c14a">&#128274; protected, never a target</span></div>
+        <div class="legend-group hide" id="overlayLegend"><b>Findings</b><span><span class="dotk" style="background:var(--ok)"></span>resilience 80+</span><span><span class="dotk" style="background:var(--warn)"></span>60-79</span><span><span class="dotk" style="background:var(--bad)"></span>below 60</span><span><span class="dotk" style="background:var(--text-3)"></span>not tested</span><span>click a service to filter its findings</span></div>
         <div class="legend-group"><b>Status</b><span><span class="dotk" style="background:#f0524f"></span>container down</span><span><span class="dotk" style="background:#e5484d"></span>target</span><span><span class="dotk" style="background:#c8761e"></span>blast radius</span></div>
       </div>
     </div>
@@ -376,6 +404,7 @@ a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-
       </div>
     </header>
     <div class="card-body">
+      <div id="retestNote" class="notice info hide" role="status"></div>
       <div id="plan"><p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p></div>
       <div id="decision" class="decision hide">
         <label class="chk"><input type="checkbox" id="reviewed" disabled aria-describedby="approveHint"> I reviewed the hypothesis and blast radius</label>
@@ -400,9 +429,11 @@ a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-
         <div id="rankPanel" class="muted">Loading…</div>
       </div>
       <div class="agent-col">
-        <h3 class="sub">Agent activity <span id="feedRun" class="muted"></span></h3>
-        <p id="feedEmpty" class="muted">No agent activity yet. Propose an experiment and every step shows up here as it happens.</p>
-        <ol id="feed" aria-label="Agent activity, one entry per step; open an entry for details"></ol>
+        <h3 class="sub">Agent activity <span><span id="feedCalls" class="calls muted"></span> <span id="feedRun" class="muted"></span></span></h3>
+        <div class="feedbar"><div class="seg" role="group" aria-label="Show the activity of">
+          <button type="button" data-feed-mode="planning" aria-pressed="true">Planning</button><button type="button" data-feed-mode="analysis" aria-pressed="false">Analysis</button><button type="button" data-feed-mode="all" aria-pressed="false">All</button></div></div>
+        <p id="feedEmpty" class="muted">No planning activity yet. Propose an experiment and every step shows up here as it happens.</p>
+        <ol id="feed" class="feed" aria-label="Agent activity, one entry per step; open an entry for details"></ol>
       </div>
     </div>
   </section>
@@ -467,15 +498,21 @@ a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-
 
   <section id="findingsSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>08</b>Improve</span><h2>Findings <span id="findingsPill" class="pill"></span></h2></div>
+      <div class="card-title"><span class="eyebrow"><b>09</b>Improve</span><h2>Findings <span id="findingsPill" class="pill">loading</span></h2></div>
       <div class="card-actions">
-        <a class="btn btn-sm" href="/api/report" target="_blank" rel="noopener">Open report</a>
-        <button id="runAnalysis" class="btn btn-sm btn-primary" type="button">Run analysis</button>
+        <label class="chk"><input type="checkbox" id="autoAnalyse"> Auto-analyse after each experiment</label>
+        <a class="btn btn-sm" href="/api/report" target="_blank" rel="noopener">Open full report<span class="sr"> (opens in a new tab)</span></a>
+        <button id="downloadReport" class="btn btn-sm" type="button">Download report</button>
+        <button id="copySummary" class="btn btn-sm" type="button">Copy summary</button>
+        <button id="runAnalysis" class="btn btn-sm btn-primary" type="button" aria-describedby="analysisHint">Run analysis</button>
       </div>
     </header>
     <div class="card-body">
-      <div id="findings" class="muted">Loading…</div>
-      <details id="analysisLogBox" class="block hide"><summary class="muted">Analysis agent log</summary><pre id="analysisLog" role="log" tabindex="0"></pre></details>
+      <p id="analysisHint" class="muted hide" aria-live="polite"></p>
+      <div id="findings" class="muted"><span class="spin"></span>Loading findings…</div>
+      <details id="afeedBox" class="block hide"><summary class="muted">Analysis agent activity&nbsp;<span id="afeedCalls" class="calls"></span>&nbsp;<span id="afeedRun"></span></summary>
+        <p id="afeedEmpty" class="muted hide">This analysis was recorded before the activity feed existed, so its steps cannot be replayed.</p>
+        <ol id="afeed" class="feed compact" aria-label="Analysis agent activity, one entry per step"></ol></details>
     </div>
   </section>
 </main>
@@ -628,8 +665,20 @@ function layerGraph(nodes, edges, nodeInfo) {
   return { pos, layers: bestLayers, crossings: bestCount };
 }
 
+const tok = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();   // CSS design tokens for cytoscape
 const isDown = n => { const h = (info[n] || {}).health; return !!h && h !== 'running' && h !== 'unknown'; };
-const nodeLabel = n => `${(info[n] || {}).protected ? '\u{1F512} ' : ''}${n}${isDown(n) ? ' (stopped)' : ''}`;
+let overlayOn = false;
+const RES_CLASSES = 'res-ok res-warn res-bad res-none';
+function overlayInfo(n) {                                 // per-service resilience from the findings, for the graph overlay
+  const sv = fdata && fdata.analysis.scores.services[n]; if (!sv) return null;
+  return sv.score == null ? { cls: 'res-none', text: sv.status } : { cls: sv.score >= 80 ? 'res-ok' : sv.score >= 60 ? 'res-warn' : 'res-bad', text: String(sv.score) };
+}
+const nodeLabel = n => { const o = overlayOn && overlayInfo(n); return `${(info[n] || {}).protected ? '\u{1F512} ' : ''}${n}${isDown(n) ? ' (stopped)' : ''}${o ? ' \u00b7 ' + o.text : ''}`; };
+function applyOverlay() {                                 // adds/removes only res-* classes: target, blast, chosen, down, sel are untouched
+  $('overlayLegend').classList.toggle('hide', !overlayOn);
+  if (!cy) return;
+  cy.nodes().forEach(nd => { const o = overlayOn && overlayInfo(nd.id()); nd.removeClass(RES_CLASSES); if (o) nd.addClass(o.cls); nd.data('label', nodeLabel(nd.id())); });
+}
 const nodeClasses = n => ['role-' + String((info[n] || {}).role || 'service').replace(' ', '-'), (info[n] || {}).protected ? 'protected' : '', isDown(n) ? 'down' : ''].join(' ');
 const edgeTip = e => `<b>${esc(e.parent)} &rarr; ${esc(e.child)}</b><br>${esc(e.type || 'unknown')}${e.topic ? ' &middot; topic ' + esc(e.topic) : ''} &middot; ${e.source === 'config' ? 'config only (hidden)' : 'seen in traces'}`
   + (e.operations && e.operations.length ? `<br>ops: ${esc(e.operations.slice(0, 5).join(', '))}${e.operations.length > 5 ? ' …' : ''}` : '')
@@ -656,6 +705,11 @@ async function loadGraph() {
       { selector: 'node.role-datastore', style: { shape: 'barrel', 'background-color': '#17503f', 'border-color': '#2fbf9b' } },
       { selector: 'node.role-client', style: { 'background-color': '#262b38', 'border-color': '#6f7a91', 'border-style': 'dashed' } },
       { selector: 'node.role-control-plane', style: { 'background-color': '#4a3b63', 'border-color': '#a58be0' } },
+      // findings overlay: before protected/down/blast/target/chosen/sel, so those still win where they apply
+      { selector: 'node.res-ok', style: { 'background-color': tok('--ok-soft'), 'border-color': tok('--ok'), 'border-width': 2.5 } },
+      { selector: 'node.res-warn', style: { 'background-color': tok('--warn-soft'), 'border-color': tok('--warn'), 'border-width': 2.5 } },
+      { selector: 'node.res-bad', style: { 'background-color': tok('--bad-soft'), 'border-color': tok('--bad'), 'border-width': 2.5 } },
+      { selector: 'node.res-none', style: { 'background-color': tok('--surface-2'), 'border-color': tok('--text-3'), 'border-style': 'dashed', color: tok('--text-3') } },
       { selector: 'node.protected', style: { 'border-width': 4, 'border-style': 'double', 'border-color': '#e8c14a' } },
       { selector: 'node.down', style: { 'border-width': 4, 'border-style': 'solid', 'border-color': '#f0524f' } },
       { selector: 'node.blast', style: { 'background-color': '#c8761e', 'border-color': '#ffd27a' } },
@@ -670,7 +724,7 @@ async function loadGraph() {
       { selector: 'edge[step]', style: { label: 'data(step)', 'font-size': 11, color: '#ffffff', 'text-background-color': '#0b0e14',
           'text-background-opacity': 0.9, 'text-background-padding': 3 } },
       { selector: '.faded', style: { opacity: 0.1 } }] });
-  cy.on('tap', 'node', ev => selectNode(ev.target.id()));
+  cy.on('tap', 'node', ev => { selectNode(ev.target.id()); if (overlayOn) filterFindingsBy(ev.target.id(), false); });
   cy.on('tap', ev => { if (ev.target === cy) selectNode(null); });
   cy.on('mouseover', 'edge', ev => { const t = $('edgeTip'); t.innerHTML = ev.target.data('tip'); t.classList.remove('hide'); });
   cy.on('mousemove', 'edge', ev => { const t = $('edgeTip'); t.style.left = Math.min(ev.renderedPosition.x + 14, $('cy').clientWidth - 300) + 'px'; t.style.top = ev.renderedPosition.y + 14 + 'px'; });
@@ -682,7 +736,7 @@ async function loadGraph() {
     const bb = cy.nodes().boundingBox(), z = 0.6;
     cy.zoom(z); cy.pan({ x: 24 - bb.x1 * z, y: (cy.height() - bb.h * z) / 2 - bb.y1 * z });
   }
-  highlight(); applyFocus();
+  highlight(); applyFocus(); applyOverlay();
 }
 
 async function refreshHealth() {                       // live container state: a stopped target turns red
@@ -894,7 +948,17 @@ function scoreBlock(r) {
       ${(sc.limitations || []).map(l => `<div class="muted">&bull; ${esc(l)}</div>`).join('')}</div></div>`;
 }
 function delta(x, unit = '') { return x == null ? '<span class="muted">no data</span>' : `<span class="${x > 0 ? 'pos' : x < 0 ? 'neg' : ''}">${x > 0 ? '+' : ''}${num(x)}${unit}</span>`; }
+let shownResult = null, shownNote = '';
+function resultFindingsHtml(id) {                         // findings whose supporting runs include this result
+  if (!id) return '';
+  if (!fdata) return '<div class="block"><h3 class="sub">Findings from this run</h3><p class="muted">Loading findings…</p></div>';
+  const fs = sortFindings(fdata.analysis.findings.filter(f => f.runs.includes(id)), 'severity');
+  return `<div class="block"><h3 class="sub">Findings from this run</h3>${fs.length ? `<ul class="factors">${fs.map(f =>
+    `<li><span><span class="pill ${SEV_PILL[f.severity]}">${esc(f.severity)}</span> <button type="button" class="rowbtn" data-goto-finding="${esc(f.id)}">${esc(f.title)}</button></span><small class="muted">${esc(f.edge || f.service)}</small></li>`).join('')}</ul>`
+    : `<p class="muted">No finding cites this run${fdata.analysis.results_used.includes(id) ? '' : ' (it is not part of the analysed results)'}.</p>`}</div>`;
+}
 function renderResult(r, note) {
+  shownResult = r; shownNote = note;
   $('resultPanel').classList.toggle('hide', !r); if (!r) return;
   const g = r.guard, p = r.plan, v = r.verdict, rec = r.recovery;
   $('resultNote').textContent = note || '';
@@ -927,7 +991,8 @@ function renderResult(r, note) {
         `<tr><td>${esc(c.claim)}</td><td><span class="pill ${c.status === 'supported' ? 'ok' : c.status === 'contradicted' ? 'bad' : ''}">${esc(c.status)}</span></td><td>${esc(c.evidence)}</td></tr>`).join('')}</table></div>` : ''}
       ${v.recommendation ? `<div class="next"><h3 class="sub" style="color:var(--accent)">AI interpretation: recommended next move</h3><div>${esc(v.recommendation)}</div></div>` : ''}</div>
     ${r.container_resources.length ? `<details class="block"><summary class="muted">Container CPU / memory (reference only)</summary><div class="table-wrap" style="margin-top:8px"><table>${r.container_resources.map(c =>
-      `<tr><td>${esc(c.container)}</td><td class="num">cpu ${num(c.cpu_percent.baseline)}% &rarr; ${num(c.cpu_percent.peak)}%</td><td class="num">mem ${num(c.memory_mb.baseline, 0)} &rarr; ${num(c.memory_mb.peak, 0)}&nbsp;MB</td></tr>`).join('')}</table></div></details>` : ''}`;
+      `<tr><td>${esc(c.container)}</td><td class="num">cpu ${num(c.cpu_percent.baseline)}% &rarr; ${num(c.cpu_percent.peak)}%</td><td class="num">mem ${num(c.memory_mb.baseline, 0)} &rarr; ${num(c.memory_mb.peak, 0)}&nbsp;MB</td></tr>`).join('')}</table></div></details>` : ''}
+    ${resultFindingsHtml(r.id)}`;
 }
 
 /* ---------- 7. history ---------- */
@@ -958,9 +1023,17 @@ function renderHistory() {
   if ($('historyMore')) $('historyMore').onclick = () => { historyAll = !historyAll; renderHistory(); };
 }
 
-/* ---------- 8. findings ---------- */
+/* ---------- 9. findings ---------- */
 const SEV_PILL = { Critical: 'bad', High: 'warn', Medium: 'info', Low: '' };
-let analysisRunning = false, findingsOpen = new Set();
+const SEVS = ['Critical', 'High', 'Medium', 'Low'];
+const EVIDENCE_ID = /\d{8}T\d{6}Z#[\w.\-]+/g;               // analysis.EVIDENCE_ID
+const RETEST_GOAL = { latency_amplification: 'timeout_behavior', silent_degradation: 'timeout_behavior', hard_dependency: 'graceful_degradation',
+                      slow_recovery: 'recovery_time', blast_radius_spread: 'critical_dependency' };
+let fdata = null, findingsOpen = new Set(), fview = { sev: '', svc: '', sort: 'severity' }, analysisWas = null, analysisPosting = false;
+function evText(text) {                                   // escaped text with evidence ids turned into chips
+  return esc(text).replace(EVIDENCE_ID, m => { const id = m.replace(/[.]+$/, ''), rest = m.slice(id.length);
+    return `<button type="button" class="chip ev" data-ev="${id}" title="Show evidence ${id}">${id.split('#')[1]}</button>${rest}`; });
+}
 function evidenceValue(it) {
   const v = it.value;
   if (it.kind === 'impact') return `${nd(v.baseline)} &rarr; ${nd(v.peak)} (${delta(v.change)})`;
@@ -969,55 +1042,240 @@ function evidenceValue(it) {
   if (it.kind === 'guard') return `${v.aborted ? 'aborted' : 'completed'} after ${esc(v.elapsed_s)} s: ${esc(v.reason)}`;
   if (it.kind === 'claim') return `<span class="pill ${v.status === 'contradicted' ? 'bad' : v.status === 'supported' ? 'ok' : ''}">${esc(v.status)}</span> ${esc(v.claim)}`;
   if (it.kind === 'plan') return `${esc(v.fault)} on <b>${esc(v.target)}</b>${v.fault === 'network_delay' ? ', ' + esc(v.magnitude) + ' ms' : ''}`;
+  if (it.kind === 'link') return `<a href="${esc(v.url)}" target="_blank" rel="noopener">open</a>`;
   return `<code>${esc(JSON.stringify(v).slice(0, 160))}</code>`;
 }
-function renderFindings(d) {
-  const a = d.analysis, ov = a.scores.overall, st = d.status;
-  analysisRunning = st.running;
-  $('runAnalysis').disabled = st.running; $('runAnalysis').textContent = st.running ? 'Analysing…' : 'Run analysis';
-  $('findingsPill').textContent = st.running ? 'agent running' : a.source === 'analysis_agent' ? 'AI-checked' : 'rules only';
-  $('findingsPill').className = 'pill ' + (st.running ? 'warn' : a.source === 'analysis_agent' ? 'ok' : '');
+const sortFindings = (fs, by) => fs.slice().sort((a, b) => by === 'score'
+  ? b.severity_score - a.severity_score || a.id.localeCompare(b.id)
+  : SEVS.indexOf(a.severity) - SEVS.indexOf(b.severity) || b.severity_score - a.severity_score || a.id.localeCompare(b.id));
+const shownFindings = a => sortFindings(a.findings.filter(f => (!fview.sev || f.severity === fview.sev) && (!fview.svc || f.service === fview.svc || f.caller === fview.svc)), fview.sort);
+const adjusted = f => f.source === 'agent' && (!!f.agent_adjustment || (f.deterministic_severity && f.severity !== f.deterministic_severity));
+function worstFindingFor(svc) {                           // for the ranking table: worst open finding on a target
+  if (!fdata) return null;
+  const fs = sortFindings(fdata.analysis.findings.filter(f => f.service === svc), 'severity');
+  return fs.length ? { sev: fs[0].severity, n: fs.length } : null;
+}
+function analysisBlocked() {                              // why Run analysis is unavailable right now ('' = available)
+  const st = status || {}, a = st.analysis || (fdata && fdata.status) || {};
+  return a.running ? 'An analysis is running; its steps stream into the activity feed below.'
+    : st.running ? 'An experiment is running. Analyse after it finishes (the analysis only reads results, it never touches Docker).'
+    : analysisPosting ? 'Starting…' : '';
+}
+function syncAnalysisControls() {
+  const why = analysisBlocked(), running = !!((status && status.analysis) || {}).running;
+  document.querySelectorAll('#runAnalysis, [data-act="run-analysis"]').forEach(b => { b.disabled = !!why; });
+  $('runAnalysis').innerHTML = running ? '<span class="spin"></span>Analysing…' : 'Run analysis';
+  setText($('analysisHint'), why); $('analysisHint').classList.toggle('hide', !why);
+  const auto = ((status && status.analysis) || {}).auto;
+  if (auto != null && document.activeElement !== $('autoAnalyse')) $('autoAnalyse').checked = !!auto;
+  if (fdata) {
+    const pill = running ? ['warn', 'agent running'] : fdata.analysis.source === 'analysis_agent' ? ['ok', 'AI-checked'] : ['', 'rules only'];
+    setText($('findingsPill'), pill[1]); $('findingsPill').className = 'pill ' + pill[0];
+  }
+}
+function noticesHtml(d) {
+  const a = d.analysis, st = (status && status.analysis) || d.status || {}, out = [];
+  const gen = d.generated_at ? d.generated_at.replace('T', ' ').replace('+00:00', ' UTC') : '';
+  const run = '<button type="button" class="btn btn-sm btn-primary" data-act="run-analysis">Run analysis</button>';
+  if (st.error) out.push(`<div class="notice bad" role="alert"><span>The analysis failed: ${esc(st.error)}. The findings below come from the deterministic rules.</span>${run}</div>`);
+  if (a.source !== 'analysis_agent') {
+    if (!d.analysed) out.push(`<div class="notice info"><span><b>Rules only.</b> No AI analysis has run yet: these findings come from the deterministic rules. Run the analysis to let the agent check them against source, config and traces.</span>${run}</div>`);
+    else if (d.stale) out.push(`<div class="notice warn"><span><b>${d.new_runs.length} new run${d.new_runs.length === 1 ? '' : 's'} since the last AI analysis</b> (${esc(gen)}, ${d.covered_runs.length} runs). The findings below are rule-based until you re-run it.</span>${run}</div>`);
+    else {
+      const reason = a.note || 'unknown reason', llmDown = /not set|all models failed|HTTP 4|HTTP 5|Timeout|Connection/i.test(reason);
+      out.push(`<div class="notice warn"><span><b>${llmDown ? 'LLM unavailable: the AI analysis did not run.' : 'The AI analysis fell back to the rules.'}</b> Reason: ${esc(reason)}. Nothing here was written by the AI.</span>${run}</div>`);
+    }
+  }
+  return out.join('');
+}
+function serviceTableHtml(scores) {
+  const rows = Object.entries(scores.services).sort(([an, a], [bn, b]) =>
+    (a.score == null) - (b.score == null) || (a.score ?? 0) - (b.score ?? 0) || (a.status || '').localeCompare(b.status || '') || an.localeCompare(bn));
+  return `<details class="block" open><summary class="muted">Resilience by service, weakest first</summary><div class="table-wrap scroll svc-table" style="margin-top:8px"><table>
+    <caption class="sr">Per-service resilience scores, weakest first</caption>
+    <thead><tr><th scope="col">Service</th><th scope="col">Score</th><th scope="col">Runs</th><th scope="col">Open weaknesses</th><th scope="col">How it is computed</th></tr></thead><tbody>${rows.map(([n, v]) => {
+      const col = v.score == null ? '' : v.score >= 80 ? 'ok' : v.score >= 60 ? 'warn' : 'bad';
+      const open = (v.open_weaknesses || []).length;
+      return `<tr><th scope="row" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);position:static">${open || v.score != null ? `<button type="button" class="rowbtn" data-findings-svc="${esc(n)}">${esc(n)}</button>` : esc(n)}</th>
+        <td><span class="pill ${col}">${v.score == null ? esc(v.status) : esc(v.score)}</span></td><td>${esc(v.runs ?? 0)}</td><td>${open || '<span class="muted">0</span>'}</td><td class="muted">${esc(v.explain)}</td></tr>`; }).join('')}</tbody></table></div></details>`;
+}
+function findingHtml(f, a, ex) {
+  const adj = adjusted(f), evs = [...new Set(f.evidence_ids)].filter(e => a.evidence[e]);
+  const runs = f.runs.map(r => ex[r] ? `<span><button type="button" class="chip link" data-open-result="${esc(r)}" title="Open this run in the Result panel">${esc(r)}</button>
+    <a href="${esc(ex[r].grafana_url)}" target="_blank" rel="noopener">Grafana</a> &middot; <a href="${esc(ex[r].jaeger_url)}" target="_blank" rel="noopener">Jaeger</a></span>` : esc(r)).join('<br>');
+  return `<details class="finding" data-id="${esc(f.id)}"${findingsOpen.has(f.id) ? ' open' : ''}>
+    <summary><span class="pill ${SEV_PILL[f.severity]}">${esc(f.severity)}</span><b>${esc(f.title)}</b>
+      ${adj ? `<span class="pill info" title="${esc(f.agent_adjustment || '')}">AI adjusted: ${esc(f.deterministic_severity)} &rarr; ${esc(f.severity)}</span>` : ''}
+      <span class="muted">${esc(f.edge || f.service)} &middot; score ${esc(f.severity_score)} &middot; ${f.runs.length} run${f.runs.length === 1 ? '' : 's'} &middot; ${f.source === 'agent' ? 'AI-checked' : 'rules'}</span></summary>
+    <div class="fbody">
+      <dl class="kv"><dt>Root cause</dt><dd>${evText(f.root_cause)}${f.root_cause_replaced ? ' <span class="muted">(the agent quoted numbers that are not in the evidence, so the rule\'s own text is shown)</span>' : ''}</dd>
+        ${adj ? `<dt>AI adjusted</dt><dd>${esc(f.deterministic_severity)} &rarr; ${esc(f.severity)}${f.agent_adjustment ? ': ' + evText(f.agent_adjustment) : ''}</dd>` : ''}
+        <dt>Fix</dt><dd>${esc(f.fix)}${f.fix_location ? ` <code>${esc(f.fix_location)}</code>` : ''}</dd>
+        <dt>Verify by</dt><dd>${esc(f.verify_by)}</dd>
+        <dt>Confidence</dt><dd>${esc(f.confidence)}</dd>
+        <dt>Runs</dt><dd>${runs || '<span class="muted">none</span>'}</dd></dl>
+      <div class="table-wrap scroll"><table><caption class="sr">Evidence for this finding</caption><tr><th scope="col">Evidence</th><th scope="col">What</th><th scope="col">Value</th></tr>${evs.map(e =>
+        `<tr data-ev="${esc(e)}" tabindex="-1"><td><code>${esc(e)}</code></td><td>${esc(a.evidence[e].label)}</td><td class="num">${evidenceValue(a.evidence[e])}</td></tr>`).join('')}</table></div>
+      <div class="retest"><button type="button" class="btn btn-sm" data-retest="${esc(f.id)}">Re-test this</button>
+        <span class="muted">Prefills the plan's goal; nothing runs until you propose, review and approve.</span></div>
+    </div></details>`;
+}
+function renderFindings() {
+  const d = fdata; if (!d) return;
+  const a = d.analysis, ov = a.scores.overall, ex = Object.fromEntries(a.experiments.map(e => [e.id, e])), shown = shownFindings(a);
+  const counts = Object.fromEntries(SEVS.map(sv => [sv, a.findings.filter(f => f.severity === sv).length]));
   const col = ov.score == null ? 'var(--text-3)' : ov.score >= 80 ? 'var(--ok)' : ov.score >= 60 ? 'var(--warn)' : 'var(--bad)';
-  const ex = Object.fromEntries(a.experiments.map(e => [e.id, e]));
-  const link = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
   $('findings').className = '';
-  $('findings').innerHTML = `
-    <div class="scorebar"><div class="ring" style="--p:${ov.score ?? 0};--c:${col}"><div><span><b>${ov.score ?? '–'}</b><br><small>/100</small></span></div></div>
-      <div><small class="muted">OVERALL RESILIENCE</small><div style="font-size:16px;font-weight:600">${a.findings.length} weaknesses &middot; ${a.strengths.length} strengths</div>
+  $('findings').innerHTML = `${noticesHtml(d)}
+    <div class="scorewrap"><div class="scorebar" style="margin-bottom:0"><div class="ring" style="--p:${ov.score ?? 0};--c:${col}"><div><span><b>${ov.score ?? '&ndash;'}</b><br><small>/100</small></span></div></div>
+      <div><small class="muted">OVERALL RESILIENCE</small><div style="font-size:16px;font-weight:600">${a.findings.length} weakness${a.findings.length === 1 ? '' : 'es'} &middot; ${a.strengths.length} strength${a.strengths.length === 1 ? '' : 's'} &middot; ${a.results_used.length} experiments</div>
         <div class="muted">${esc(ov.explain)}</div>
-        ${a.source !== 'analysis_agent' && a.note ? `<div class="muted">${esc(a.note)}</div>` : ''}
-        ${st.error ? `<div class="pos">Analysis failed: ${esc(st.error)}</div>` : ''}</div></div>
-    <p class="muted">${esc(a.summary)}</p>
-    ${a.findings.length ? a.findings.map(f => `
-      <details class="finding" data-id="${esc(f.id)}"${findingsOpen.has(f.id) ? ' open' : ''}>
-        <summary><span class="pill ${SEV_PILL[f.severity]}">${esc(f.severity)}</span><b>${esc(f.title)}</b>
-          <span class="muted">${esc(f.edge || f.service)} &middot; ${esc(f.severity_score)} &middot; ${f.runs.length} run${f.runs.length === 1 ? '' : 's'}${f.source === 'agent' ? ' &middot; AI' : ''}</span></summary>
-        <div class="fbody">
-          <dl class="kv"><dt>Root cause</dt><dd>${esc(f.root_cause)}</dd>
-            ${f.agent_adjustment ? `<dt>Adjustment</dt><dd>rules said ${esc(f.deterministic_severity)}: ${esc(f.agent_adjustment)}</dd>` : ''}
-            <dt>Fix</dt><dd>${esc(f.fix)}${f.fix_location ? ` <code>${esc(f.fix_location)}</code>` : ''}</dd>
-            <dt>Verify by</dt><dd>${esc(f.verify_by)}</dd>
-            <dt>Runs</dt><dd>${f.runs.slice(0, 6).map(r => ex[r] ? `${link(ex[r].grafana_url, r)} (${link(ex[r].jaeger_url, 'traces')})` : esc(r)).join(', ')}</dd></dl>
-          <div class="table-wrap"><table><tr><th>Evidence</th><th>What</th><th>Value</th></tr>${f.evidence_ids.filter(e => a.evidence[e] && a.evidence[e].kind !== 'link').slice(0, 12).map(e =>
-            `<tr><td><code>${esc(e)}</code></td><td>${esc(a.evidence[e].label)}</td><td class="num">${evidenceValue(a.evidence[e])}</td></tr>`).join('')}</table></div>
-        </div></details>`).join('') : '<p class="muted">No weaknesses found in the experiments so far.</p>'}
-    <div class="block"><h3 class="sub">What held up</h3>${a.strengths.length ? a.strengths.map(s =>
-      `<div><span class="pill ok">strength</span> ${esc(s.title)} <span class="muted">&middot; ${esc(s.detail)}</span></div>`).join('') : '<p class="muted">No strengths observed yet.</p>'}</div>`;
+        <div class="muted">${a.source === 'analysis_agent' ? `AI-checked by ${esc(a.model || 'the analysis agent')}, ${esc(a.tool_calls)} tool calls` : 'Deterministic rules only'}${d.generated_at ? ' &middot; ' + esc(d.generated_at.replace('T', ' ').replace('+00:00', ' UTC')) : ''}</div></div></div>
+      ${serviceTableHtml(a.scores)}</div>
+    <p class="muted" style="margin-top:var(--s4)">${evText(a.summary)}</p>
+    <div class="ftools" role="group" aria-label="Filter and sort findings">
+      <span class="counts">${SEVS.map(sv => `<button type="button" class="pill ${SEV_PILL[sv]}" data-sev="${sv}" aria-pressed="${fview.sev === sv}" title="Show only ${sv} findings">${sv} ${counts[sv]}</button>`).join('')}</span>
+      <label class="field">Severity <select id="fSev">${['', ...SEVS].map(sv => `<option value="${sv}"${fview.sev === sv ? ' selected' : ''}>${sv || 'All'}</option>`).join('')}</select></label>
+      <label class="field">Sort by <select id="fSort"><option value="severity"${fview.sort === 'severity' ? ' selected' : ''}>Severity</option><option value="score"${fview.sort === 'score' ? ' selected' : ''}>Score</option></select></label>
+      ${fview.svc ? `<span class="chip">service: ${esc(fview.svc)} <button type="button" class="banner-x" style="width:20px;height:20px;font-size:15px;display:inline-grid" data-clear-svc aria-label="Clear the service filter">&times;</button></span>` : ''}
+      <span class="muted" aria-live="polite">${shown.length} of ${a.findings.length} shown</span></div>
+    ${!a.findings.length ? '<p class="muted">No weaknesses found in the experiments so far.</p>'
+      : shown.length ? shown.map(f => findingHtml(f, a, ex)).join('') : '<p class="muted">No findings match this filter.</p>'}
+    <div class="block"><h3 class="sub">What held up</h3>${a.strengths.length ? a.strengths.map(st =>
+      `<div style="margin:4px 0"><span class="pill ok">strength</span> ${esc(st.title)} <span class="muted">&middot; ${evText(st.detail)}</span></div>`).join('') : '<p class="muted">No strengths observed yet.</p>'}
+      ${(a.strength_notes || []).map(n => `<div class="muted">&bull; ${esc(n)}</div>`).join('')}</div>`;
   document.querySelectorAll('#findings details.finding').forEach(el => { el.ontoggle = () => { el.open ? findingsOpen.add(el.dataset.id) : findingsOpen.delete(el.dataset.id); }; });
-  $('analysisLogBox').classList.toggle('hide', !d.log.length);
-  if (st.running) $('analysisLogBox').open = true;
-  $('analysisLog').textContent = d.log.map(r => `${r.ts.slice(11, 19)}  ${r.type.padEnd(11)} ${r.tool ? r.tool + ': ' : ''}${r.summary}`).join('\n');
-  $('analysisLog').scrollTop = $('analysisLog').scrollHeight;
+  syncAnalysisControls();
 }
 async function loadFindings() {
-  try { renderFindings(await api('/api/analysis/latest')); }
-  catch (e) { $('findings').className = ''; $('findings').innerHTML = `<p class="pos">Could not load findings: ${esc(e.message)}</p>`; }
-  if (analysisRunning) setTimeout(loadFindings, 2000);
+  try { fdata = await api('/api/analysis/latest'); }
+  catch (e) {
+    $('findings').className = ''; $('findings').innerHTML = `<div class="notice bad" role="alert"><span>Could not load findings: ${esc(e.message)}</span><button type="button" class="btn btn-sm" data-act="reload-findings">Retry</button></div>`;
+    setText($('findingsPill'), 'unavailable'); $('findingsPill').className = 'pill bad'; return;
+  }
+  renderFindings(); applyOverlay(); renderRanking();
+  if (shownResult && !$('resultPanel').classList.contains('hide')) renderResult(shownResult, shownNote);
+  if (fdata.run_id && !aFeed.run) { aFeed.viewRun = ''; aFeed.poll(); }
 }
-$('runAnalysis').onclick = async () => {
-  $('runAnalysis').disabled = true;
-  if (await act('/api/analysis/run', 'Run analysis')) loadFindings(); else $('runAnalysis').disabled = false;
+function filterFindingsBy(svc, scroll = true) {
+  fview.svc = svc || ''; renderFindings();
+  announce(svc ? `Findings filtered to ${svc}: ${shownFindings(fdata ? fdata.analysis : { findings: [] }).length} shown.` : 'Service filter cleared.');
+  if (scroll) $('findingsSec').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function openFinding(id, evId) {                           // open a finding (clearing filters that hide it), optionally highlight one evidence row
+  if (!fdata) return false;
+  const f = fdata.analysis.findings.find(x => x.id === id); if (!f) return false;
+  if (!shownFindings(fdata.analysis).includes(f)) { fview.sev = ''; fview.svc = ''; renderFindings(); }
+  const el = document.querySelector(`#findings details.finding[data-id="${CSS.escape(id)}"]`); if (!el) return false;
+  el.open = true; findingsOpen.add(id);
+  const row = evId ? el.querySelector(`tr[data-ev="${CSS.escape(evId)}"]`) : null, target = row || el;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (row) { row.classList.add('hl'); row.focus({ preventScroll: true }); setTimeout(() => row.classList.remove('hl'), 2600); }
+  else { el.classList.add('flash'); el.querySelector('summary').focus({ preventScroll: true }); setTimeout(() => el.classList.remove('flash'), 2600); }
+  announce(`Finding: ${f.title}${row ? ', evidence ' + evId : ''}.`);
+  return true;
+}
+function showEvidence(evId, chip) {
+  if (!fdata) return;
+  const fs = fdata.analysis.findings, scope = chip.closest('details.finding');
+  const f = (scope && fs.find(x => x.id === scope.dataset.id && x.evidence_ids.includes(evId))) || fs.find(x => x.evidence_ids.includes(evId));
+  if (f) { openFinding(f.id, evId); return; }
+  const rid = evId.split('#')[0];                          // cited by the agent but not by a finding: show the run itself
+  if (/^\d{8}T\d{6}Z$/.test(rid)) openResult(rid);
+}
+function retest(f) {                                      // only prefills: the human proposal and approval flow stays in charge
+  const goal = RETEST_GOAL[f.pattern] || '', sel = $('goalSel'), has = [...sel.options].some(o => o.value === goal);
+  sel.value = has ? goal : '';
+  const goalText = has ? sel.options[sel.selectedIndex].text : 'no preference';
+  $('retestNote').innerHTML = `<span><b>Re-test: ${esc(f.title)}</b> <span class="muted">(${esc(f.edge || f.service)})</span><br>${esc(f.verify_by)}<br>
+    <small class="muted">Goal set to &ldquo;${esc(goalText)}&rdquo;${has ? ' (with a goal the single-shot LLM planner proposes, not the ranking agent)' : ''}. Nothing runs until you press Propose, review the plan and approve it.</small></span>
+    <button type="button" class="banner-x" data-clear-retest aria-label="Dismiss the re-test note">&times;</button>`;
+  $('retestNote').classList.remove('hide');
+  $('planSec').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('propose').focus({ preventScroll: true });
+  announce(`Plan goal prefilled to re-test ${f.title}. Press Propose experiment when ready; nothing has run.`);
+}
+function summaryText() {
+  const a = fdata.analysis, ov = a.scores.overall, top = sortFindings(a.findings, 'severity').slice(0, 3);
+  return [`Chaos Copilot findings (${a.source === 'analysis_agent' ? 'AI-checked' : 'rules only'}, ${a.results_used.length} experiments)`,
+    `Overall resilience: ${ov.score == null ? 'not tested' : ov.score + '/100'} (${ov.tested} of ${ov.services} services tested)`,
+    top.length ? 'Top findings:' : 'No weaknesses found.',
+    ...top.map((f, i) => `${i + 1}. [${f.severity}] ${f.title} (${f.edge || f.service})`),
+    ...(top.length ? [`Top fix: ${top[0].fix}${top[0].fix_location ? ' (' + top[0].fix_location + ')' : ''}`] : [])].join('\n');
+}
+async function copySummary() {
+  if (!fdata) return;
+  const text = summaryText();
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {                                              // older browsers / insecure contexts
+    const t = document.createElement('textarea'); t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove();
+    if (!ok) { banner('Copy failed; the summary is: ' + text, true); return; }
+  }
+  announce('Summary copied to the clipboard.'); setText($('copySummary'), 'Copied'); setTimeout(() => setText($('copySummary'), 'Copy summary'), 1600);
+}
+async function downloadReport() {
+  await withBusy($('downloadReport'), 'Preparing…', async () => {
+    try {
+      const r = await fetch('/api/report'); if (!r.ok) throw new Error(r.statusText);
+      const url = URL.createObjectURL(new Blob([await r.text()], { type: 'text/html' }));
+      const a = document.createElement('a'); a.href = url; a.download = `chaos-copilot-findings-${new Date().toISOString().slice(0, 10)}.html`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+      announce('Report downloaded.');
+    } catch (e) { banner('Download failed: ' + e.message); }
+  });
+}
+async function runAnalysis() {
+  if (analysisBlocked()) return;
+  analysisPosting = true; syncAnalysisControls();
+  try { if (await act('/api/analysis/run', 'Run analysis')) { aFeed.viewRun = ''; aFeed.reset(); $('afeedBox').classList.remove('hide'); $('afeedBox').open = true; await poll(); } }
+  finally { analysisPosting = false; syncAnalysisControls(); }
+}
+function analysisTick(st) {                               // called by poll(): follows the analysis without polling the whole findings
+  const a = (st && st.analysis) || {}, was = analysisWas;
+  analysisWas = !!a.running;
+  syncAnalysisControls();
+  if (a.running) {
+    $('afeedBox').classList.remove('hide'); if (was === false) { $('afeedBox').open = true; aFeed.reset(); announce('Analysis started. Its steps stream into the analysis activity feed.'); }
+    aFeed.poll();
+    if (mainFeed.mode !== 'planning' && !mainFeed.viewRun) mainFeed.poll();
+  } else if (was) {                                        // just finished: one last poll of each feed, then fresh findings
+    aFeed.poll(); if (!mainFeed.viewRun) mainFeed.poll(); loadSessions();
+    loadFindings().then(() => { if (fdata) announce(`Analysis finished: ${fdata.analysis.findings.length} findings, ${fdata.analysis.source === 'analysis_agent' ? 'AI-checked' : 'rules only'}${a.error ? '. It failed: ' + a.error : ''}.`); });
+  }
+}
+document.addEventListener('click', ev => {                // findings, evidence chips and cross-links (works for re-rendered content)
+  const t = ev.target.closest('[data-ev],[data-open-result],[data-retest],[data-findings-svc],[data-sev],[data-clear-svc],[data-goto-finding],[data-act],[data-clear-retest],[data-feed-mode]');
+  if (!t) return;
+  if (t.dataset.ev) { ev.preventDefault(); showEvidence(t.dataset.ev, t); }        // preventDefault: a chip inside a feed <summary> must not toggle it
+  else if (t.dataset.openResult) openResult(t.dataset.openResult);
+  else if (t.dataset.retest) { const f = fdata && fdata.analysis.findings.find(x => x.id === t.dataset.retest); if (f) retest(f); }
+  else if (t.dataset.findingsSvc) filterFindingsBy(t.dataset.findingsSvc);
+  else if (t.dataset.sev) { fview.sev = fview.sev === t.dataset.sev ? '' : t.dataset.sev; renderFindings(); document.querySelector(`#findings [data-sev="${t.dataset.sev}"]`).focus(); }
+  else if ('clearSvc' in t.dataset) filterFindingsBy('', false);
+  else if (t.dataset.gotoFinding) openFinding(t.dataset.gotoFinding);
+  else if ('clearRetest' in t.dataset) $('retestNote').classList.add('hide');
+  else if (t.dataset.feedMode) setFeedMode(t.dataset.feedMode);
+  else if (t.dataset.act === 'run-analysis') runAnalysis();
+  else if (t.dataset.act === 'reload-findings') loadFindings();
+});
+$('findings').addEventListener('change', ev => {
+  if (ev.target.id === 'fSev') { fview.sev = ev.target.value; renderFindings(); $('fSev').focus(); }
+  if (ev.target.id === 'fSort') { fview.sort = ev.target.value; renderFindings(); $('fSort').focus(); }
+});
+$('runAnalysis').onclick = runAnalysis;
+$('copySummary').onclick = copySummary;
+$('downloadReport').onclick = downloadReport;
+$('autoAnalyse').onchange = async () => {
+  const want = $('autoAnalyse').checked;
+  const r = await act('/api/analysis/auto', 'Auto-analysis', { enabled: want }, $('autoAnalyse'));
+  $('autoAnalyse').disabled = false;
+  if (!r) { $('autoAnalyse').checked = !want; return; }
+  if (status && status.analysis) status.analysis.auto = r.auto;
+  announce(r.auto ? 'Auto-analysis on: the findings are re-analysed after each completed experiment.' : 'Auto-analysis off.');
 };
+$('showFindings').onchange = () => { overlayOn = $('showFindings').checked; applyOverlay();
+  announce(overlayOn ? 'Graph coloured by resilience score. Click a service to filter its findings.' : 'Findings overlay off.'); };
 
 /* ---------- 5. grafana ---------- */
 async function loadGrafanaCfg() {
@@ -1055,7 +1313,7 @@ function updateGrafana() {
 }
 
 /* ---------- planning agent: ranking panel + activity feed ---------- */
-let lastAgentRun = null, rankData = null, lastRankRun = null, feed = { run: '', after: 0 }, viewRun = '', ignoreRun = '', feedBusy = false;
+let lastAgentRun = null, rankData = null, lastRankRun = null;
 const SOURCE_NAME = { rank_agent: 'planning agent', ranker_fallback: 'ranker (fallback)', llm: 'LLM planner', fallback: 'fixed fallback plan' };
 const signed = x => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(3);
 function factorsHtml(c) {
@@ -1079,6 +1337,7 @@ function renderRanking() {
     <tbody>${rows.map(r => `<tr${r.id === d.chosen ? ' class="chosen-row" aria-current="true"' : ''}>
       <th scope="row"><button type="button" class="rank-node" data-node="${esc(r.target)}" title="Show ${esc(r.target)} on the dependency graph">${esc(r.id)}</button>
         ${r.id === d.chosen ? ' <span class="pill ok">chosen</span>' : r.in_top_k ? ' <span class="pill info">examined</span>' : ''}
+        ${(w => w ? ` <button type="button" class="pill ${SEV_PILL[w.sev]}" data-findings-svc="${esc(r.target)}" title="${w.n} open finding${w.n === 1 ? '' : 's'} on ${esc(r.target)}; show them">${esc(w.sev)}${w.n > 1 ? ' &times;' + w.n : ''}</button>` : '')(worstFindingFor(r.target))}
         <br><small class="muted">${esc(r.why)}</small>${factorsHtml(r)}${variantsHtml(r)}</th>
       <td>${fix2(r.priority)}<span class="pbar" aria-hidden="true"><i style="width:${Math.max(2, Math.round(100 * r.priority / top))}%"></i></span>
         ${r.adjusted_priority != null ? `<small class="muted">agent ${fix2(r.adjusted_priority)}</small>` : ''}</td>
@@ -1094,40 +1353,67 @@ async function loadRanking() {
   catch (e) { $('rankPanel').textContent = 'Ranking unavailable: ' + e.message; }
 }
 const EVENT_PILL = { thought: ['', 'Reasoning'], tool_call: ['info', 'Tool call'], tool_result: ['', 'Result'], llm: ['', 'Model'], decision: ['ok', 'Decision'] };
-function eventHtml(e) {
+const FEED_EMPTY = { planning: 'No planning activity yet. Propose an experiment and every step shows up here as it happens.',
+                     analysis: 'No analysis activity yet. Press Run analysis in the Findings section and every step shows up here.',
+                     all: 'No agent activity in this server session yet. Pick a saved session above to replay one.' };
+function eventHtml(e, showMode) {
   let [cls, name] = EVENT_PILL[e.type] || ['', e.type];
   if (e.type === 'decision' && e.fallback) { cls = 'warn'; name = 'Fallback'; }
   const args = e.args && Object.keys(e.args).length ? Object.entries(e.args).map(([k, v]) => k + '=' + JSON.stringify(v)).join(', ') : '';
-  const text = e.type === 'tool_call' ? `${e.tool}(${args})${e.call ? ' · ' + e.call : ''}` : e.summary;
+  const text = e.type === 'tool_call' ? `${e.tool}(${args})${e.call ? ' · tool call ' + e.call.replace('/', ' / ') : ''}` : e.summary;
   const body = e.type === 'tool_call' ? JSON.stringify(e.args || {}, null, 1) : (e.detail && e.detail !== e.summary ? e.detail : '');
-  return `<li><details><summary><span class="pill ${cls}">${esc(name)}</span><span>${esc(String(text).slice(0, 220))}</span><small class="muted">${esc((e.ts || '').slice(11, 19))}</small></summary>${body ? `<pre>${esc(body)}</pre>` : ''}</details></li>`;
+  const mode = e.mode || 'planning';
+  return `<li><details><summary>${showMode ? `<span class="mtag ${esc(mode)}">${esc(mode)}</span>` : ''}<span class="pill ${cls}">${esc(name)}</span><span class="ftext">${evText(String(text).slice(0, 220))}</span><small class="muted">${esc((e.ts || '').slice(11, 19))}</small></summary>${body ? `<pre>${esc(body)}</pre>` : ''}</details></li>`;
 }
-async function pollAgent() {
-  if (feedBusy) return; feedBusy = true;
-  try {
-    const q = (run, after) => api(`/api/agent-events?run=${encodeURIComponent(run)}&after=${after}`);
-    let d = await q(viewRun, feed.run && (!viewRun || viewRun === feed.run) ? feed.after : 0);
-    if (!viewRun && d.run_id && d.run_id === ignoreRun) return;          // still the previous session: the new one has not started
-    if (d.run_id !== feed.run) { feed = { run: d.run_id || '', after: 0 }; $('feed').innerHTML = ''; if (d.run_id) d = await q(d.run_id, 0); }
-    if (d.events.length) {
-      const box = $('feed'), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
-      box.insertAdjacentHTML('beforeend', d.events.map(eventHtml).join('')); feed.after = d.last;
-      if (atEnd) box.scrollTop = box.scrollHeight;
-    }
-    $('feedEmpty').classList.toggle('hide', !!$('feed').children.length);
-    $('feedRun').textContent = feed.run ? 'session ' + feed.run : '';
-  } catch (e) { /* the status poll already reports an unreachable backend */ } finally { feedBusy = false; }
+/* One feed component, used twice: the switchable "Agent activity" feed and the analysis feed inside Findings.
+   viewRun = a replayed session; ignoreRun = the previous session, hidden until the next one starts. */
+function makeFeed(o) {
+  const f = { mode: o.mode, run: '', after: 0, viewRun: '', ignoreRun: '', busy: false };
+  f.reset = () => { f.run = ''; f.after = 0; $(o.list).innerHTML = ''; if (o.calls) $(o.calls).textContent = ''; if (o.runLabel) $(o.runLabel).textContent = ''; };
+  f.poll = async () => {
+    if (f.busy) return; f.busy = true;
+    try {
+      const stream = f.mode === 'all' && !f.viewRun;
+      const q = (run, after) => api(`/api/agent-events?run=${encodeURIComponent(run)}&after=${after}&mode=${f.mode}`);
+      let d = await q(f.viewRun, stream || (f.run && (!f.viewRun || f.viewRun === f.run)) ? f.after : 0);
+      if (!stream) {
+        if (!f.viewRun && d.run_id && d.run_id === f.ignoreRun) return;     // still the previous session: the new one has not started
+        if (d.run_id !== f.run) { f.reset(); f.run = d.run_id || ''; if (d.run_id) d = await q(d.run_id, 0); }
+      }
+      if (d.events.length) {
+        const box = $(o.list), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+        box.insertAdjacentHTML('beforeend', d.events.map(e => eventHtml(e, f.mode === 'all' || o.alwaysTag)).join('')); f.after = d.last;
+        if (atEnd || o.follow) box.scrollTop = box.scrollHeight;
+        const c = [...d.events].reverse().find(e => e.call);
+        if (c && o.calls) $(o.calls).textContent = 'tool call ' + c.call.replace('/', ' / ');
+      }
+      if (o.empty) $(o.empty).classList.toggle('hide', !!$(o.list).children.length || (o.emptyOnlyWithRun && !f.run));
+      if (o.runLabel) $(o.runLabel).textContent = stream ? 'this server session' : f.run ? 'session ' + f.run : '';
+    } catch (e) { /* the status poll already reports an unreachable backend */ } finally { f.busy = false; }
+  };
+  return f;
 }
+const mainFeed = makeFeed({ list: 'feed', empty: 'feedEmpty', runLabel: 'feedRun', calls: 'feedCalls', mode: 'planning' });
+const aFeed = makeFeed({ list: 'afeed', empty: 'afeedEmpty', runLabel: 'afeedRun', calls: 'afeedCalls', mode: 'analysis', follow: true, emptyOnlyWithRun: true });
+function setFeedMode(mode) {
+  mainFeed.mode = mode; mainFeed.viewRun = ''; mainFeed.ignoreRun = ''; mainFeed.reset();
+  $('sessionSel').value = '';
+  document.querySelectorAll('[data-feed-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.feedMode === mode)));
+  $('feedEmpty').textContent = FEED_EMPTY[mode]; $('feedEmpty').classList.remove('hide');
+  loadSessions(); mainFeed.poll();
+  announce(`Agent activity: ${mode === 'all' ? 'all agents' : mode + ' agent'}.`);
+}
+async function pollAgent() { return mainFeed.poll(); }   // kept for the existing callers
 async function loadSessions() {
   try {
-    const rows = await api('/api/agent-sessions'), cur = $('sessionSel').value;
+    const mode = mainFeed.mode, rows = await api(`/api/agent-sessions?mode=${mode}`), cur = $('sessionSel').value;
     $('sessionSel').innerHTML = '<option value="">Live / latest session</option>' + rows.map(r =>
-      `<option value="${esc(r.run_id)}">${esc(r.started.slice(5, 16).replace('T', ' '))} UTC · ${esc(r.steps)} steps</option>`).join('');
-    $('sessionSel').value = cur;
+      `<option value="${esc(r.run_id)}">${esc(r.started.slice(5, 16).replace('T', ' '))} UTC${mode === 'all' ? ' · ' + esc(r.mode) : ''} · ${esc(r.steps)} steps</option>`).join('');
+    $('sessionSel').value = [...$('sessionSel').options].some(o => o.value === cur) ? cur : '';
   } catch (e) { /* optional */ }
 }
 $('rankFault').onchange = renderRanking;
-$('sessionSel').onchange = () => { viewRun = $('sessionSel').value; ignoreRun = ''; feed = { run: '', after: 0 }; $('feed').innerHTML = ''; pollAgent(); };
+$('sessionSel').onchange = () => { mainFeed.viewRun = $('sessionSel').value; mainFeed.ignoreRun = ''; mainFeed.reset(); mainFeed.poll(); };
 $('refreshRanking').onclick = () => withBusy($('refreshRanking'), 'Refreshing…', async () => { await loadRanking(); await loadSessions(); });
 $('rankPanel').onclick = e => { const b = e.target.closest('[data-node]'); if (b) { selectNode(b.dataset.node); $('graphSec').scrollIntoView({ block: 'start' }); } };
 
@@ -1159,7 +1445,8 @@ async function poll() {
   document.title = status.running ? `● ${status.phase.replace('_', ' ')} · Chaos Copilot` : 'Chaos Copilot';
   renderPlan(); renderLive(status); highlight(); setMode(status); syncNav();
   const planRun = (status.plan && status.plan.ranking && status.plan.ranking.run_id) || '';
-  if (!viewRun && (status.phase === 'proposing' || planRun !== lastAgentRun)) pollAgent();   // live feed: once a second while the agent works
+  if (!mainFeed.viewRun && mainFeed.mode !== 'analysis' && (status.phase === 'proposing' || planRun !== lastAgentRun)) mainFeed.poll();   // live feed: once a second while the agent works
+  analysisTick(status);
   if (planRun !== lastRankRun) { lastRankRun = planRun; loadRanking(); if (planRun) loadSessions(); }
   lastAgentRun = planRun;
   if (cy && Date.now() - lastHealth > (status.running ? 4000 : 30000)) refreshHealth();
@@ -1176,7 +1463,9 @@ $('refreshHistory').onclick = () => withBusy($('refreshHistory'), 'Refreshing…
 $('bannerClose').onclick = () => banner('');
 $('focus').onchange = () => { chartSig = ''; renderCharts(status); };
 $('gService').onchange = () => { gSel = $('gService').value; updateGrafana(); };
-$('propose').onclick = async () => { $('propose').disabled = true; viewRun = ''; $('sessionSel').value = ''; ignoreRun = feed.run; feed = { run: '', after: 0 }; $('feed').innerHTML = ''; $('feedEmpty').classList.remove('hide'); $('feedRun').textContent = ''; chartSig = ''; viewedResult = null; renderResult(null);
+$('propose').onclick = async () => { $('propose').disabled = true; $('sessionSel').value = ''; mainFeed.viewRun = '';
+  if (mainFeed.mode === 'planning') { mainFeed.ignoreRun = mainFeed.run; mainFeed.reset(); $('feedEmpty').classList.remove('hide'); }
+  chartSig = ''; viewedResult = null; renderResult(null);
   await act('/api/propose', 'Propose', { goal: $('goalSel').value || null }, $('propose')); await poll(); };
 $('reviewed').onchange = renderPlan;
 $('journeySel').onchange = () => { if ($('journeySel').value) { $('checkoutPath').checked = false; } applyFocus(); };
@@ -1198,7 +1487,7 @@ $('stop').onclick = async () => {
   setTimeout(() => { $('stop').disabled = false; $('stop').textContent = 'STOP EXPERIMENT'; }, 1500);   // a second press skips the recovery wait
 };
 
-loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); loadSessions(); poll();
+loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); loadSessions(); loadFindings(); poll();
 if ('ResizeObserver' in window) {                       // the sticky header's real height drives scroll padding and the banner position
   const tb = document.querySelector('.topbar');
   new ResizeObserver(() => document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight + 'px')).observe(tb);
