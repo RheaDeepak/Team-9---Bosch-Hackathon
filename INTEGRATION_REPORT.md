@@ -6,11 +6,11 @@
 
 ## 1. Executive summary
 
-The completed backend contains topology discovery, baseline metrics,
-AI/fallback planning, deterministic validation, Docker fault injection,
-automatic telemetry guards, verified rollback, multi-sample recovery checks,
-and result generation. The integration exposes those capabilities through the
-operator UI without duplicating or bypassing the backend's safety logic.
+The pulled backend contained the important domain building blocks—topology
+discovery, baseline metrics, AI/fallback planning, deterministic validation,
+Docker fault injection, and rollback—but it did not expose an HTTP API or a
+long-running experiment lifecycle. The existing command-line flow stopped
+after saving an approval file.
 
 The frontend already expected the REST and server-sent-event contract defined
 in the PRD. The integration therefore adds a thin FastAPI control plane between
@@ -37,9 +37,6 @@ flowchart LR
     C --> P[planner.py]
     C --> S[policy.py]
     C --> I[inject.py]
-    C --> G[guard.py]
-    G --> J[Jaeger spans]
-    G --> DK[Docker health]
     C --> M[metrics.py]
     I -->|allowlisted Docker SDK operations| D[Astronomy Shop Compose project]
     M --> PR[Prometheus]
@@ -55,12 +52,11 @@ The responsibilities are intentionally separated:
 | --- | --- |
 | Frontend | Show readiness, topology, proposal, policy, live state, STOP, and findings |
 | FastAPI | Validate request shapes, expose REST/SSE, host static files, and enforce readiness before approval |
-| Control plane | Own the state machine, one-active-run rule, abort signal, guaranteed rollback, guard integration, scoring, and reports |
+| Control plane | Own the state machine, one-active-run rule, abort signal, guaranteed rollback, scoring, and reports |
 | Planner | Return one structured LLM plan or the deterministic fallback plan |
 | Policy | Decide whether target, fault, magnitude, and duration are allowed |
 | Injector | Resolve an exact Compose-labeled container, inject the fixed fault, and roll it back |
-| Guard | Compare recent Jaeger spans and container health with baseline-derived thresholds; abort on consecutive breaches |
-| Metrics | Capture and read the Prometheus/Docker baseline used to derive safety thresholds |
+| Metrics | Read the saved baseline and collect live Prometheus/Docker snapshots |
 
 ## 3. What was changed
 
@@ -77,10 +73,8 @@ The responsibilities are intentionally separated:
   - Adds the in-memory experiment state machine.
   - Runs experiments in a background thread so UI refreshes do not cancel the
     server-side rollback path.
-  - Calls the existing planner, policy, injector, guard, recovery, rollback,
-    and LLM judge functions.
-  - Streams the guard's real Jaeger/container samples to the UI and turns
-    automatic threshold trips into an `aborted` terminal result.
+  - Calls the existing planner, policy, injector, rollback, telemetry, and LLM
+    judge functions.
   - Implements the PRD impact/resilience formula and separates evidence from
     AI interpretation.
 - `tests/test_control_plane.py`
@@ -91,8 +85,7 @@ The responsibilities are intentionally separated:
 
 - `discovery.py` now reads the target repository and Jaeger URLs from `.env`
   instead of another developer's absolute `C:\Users\rhea\...` path.
-- `metrics.py` now reads the target repository, Prometheus URL, and exact
-  Compose project name from `.env`.
+- `metrics.py` now reads the target repository and Prometheus URL from `.env`.
 - `inject.py` now reads the exact Compose project name from `.env`.
 - `requirements.txt` now declares FastAPI, Uvicorn, and `typing_extensions`.
 - `.gitignore` now excludes `.venv/` and the recoverable active-fault state
@@ -102,19 +95,12 @@ The responsibilities are intentionally separated:
 
 - The UI consumes real readiness, topology, baseline, proposal, policy,
   experiment, event, and report responses.
-- The live section charts request rate, error rate, and p95 latency per service,
-  colors samples by experiment phase, and deep-links to the corresponding
-  provisioned Grafana panels.
 - The STOP flow waits for backend-confirmed rollback in live mode; it no longer
   simulates recovery after sending a real abort request.
 - Terminal `completed`, `aborted`, and `failed` states close the live stream
   correctly.
 - The readiness bar supports the backend's six checks.
-- Normal mode never substitutes demo values when the API or baseline is
-  unavailable. Offline mock data is available only through the explicit
-  `?demo=1` URL.
-- Planner requests allow the backend's bounded LLM fallback sequence to finish,
-  and API error details are displayed instead of only an HTTP status number.
+- Frontend-only preview mode still falls back to visibly labelled demo data.
 
 ## 4. API contract
 
@@ -145,13 +131,10 @@ and unresolved active-fault state immediately before starting.
 
 ### Step 2: Proposal
 
-The operator can click **Explore failures with AI** without configuring a goal.
-`planner.py` receives the dependency map, baseline, protected services, and
-allowed faults, then independently chooses one informative safe experiment.
-An expandable learning-goal control can optionally provide a hint without
-becoming a constraint. If Gemini is configured, it returns structured JSON. If
-the key, network, or model output is unavailable, the known-safe cart fallback
-is used and the UI labels its source.
+The operator selects a learning goal. `planner.py` receives the dependency map,
+baseline, protected services, and allowed faults. If Gemini is configured, it
+returns structured JSON. If the key, network, or model output is unavailable,
+the known-safe cart fallback is used and the UI labels its source.
 
 The model never returns or executes a shell command.
 
@@ -173,19 +156,14 @@ the human-review box.
 ### Step 4: Execution and STOP
 
 The approval request records the operator name and starts a server-side worker.
-The worker loads the baseline, determines which target and blast-radius
-services have measured thresholds, confirms that live Jaeger telemetry is
-visible, and calls the existing injector. The injector resolves exactly one container using both
+The worker loads the baseline, records a live snapshot, and calls the existing
+injector. The injector resolves exactly one container using both
 `com.docker.compose.project` and `com.docker.compose.service` labels.
 
-During observation, `guard.py` samples recent Jaeger server/consumer spans and
-Docker state. Two consecutive threshold breaches, loss of guard telemetry, or
-the operator's STOP signal abort the fault window. The UI receives these live
-samples and phases through SSE, with polling as a fallback. STOP is wired into
-the guard's wait loop, so it interrupts promptly without skipping rollback.
-The same samples feed the in-app live charts, including an estimated request
-rate for the selected service. Each chart links to Grafana's 15-minute panel
-view for detailed Prometheus-backed inspection.
+During observation, the UI receives phases and telemetry through SSE, with
+polling as a fallback. Pressing STOP sets a thread-safe abort event. It does not
+pretend that recovery happened: the UI waits for the backend to enter rollback,
+remove the fault, collect a recovery snapshot, and emit the terminal state.
 
 ### Step 5: Guaranteed rollback
 
@@ -200,12 +178,8 @@ helper container. If rollback cannot be verified, the experiment becomes
 
 ### Step 6: Evidence and scoring
 
-After rollback, the backend requires two consecutive healthy recovery samples
-and checks the target container even when that service has no usable span
-threshold. Recovery verification is capped at 45 seconds for the demo; the UI
-shows each pending threshold instead of appearing frozen. Baseline and fault peaks are compared per affected service using
-error rate and p95 latency; the UI score uses the frontend row when available.
-The score follows the PRD formula:
+Baseline and fault windows are compared using frontend availability, error
+rate, p95 latency, and throughput. The score follows the PRD formula:
 
 ```text
 impact = 100 × (
@@ -328,7 +302,7 @@ fallback source.
   - missing telemetry remains missing;
   - normal run injects, rolls back, and reports;
   - manual abort still rolls back.
-- Five frontend adapter tests passed.
+- Four frontend adapter tests passed.
 - Python syntax compilation passed for all backend modules.
 - JavaScript syntax checks passed.
 - Live API smoke test passed for static UI hosting, health, readiness,
@@ -343,9 +317,9 @@ fallback source.
 - Experiment state and historical findings are in memory and reset when the API
   restarts. The injector's active fault handle is persisted for rollback, but a
   future version should persist full experiment/audit state in SQLite.
-- Recovery requires two healthy telemetry/container samples and has a bounded
-  45-second verification window, but explicit synthetic business-journey
-  assertions remain future work.
+- Recovery currently verifies container state through the injector and collects
+  one recovery snapshot. A production version should require multiple healthy
+  intervals and explicit business-journey checks.
 - The current backend implements `container_stop` and `network_delay`; packet
   loss and a traffic-spike executor remain future work.
 - The live score uses frontend headline metrics. Per-journey scoring and direct
