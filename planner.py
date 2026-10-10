@@ -13,7 +13,7 @@ from policy import ALLOWED_FAULTS, MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECT
 # Tried in order: Gemini models get overloaded or retired, so one name is a single point of failure.
 LLM_MODELS = ("gemini-3.8-flash", "gemini-3-flash-preview", "gemini-flash-lite-latest")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-LLM_MAX_TOKENS = 800
+LLM_MAX_TOKENS = 4096  # thinking models spend part of this on reasoning before the answer
 LLM_TIMEOUT_S = 20
 VERDICTS = ("held", "not held", "inconclusive")
 API_KEY_VAR = "LLM_API_KEY"
@@ -102,8 +102,11 @@ def _call_llm(api_key, context, system=SYSTEM_PROMPT):
             errors.append(f"{model}: {type(e).__name__}")
             continue
         if resp.ok:
-            parts = resp.json()["candidates"][0]["content"]["parts"]
-            return "".join(p.get("text", "") for p in parts), model
+            cand = resp.json()["candidates"][0]
+            if cand.get("finishReason") == "MAX_TOKENS":
+                errors.append(f"{model}: reply truncated (MAX_TOKENS)")
+                continue
+            return "".join(p.get("text", "") for p in cand["content"]["parts"]), model
         errors.append(f"{model}: HTTP {resp.status_code}")
     raise RuntimeError("all models failed (" + "; ".join(errors) + ")")
 
