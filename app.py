@@ -15,7 +15,7 @@ import docker
 import requests
 import uvicorn
 from fastapi import Body, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import activity
@@ -390,19 +390,7 @@ def api_status():
 
 
 def _load_result(path):
-    d = json.loads(path.read_text(encoding="utf-8"))
-    d["id"] = path.stem
-    d.setdefault("container_resources", [])
-    d["amplification"] = exp.amplification(d["plan"], d["impact"])  # recomputed: older results have an older shape
-    d["recovery"].setdefault("metrics_confirmed", None)
-    d["recovery"].setdefault("recovered", False)
-    if not d.get("score"):  # older results: score what was recorded (no probe data then)
-        d["score"] = exp.score_experiment(d["impact"], d["recovery"], None, d["guard"]["elapsed_s"])
-    d["verdict"].setdefault("recommendation", planner.remediation_for(d["plan"]))
-    if not d.get("grafana_window_ms"):  # older results: derive the window from what was recorded
-        start = datetime.fromisoformat(d["started_at"]).timestamp()
-        d["grafana_window_ms"] = grafana.window_ms(start, start + d["guard"]["elapsed_s"] + (d["recovery"]["seconds"] or 60))
-    return d
+    return analysis.normalise_result(json.loads(path.read_text(encoding="utf-8")), path.stem)
 
 
 @app.get("/api/results")
@@ -427,6 +415,57 @@ def api_result(rid: str):
     if not RESULT_ID.match(rid) or not path.is_file():
         raise HTTPException(404, "no such result")
     return _load_result(path)
+
+
+# ---- analysis (findings) ---------------------------------------------------------------
+
+ANALYSIS = {"running": False, "started_at": None, "error": None, "source": None, "note": None}
+ANALYSIS_LOG_LINES = 80
+
+
+def _analysis_worker():
+    try:
+        out = analysis_agent.run_analysis()
+        with LOCK:
+            ANALYSIS.update(running=False, source=out["source"], note=out["note"])
+    except Exception as e:  # e.g. no dependency map; the agent itself never raises for LLM problems
+        with LOCK:
+            ANALYSIS.update(running=False, error=f"{type(e).__name__}: {e}"[:300])
+
+
+@app.post("/api/analysis/run", status_code=202)
+def api_analysis_run():
+    """Start the analysis agent in the background (read-only: it never touches Docker)."""
+    with LOCK:
+        if ANALYSIS["running"]:
+            raise HTTPException(409, "an analysis is already running")
+        ANALYSIS.update(running=True, started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                        error=None, source=None, note=None)
+    threading.Thread(target=_analysis_worker, name="analysis", daemon=True).start()
+    return {"started": True}
+
+
+@app.get("/api/analysis/latest")
+def api_analysis_latest():
+    """Latest findings (agent output if it covers the current results, else deterministic), status and agent log."""
+    log = rank_agent.read_log(mode="analysis", limit=ANALYSIS_LOG_LINES)
+    last = log[-1]["run_id"] if log else None
+    with LOCK:
+        status = dict(ANALYSIS)
+    try:
+        data = analysis_agent.latest_or_deterministic()
+    except (OSError, ValueError, KeyError) as e:
+        raise HTTPException(503, f"analysis unavailable: {e}")
+    return {"status": status, "analysis": data, "log": [r for r in log if r["run_id"] == last]}
+
+
+@app.get("/api/report", response_class=HTMLResponse)
+def api_report():
+    """The findings report as one self-contained HTML page."""
+    try:
+        return HTMLResponse(report.render_html(analysis_agent.latest_or_deterministic()))
+    except (OSError, ValueError, KeyError) as e:
+        raise HTTPException(503, f"report unavailable: {e}")
 
 
 app.mount("/", StaticFiles(directory=BASE_DIR / "static", html=True), name="static")

@@ -254,6 +254,17 @@ a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-
   .check, .gate li { min-height:40px; }
 }
 
+/* ================= 8. Findings ================= */
+.finding { border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface-2); }
+.finding + .finding { margin-top:var(--s2); }
+.finding > summary { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s3); padding:var(--s3) var(--s4); cursor:pointer; list-style:none; }
+.finding > summary::-webkit-details-marker { display:none; }
+.finding > summary::before { content:"\25B8"; color:var(--text-3); transition:transform var(--ease); }
+.finding[open] > summary::before { transform:rotate(90deg); }
+.finding > summary b { flex:1 1 260px; } .finding .fbody { padding:0 var(--s4) var(--s4); }
+.finding .pill { min-width:70px; justify-content:center; }
+#analysisLog { max-height:220px; overflow:auto; overscroll-behavior:contain; background:var(--well); border:1px solid var(--line); border-radius:var(--r-sm); padding:var(--s2) var(--s3); margin:0; font:12px/1.55 var(--mono); color:var(--text-2); white-space:pre-wrap; overflow-wrap:anywhere; }
+
 /* ================= Emergency stop ================= */
 #stop { position:fixed; right:var(--s5); bottom:calc(var(--s5) + env(safe-area-inset-bottom)); z-index:40; display:none; align-items:center; gap:var(--s3);
   background:var(--bad-solid); border:2px solid #ff8a87; color:#fff; font-size:17px; font-weight:800; letter-spacing:.03em; padding:16px 30px; border-radius:var(--r-md);
@@ -452,6 +463,20 @@ a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-
       <div class="card-actions"><button id="refreshHistory" class="btn btn-sm" type="button">Refresh</button></div>
     </header>
     <div class="card-body"><div id="history" class="muted">Loading…</div></div>
+  </section>
+
+  <section id="findingsSec" class="card">
+    <header class="card-head">
+      <div class="card-title"><span class="eyebrow"><b>08</b>Improve</span><h2>Findings <span id="findingsPill" class="pill"></span></h2></div>
+      <div class="card-actions">
+        <a class="btn btn-sm" href="/api/report" target="_blank" rel="noopener">Open report</a>
+        <button id="runAnalysis" class="btn btn-sm btn-primary" type="button">Run analysis</button>
+      </div>
+    </header>
+    <div class="card-body">
+      <div id="findings" class="muted">Loading…</div>
+      <details id="analysisLogBox" class="block hide"><summary class="muted">Analysis agent log</summary><pre id="analysisLog" role="log" tabindex="0"></pre></details>
+    </div>
   </section>
 </main>
 
@@ -933,6 +958,67 @@ function renderHistory() {
   if ($('historyMore')) $('historyMore').onclick = () => { historyAll = !historyAll; renderHistory(); };
 }
 
+/* ---------- 8. findings ---------- */
+const SEV_PILL = { Critical: 'bad', High: 'warn', Medium: 'info', Low: '' };
+let analysisRunning = false, findingsOpen = new Set();
+function evidenceValue(it) {
+  const v = it.value;
+  if (it.kind === 'impact') return `${nd(v.baseline)} &rarr; ${nd(v.peak)} (${delta(v.change)})`;
+  if (it.kind === 'amplification') return `+${num(v.increase_ms)} ms for ${esc(v.delay_ms)} ms injected = ${num(v.ratio)}&times;`;
+  if (it.kind === 'recovery') return v.recovered ? `recovered after ${esc(v.seconds)} s` : `not recovered${v.note ? ' (' + esc(v.note) + ')' : ''}`;
+  if (it.kind === 'guard') return `${v.aborted ? 'aborted' : 'completed'} after ${esc(v.elapsed_s)} s: ${esc(v.reason)}`;
+  if (it.kind === 'claim') return `<span class="pill ${v.status === 'contradicted' ? 'bad' : v.status === 'supported' ? 'ok' : ''}">${esc(v.status)}</span> ${esc(v.claim)}`;
+  if (it.kind === 'plan') return `${esc(v.fault)} on <b>${esc(v.target)}</b>${v.fault === 'network_delay' ? ', ' + esc(v.magnitude) + ' ms' : ''}`;
+  return `<code>${esc(JSON.stringify(v).slice(0, 160))}</code>`;
+}
+function renderFindings(d) {
+  const a = d.analysis, ov = a.scores.overall, st = d.status;
+  analysisRunning = st.running;
+  $('runAnalysis').disabled = st.running; $('runAnalysis').textContent = st.running ? 'Analysing…' : 'Run analysis';
+  $('findingsPill').textContent = st.running ? 'agent running' : a.source === 'analysis_agent' ? 'AI-checked' : 'rules only';
+  $('findingsPill').className = 'pill ' + (st.running ? 'warn' : a.source === 'analysis_agent' ? 'ok' : '');
+  const col = ov.score == null ? 'var(--text-3)' : ov.score >= 80 ? 'var(--ok)' : ov.score >= 60 ? 'var(--warn)' : 'var(--bad)';
+  const ex = Object.fromEntries(a.experiments.map(e => [e.id, e]));
+  const link = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+  $('findings').className = '';
+  $('findings').innerHTML = `
+    <div class="scorebar"><div class="ring" style="--p:${ov.score ?? 0};--c:${col}"><div><span><b>${ov.score ?? '–'}</b><br><small>/100</small></span></div></div>
+      <div><small class="muted">OVERALL RESILIENCE</small><div style="font-size:16px;font-weight:600">${a.findings.length} weaknesses &middot; ${a.strengths.length} strengths</div>
+        <div class="muted">${esc(ov.explain)}</div>
+        ${a.source !== 'analysis_agent' && a.note ? `<div class="muted">${esc(a.note)}</div>` : ''}
+        ${st.error ? `<div class="pos">Analysis failed: ${esc(st.error)}</div>` : ''}</div></div>
+    <p class="muted">${esc(a.summary)}</p>
+    ${a.findings.length ? a.findings.map(f => `
+      <details class="finding" data-id="${esc(f.id)}"${findingsOpen.has(f.id) ? ' open' : ''}>
+        <summary><span class="pill ${SEV_PILL[f.severity]}">${esc(f.severity)}</span><b>${esc(f.title)}</b>
+          <span class="muted">${esc(f.edge || f.service)} &middot; ${esc(f.severity_score)} &middot; ${f.runs.length} run${f.runs.length === 1 ? '' : 's'}${f.source === 'agent' ? ' &middot; AI' : ''}</span></summary>
+        <div class="fbody">
+          <dl class="kv"><dt>Root cause</dt><dd>${esc(f.root_cause)}</dd>
+            ${f.agent_adjustment ? `<dt>Adjustment</dt><dd>rules said ${esc(f.deterministic_severity)}: ${esc(f.agent_adjustment)}</dd>` : ''}
+            <dt>Fix</dt><dd>${esc(f.fix)}${f.fix_location ? ` <code>${esc(f.fix_location)}</code>` : ''}</dd>
+            <dt>Verify by</dt><dd>${esc(f.verify_by)}</dd>
+            <dt>Runs</dt><dd>${f.runs.slice(0, 6).map(r => ex[r] ? `${link(ex[r].grafana_url, r)} (${link(ex[r].jaeger_url, 'traces')})` : esc(r)).join(', ')}</dd></dl>
+          <div class="table-wrap"><table><tr><th>Evidence</th><th>What</th><th>Value</th></tr>${f.evidence_ids.filter(e => a.evidence[e] && a.evidence[e].kind !== 'link').slice(0, 12).map(e =>
+            `<tr><td><code>${esc(e)}</code></td><td>${esc(a.evidence[e].label)}</td><td class="num">${evidenceValue(a.evidence[e])}</td></tr>`).join('')}</table></div>
+        </div></details>`).join('') : '<p class="muted">No weaknesses found in the experiments so far.</p>'}
+    <div class="block"><h3 class="sub">What held up</h3>${a.strengths.length ? a.strengths.map(s =>
+      `<div><span class="pill ok">strength</span> ${esc(s.title)} <span class="muted">&middot; ${esc(s.detail)}</span></div>`).join('') : '<p class="muted">No strengths observed yet.</p>'}</div>`;
+  document.querySelectorAll('#findings details.finding').forEach(el => { el.ontoggle = () => { el.open ? findingsOpen.add(el.dataset.id) : findingsOpen.delete(el.dataset.id); }; });
+  $('analysisLogBox').classList.toggle('hide', !d.log.length);
+  if (st.running) $('analysisLogBox').open = true;
+  $('analysisLog').textContent = d.log.map(r => `${r.ts.slice(11, 19)}  ${r.type.padEnd(11)} ${r.tool ? r.tool + ': ' : ''}${r.summary}`).join('\n');
+  $('analysisLog').scrollTop = $('analysisLog').scrollHeight;
+}
+async function loadFindings() {
+  try { renderFindings(await api('/api/analysis/latest')); }
+  catch (e) { $('findings').className = ''; $('findings').innerHTML = `<p class="pos">Could not load findings: ${esc(e.message)}</p>`; }
+  if (analysisRunning) setTimeout(loadFindings, 2000);
+}
+$('runAnalysis').onclick = async () => {
+  $('runAnalysis').disabled = true;
+  if (await act('/api/analysis/run', 'Run analysis')) loadFindings(); else $('runAnalysis').disabled = false;
+};
+
 /* ---------- 5. grafana ---------- */
 async function loadGrafanaCfg() {
   try { gcfg = await api('/api/grafana'); } catch (e) { $('grafanaSec').classList.add('hide'); return; }
@@ -1080,7 +1166,7 @@ async function poll() {
   if (status.running) viewedResult = null;
   updateGrafana();
   if (status.phase === 'done' && status.result && lastDone !== status.result.id) {
-    lastDone = status.result.id; viewingId = null; viewedResult = null; renderResult(status.result, 'this run'); updateGrafana(); loadHistory(); loadReadiness();
+    lastDone = status.result.id; viewingId = null; viewedResult = null; renderResult(status.result, 'this run'); updateGrafana(); loadHistory(); loadReadiness(); loadFindings();
   } else if (status.phase === 'refused') { renderResult(null); }
   syncNav();
 }

@@ -10,7 +10,7 @@ import re
 import statistics
 import sys
 import uuid
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -36,7 +36,7 @@ MAX_MATCHES = 20
 MAX_LINE_CHARS = 160
 MAX_PATTERN_CHARS = 200
 MAX_FILE_BYTES = 1_000_000
-SKIP_DIRS = {".git", "node_modules", "genproto", "vendor", "target", "bin", "obj", "dist", ".next",
+SKIP_DIRS = {".git", "node_modules", "genproto", "protos", "vendor", "target", "bin", "obj", "dist", ".next",
              "__pycache__", "test", "tests", "cypress"}
 SOURCE_EXT = {".go", ".py", ".js", ".mjs", ".ts", ".tsx", ".cs", ".rs", ".java", ".kt", ".rb", ".php", ".ex",
               ".exs", ".erl", ".cpp", ".cc", ".h", ".hpp", ".lua", ".yaml", ".yml", ".json", ".toml",
@@ -144,7 +144,7 @@ def search_source(service, pattern):
         rx = re.compile(pattern, re.I)
     except re.error as e:
         raise ToolError(f"bad regex: {e}")
-    matches, files = [], 0
+    matches, files, more = [], 0, Counter()  # more: files holding matches beyond MAX_MATCHES, to narrow the next search
     for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
         dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS and not os.path.islink(os.path.join(dirpath, d)))
         for name in sorted(filenames):
@@ -159,12 +159,17 @@ def search_source(service, pattern):
             except OSError:
                 continue
             files += 1
+            rel = p.relative_to(root).as_posix()
             for i, line in enumerate(lines, 1):
                 if rx.search(line[:500]):
-                    matches.append({"at": f"{p.relative_to(root).as_posix()}:{i}", "line": line.strip()[:MAX_LINE_CHARS]})
-                    if len(matches) >= MAX_MATCHES:
-                        return {"service": service, "pattern": pattern, "matches": matches, "truncated": True}
-    return {"service": service, "pattern": pattern, "files_searched": files, "matches": matches, "truncated": False}
+                    if len(matches) < MAX_MATCHES:
+                        matches.append({"at": f"{rel}:{i}", "line": line.strip()[:MAX_LINE_CHARS]})
+                    else:
+                        more[rel] += 1
+    out = {"service": service, "pattern": pattern, "files_searched": files, "matches": matches, "truncated": bool(more)}
+    if more:
+        out["more_matches_in"] = dict(more.most_common(10))
+    return out
 
 
 def get_service_env(service):
@@ -234,7 +239,9 @@ def retry_evidence(caller, callee, spans=None):
 
 
 class Toolbox:
-    """Dispatches the LLM's tool calls to the read-only functions above. Never raises."""
+    """Dispatches the LLM's tool calls to the read-only functions above. Never raises.
+    Only methods named in `decls` can be called (analysis_agent.py subclasses this with its own list)."""
+    decls = TOOL_DECLS
 
     def __init__(self, g, baseline, history, ranking):
         self.g, self.baseline, self.history = g, baseline or {}, history
@@ -284,7 +291,7 @@ class Toolbox:
         return retry_evidence(self._service(caller), self._service(callee))
 
     def call(self, name, args):
-        fn = getattr(self, name, None) if name in {d["name"] for d in TOOL_DECLS} else None
+        fn = getattr(self, name, None) if name in {d["name"] for d in self.decls} else None
         if fn is None:
             return {"error": f"unknown tool {name!r}"}
         try:
@@ -322,7 +329,7 @@ class AgentLog:
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
         except OSError:
-            pass  # logging must never break planning
+            pass  # logging must never break an agent
 
 
 # ---- the agent -------------------------------------------------------------------------
@@ -372,7 +379,7 @@ def _loop(api_key, top, g, toolbox, log, post, trail):
         replies = []
         for fc in calls:
             name, args = fc.get("name"), fc.get("args") or {}
-            if used >= MAX_TOOL_CALLS:
+            if used >= max_tool_calls:
                 result = {"error": "tool budget used up; give your final JSON answer now"}
             else:
                 used += 1
@@ -383,7 +390,7 @@ def _loop(api_key, top, g, toolbox, log, post, trail):
                 trail.append({"tool": name, "finding": f"{name}({json.dumps(args)}): {shown}"[:300]})
             replies.append({"functionResponse": {"name": name, "response": {"result": result},
                                                  **({"id": fc["id"]} if fc.get("id") else {})}})
-        if used >= MAX_TOOL_CALLS:
+        if used >= max_tool_calls:
             replies.append({"text": "Tool budget used up. Reply now with the final JSON only."})
         contents.append({"role": "user", "parts": replies})
     if used >= MAX_TOOL_CALLS:
@@ -481,7 +488,7 @@ def top_k(ranking, k):
 
 
 def run_agent(k=TOP_K, api_key=None, post=None, graph=None, baseline=None, flows=None, history=None,
-              log_path=AGENT_LOG):
+              log_path=AGENT_LOG, goal=None):
     """Rank, investigate the top-k, choose one. Raises only if ranking itself is impossible
     (no dependency map / baseline); every LLM problem falls back to the ranker's #1."""
     if graph is None:
