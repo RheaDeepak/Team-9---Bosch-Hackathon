@@ -88,7 +88,7 @@ class ControlPlaneTests(unittest.TestCase):
         manager = ExperimentManager(
             planner=lambda goal: (dict(PLAN), "fallback", "test"),
             validator=lambda plan: {"valid": True, "reasons": [], "blast_radius": ["frontend"]},
-            injector=lambda plan: actions.append(("inject", plan["target"])) or {"target": plan["target"], "fault": plan["fault"]},
+            injector=lambda plan, experiment_id: actions.append(("inject", plan["target"])) or {"target": plan["target"], "fault": plan["fault"]},
             rollback_fn=lambda active: actions.append(("rollback", active["target"])) or True,
             snapshotter=lambda: next(snapshots, snapshot(1, 55, 19)),
             baseline_loader=baseline,
@@ -118,7 +118,7 @@ class ControlPlaneTests(unittest.TestCase):
         manager = ExperimentManager(
             planner=lambda goal: (plan, "fallback", "test"),
             validator=lambda candidate: {"valid": True, "reasons": [], "blast_radius": ["frontend"]},
-            injector=lambda candidate: actions.append("inject") or {"target": "cart", "fault": "container_stop"},
+            injector=lambda candidate, experiment_id: actions.append("inject") or {"target": "cart", "fault": "container_stop"},
             rollback_fn=lambda active: actions.append("rollback") or True,
             snapshotter=lambda: snapshot(4, 80, 16),
             baseline_loader=baseline,
@@ -138,6 +138,79 @@ class ControlPlaneTests(unittest.TestCase):
         finished = self._wait_for_terminal(manager, experiment["id"])
         self.assertEqual(finished["state"], "aborted")
         self.assertEqual(actions, ["inject", "rollback"])
+
+    def test_active_verification_exception_still_rolls_back(self):
+        traffic_plan = {
+            "target": "frontend",
+            "fault": "traffic_spike",
+            "magnitude": 8,
+            "duration_s": 20,
+            "hypothesis": "Traffic rises and returns to baseline.",
+            "reasoning": "Exercise the existing load path.",
+            "parameters": {
+                "baseline_users": 5,
+                "peak_users": 8,
+                "spawn_rate_per_second": 2,
+                "duration_seconds": 20,
+                "journey_profile": "astronomy-shop-default",
+            },
+        }
+        actions = []
+        manager = ExperimentManager(
+            planner=lambda goal: (traffic_plan, "deterministic-capability", "test"),
+            validator=lambda candidate: {"valid": True, "reasons": [], "blast_radius": ["frontend"]},
+            injector=lambda candidate, experiment_id: actions.append("inject") or {"target": "frontend", "fault": "traffic_spike"},
+            active_verifier=lambda handle: (_ for _ in ()).throw(RuntimeError("active verification failed")),
+            rollback_fn=lambda active: actions.append("rollback") or True,
+            recovery_verifier=lambda active: {"verified": True},
+            baseline_loader=baseline,
+            telemetry_probe=lambda services: snapshot()["services"],
+        )
+        experiment = manager.propose("capacity")
+        manager.validate(experiment["id"])
+        manager.approve(experiment["id"], "judge-demo")
+        finished = self._wait_for_terminal(manager, experiment["id"])
+        self.assertEqual(finished["state"], "failed")
+        self.assertEqual(actions, ["inject", "rollback"])
+        self.assertIn("active verification failed", finished["error"])
+
+    def test_traffic_spike_report_keeps_executor_evidence(self):
+        traffic_plan = {
+            "target": "frontend",
+            "fault": "traffic_spike",
+            "magnitude": 8,
+            "duration_s": 20,
+            "hypothesis": "Traffic rises and returns to baseline.",
+            "reasoning": "Exercise the existing load path.",
+            "parameters": {
+                "baseline_users": 5,
+                "peak_users": 8,
+                "spawn_rate_per_second": 2,
+                "duration_seconds": 20,
+                "journey_profile": "astronomy-shop-default",
+            },
+        }
+        manager = ExperimentManager(
+            planner=lambda goal: (traffic_plan, "deterministic-capability", "tested"),
+            validator=lambda candidate: {"valid": True, "reasons": [], "blast_radius": ["frontend"]},
+            injector=lambda candidate, experiment_id: {"target": "frontend", "fault": "traffic_spike"},
+            active_verifier=lambda handle: {"verified": True, "expected_users": 8, "observed_users": 8},
+            rollback_fn=lambda active: True,
+            recovery_verifier=lambda active: {"verified": True, "expected_users": 5, "observed_users": 5},
+            baseline_loader=baseline,
+            telemetry_probe=lambda services: snapshot()["services"],
+            guard_watcher=lambda candidate, measured, services, **kwargs: guarded_result(),
+            recovery_waiter=lambda candidate, measured, services, **kwargs: {"recovered": True, "seconds": 0.01},
+            judge=lambda candidate, results: {"verdict": "held", "explanation": "bounded load observed"},
+        )
+        experiment = manager.propose("capacity")
+        manager.validate(experiment["id"])
+        manager.approve(experiment["id"], "judge-demo")
+        finished = self._wait_for_terminal(manager, experiment["id"])
+        self.assertEqual(finished["state"], "completed")
+        self.assertTrue(finished["report"]["fault_evidence"]["verified"])
+        self.assertTrue(finished["report"]["fault_recovery"]["verified"])
+        self.assertIn("Locust users", [item["label"] for item in finished["report"]["evidence"]])
 
     @staticmethod
     def _wait_for_terminal(manager, experiment_id):

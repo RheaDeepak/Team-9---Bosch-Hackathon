@@ -8,7 +8,11 @@ from dotenv import load_dotenv
 
 from discovery import load_flows, load_graph
 from metrics import load_baseline
-from policy import ALLOWED_FAULTS, MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECTED, REQUIRED_KEYS
+from policy import MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECTED, REQUIRED_KEYS
+from traffic_spike import JOURNEY_PROFILE, MAX_PEAK_USERS, capability as traffic_spike_capability
+
+AI_PROPOSABLE_FAULTS = ("container_stop", "network_delay")
+TRAFFIC_SPIKE_GOAL = "capacity"
 
 # Tried in order: Gemini models get overloaded or retired, so one name is a single point of failure.
 LLM_MODELS = ("gemini-3.8-flash", "gemini-3-flash-preview", "gemini-flash-lite-latest")
@@ -31,7 +35,7 @@ Reply with a single JSON object and nothing else: no prose, no markdown, no code
 Schema: {{"target": str, "fault": str, "magnitude": number, "duration_s": integer,
 "hypothesis": str, "reasoning": str}}
 Rules:
-- fault is one of {list(ALLOWED_FAULTS)}.
+- fault is one of {list(AI_PROPOSABLE_FAULTS)}.
 - magnitude is the delay in ms for network_delay (1-{MAX_NETWORK_DELAY_MS}); use 0 for container_stop.
 - duration_s is at most {MAX_DURATION_S}.
 - target must be one of "candidate_targets" in the context. Never pick a protected service.
@@ -115,6 +119,30 @@ def _call_llm(api_key, context, system=SYSTEM_PROMPT):
 
 def propose_experiment(goal=None):
     """Return (plan, source, note); source is "llm" or "fallback" and note says why."""
+    if goal == TRAFFIC_SPIKE_GOAL:
+        traffic = traffic_spike_capability()
+        if traffic["ready"]:
+            baseline_users = int(traffic["current_state"]["user_count"])
+            peak_users = min(MAX_PEAK_USERS, max(baseline_users + 1, 8))
+            duration_seconds = 20
+            return {
+                "target": "frontend",
+                "fault": "traffic_spike",
+                "magnitude": peak_users,
+                "duration_s": duration_seconds,
+                "hypothesis": "Increasing the existing Astronomy Shop journey load reveals the frontend saturation response without changing the journey mix, then the original load is restored.",
+                "reasoning": "The load-generator is already running the fixed 9:1 user-class mix against the frontend ingress, so a bounded user-count increase exercises the full request path without targeting infrastructure.",
+                "parameters": {
+                    "baseline_users": baseline_users,
+                    "peak_users": peak_users,
+                    "spawn_rate_per_second": 2,
+                    "duration_seconds": duration_seconds,
+                    "journey_profile": JOURNEY_PROFILE,
+                },
+                "candidate_id": "traffic-spike-core-v1",
+                "capability_version": traffic["capability_version"],
+            }, "deterministic-capability", traffic["detail"]
+        return dict(FALLBACK_PLAN), "fallback", f"Traffic-spike capability is not ready: {traffic['detail']}"
     load_dotenv()
     api_key = os.getenv(API_KEY_VAR, "").strip()
     if not api_key or api_key == PLACEHOLDER_KEY:

@@ -1,10 +1,22 @@
 import unittest
+import time
 from unittest.mock import patch
 
 import guard
 
 
 class RecoveryGuardTests(unittest.TestCase):
+    def test_live_metrics_exposes_request_rate_for_frontend_charts(self):
+        now = time.time() * 1e9
+        spans = {
+            "one": {"svc": "frontend", "kind": guard.SERVER, "start": now, "dur": 40.0, "status": 0},
+            "two": {"svc": "frontend", "kind": guard.SERVER, "start": now, "dur": 60.0, "status": 0},
+        }
+        with patch.object(guard, "fetch_spans", return_value=spans):
+            metrics = guard.live_metrics(["frontend"], window_s=10)
+
+        self.assertEqual(metrics["frontend"]["request_rate"], 0.2)
+
     def test_recovery_checks_target_container_even_when_target_has_no_span_threshold(self):
         baseline = {
             "thresholds": {

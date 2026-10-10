@@ -1,4 +1,4 @@
-import { createApiClient, normalizeBaseline, normalizePolicy, normalizeReadiness, normalizeTopology, resolveApiBaseUrl } from "./api.js";
+import { buildGrafanaPanelUrl, createApiClient, normalizeBaseline, normalizePolicy, normalizeReadiness, normalizeTopology, resolveApiBaseUrl, resolveGrafanaBaseUrl } from "./api.js";
 import {
   mockBaseline,
   mockPhaseMetrics,
@@ -13,6 +13,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const svgNs = "http://www.w3.org/2000/svg";
 const api = createApiClient({ baseUrl: resolveApiBaseUrl() });
+const grafanaBaseUrl = resolveGrafanaBaseUrl();
 const demoRequested = new URLSearchParams(window.location.search).get("demo") === "1";
 const emptyBaseline = { availability: null, errorRate: null, p95LatencyMs: null, throughputRps: null };
 const emptyTopology = { nodes: [], edges: [] };
@@ -36,6 +37,8 @@ const state = {
   pollFailures: 0,
   eventSource: null,
   demoTimers: [],
+  telemetryHistory: [],
+  telemetryService: "frontend",
 };
 
 const elements = {
@@ -59,6 +62,7 @@ const elements = {
   proposalName: $("#proposalName"),
   proposalHypothesis: $("#proposalHypothesis"),
   proposalDuration: $("#proposalDuration"),
+  proposalLoad: $("#proposalLoad"),
   proposalRadius: $("#proposalRadius"),
   proposalRollback: $("#proposalRollback"),
   validateButton: $("#validateButton"),
@@ -80,6 +84,18 @@ const elements = {
   liveErrors: $("#liveErrors"),
   liveLatency: $("#liveLatency"),
   liveThroughput: $("#liveThroughput"),
+  telemetryPhase: $("#telemetryPhase"),
+  telemetryServiceSelect: $("#telemetryServiceSelect"),
+  telemetryPhaseLegend: $("#telemetryPhaseLegend"),
+  throughputChartValue: $("#throughputChartValue"),
+  errorChartValue: $("#errorChartValue"),
+  latencyChartValue: $("#latencyChartValue"),
+  throughputChartLine: $("#throughputChartLine"),
+  errorChartLine: $("#errorChartLine"),
+  latencyChartLine: $("#latencyChartLine"),
+  throughputGrafanaLink: $("#throughputGrafanaLink"),
+  errorGrafanaLink: $("#errorGrafanaLink"),
+  latencyGrafanaLink: $("#latencyGrafanaLink"),
   resultEmpty: $("#resultEmpty"),
   resultContent: $("#resultContent"),
   resilienceScore: $("#resilienceScore"),
@@ -250,8 +266,12 @@ function renderProposal() {
   elements.proposalName.textContent = proposal.title;
   elements.proposalHypothesis.textContent = proposal.hypothesis;
   elements.proposalDuration.textContent = proposal.parameters.duration_seconds ? `${proposal.parameters.duration_seconds} sec` : "Bounded";
+  elements.proposalLoad.textContent = proposal.parameters.peak_users
+    ? `${proposal.parameters.baseline_users} → ${proposal.parameters.peak_users} users @ ${proposal.parameters.spawn_rate_per_second}/s`
+    : "Unchanged";
   elements.proposalRadius.textContent = proposal.blast_radius;
   elements.proposalRollback.textContent = proposal.rollback;
+  setTelemetryServices(["frontend", proposal.target_service], proposal.target_service);
 }
 
 function renderPolicy() {
@@ -296,6 +316,77 @@ function renderLiveMetrics(metrics) {
   renderSparklines(state.phase);
 }
 
+const telemetryCharts = [
+  { metric: "throughputRps", panelId: 12, line: "throughputChartLine", value: "throughputChartValue" },
+  { metric: "errorRate", panelId: 10, line: "errorChartLine", value: "errorChartValue" },
+  { metric: "p95LatencyMs", panelId: 2, line: "latencyChartLine", value: "latencyChartValue" },
+];
+
+function setTelemetryServices(services, preferred = state.telemetryService) {
+  const unique = [...new Set(services.filter(Boolean))];
+  elements.telemetryServiceSelect.replaceChildren(...unique.map((service) => {
+    const option = document.createElement("option");
+    option.value = service;
+    option.textContent = service;
+    return option;
+  }));
+  state.telemetryService = unique.includes(preferred) ? preferred : unique[0] || "frontend";
+  elements.telemetryServiceSelect.value = state.telemetryService;
+  renderTelemetryCharts();
+}
+
+function sampleMetrics(sample) {
+  const raw = sample.services?.[state.telemetryService];
+  if (raw) {
+    const errorRate = raw.error_rate;
+    return {
+      availability: errorRate == null ? null : Math.max(0, 100 - Number(errorRate)),
+      errorRate: errorRate == null ? null : Number(errorRate),
+      p95LatencyMs: raw.p95_ms == null ? null : Number(raw.p95_ms),
+      throughputRps: raw.request_rate == null ? null : Number(raw.request_rate),
+    };
+  }
+  return state.telemetryService === "frontend" ? sample.metrics : null;
+}
+
+function recordTelemetrySample({ phase, metrics, services }) {
+  if (!metrics && !services) return;
+  state.telemetryHistory.push({ timestamp: Date.now(), phase, metrics, services });
+  state.telemetryHistory = state.telemetryHistory.slice(-80);
+  renderTelemetryCharts();
+}
+
+function renderTelemetryCharts() {
+  const samples = state.telemetryHistory.map((sample) => ({ ...sample, selected: sampleMetrics(sample) }));
+  telemetryCharts.forEach(({ metric, panelId, line, value }) => {
+    const values = samples.map((sample) => sample.selected?.[metric] ?? null);
+    const finite = values.filter((item) => Number.isFinite(item));
+    const floor = metric === "errorRate" ? 5 : 1;
+    const ceiling = Math.max(floor, ...finite);
+    const points = values.map((item, index) => {
+      if (!Number.isFinite(item)) return null;
+      const x = values.length < 2 ? 160 : 10 + index * 300 / (values.length - 1);
+      const y = 108 - Math.min(1, item / ceiling) * 96;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).filter(Boolean).join(" ");
+    elements[line].setAttribute("points", points);
+    const latest = [...values].reverse().find((item) => Number.isFinite(item));
+    elements[value].textContent = formatMetric(metric, latest);
+    const link = buildGrafanaPanelUrl({ baseUrl: grafanaBaseUrl, panelId, service: state.telemetryService });
+    const anchor = metric === "throughputRps" ? elements.throughputGrafanaLink : metric === "errorRate" ? elements.errorGrafanaLink : elements.latencyGrafanaLink;
+    anchor.href = link;
+  });
+  $$(".chart-grid-lines").forEach((group) => {
+    group.replaceChildren(...[12, 44, 76, 108].map((y) => createSvg("line", { x1: 0, y1: y, x2: 320, y2: y })));
+  });
+  elements.telemetryPhaseLegend.replaceChildren(...samples.map((sample) => {
+    const segment = document.createElement("span");
+    segment.dataset.phase = sample.phase;
+    segment.title = sample.phase.replaceAll("_", " ");
+    return segment;
+  }));
+}
+
 function renderSparklines(phase) {
   const shapes = {
     baseline: [45, 50, 48, 53, 50, 52, 49, 51, 50, 52],
@@ -326,6 +417,7 @@ function updatePhase(phase, message, metrics) {
   state.phase = phase.toLowerCase().replaceAll(" ", "_");
   const active = activePhases.has(state.phase);
   elements.phaseBadge.textContent = state.phase.replaceAll("_", " ").toUpperCase();
+  elements.telemetryPhase.textContent = state.phase.replaceAll("_", " ").toUpperCase();
   elements.phaseBadge.classList.toggle("active", active);
   elements.stopButton.disabled = !stoppablePhases.has(state.phase);
   elements.activeFault.textContent = ["injecting", "observing"].includes(state.phase)
@@ -337,7 +429,10 @@ function updatePhase(phase, message, metrics) {
     item.classList.toggle("done", currentIndex > index || state.phase === "completed");
   });
   updateEvent(message || phaseMessage(state.phase));
-  if (metrics) renderLiveMetrics(metrics);
+  if (metrics) {
+    renderLiveMetrics(metrics);
+    if (state.mode === "demo") recordTelemetrySample({ phase: state.phase, metrics, services: null });
+  }
 }
 
 function phaseMessage(phase) {
@@ -392,6 +487,7 @@ function extractExperiment(payload = {}) {
     phase: experiment.phase || experiment.state || "idle",
     message: experiment.message || experiment.latest_event,
     metrics: rawMetrics ? normalizeBaseline(rawMetrics) : null,
+    services: experiment.live_services || null,
   };
 }
 
@@ -424,6 +520,7 @@ function applyExperimentUpdate(payload) {
   state.pollFailures = 0;
   const update = extractExperiment(payload);
   updatePhase(update.phase, update.message, update.metrics);
+  recordTelemetrySample(update);
   const terminal = update.phase.toLowerCase();
   if (["completed", "aborted", "failed"].includes(terminal)) finishLiveExperiment(terminal);
 }
@@ -613,6 +710,8 @@ elements.approveButton.addEventListener("click", async () => {
   setBusy(elements.approveButton, true, "Starting safely…");
   try {
     if (state.mode === "live") await api.approve(state.experimentId);
+    state.telemetryHistory = [];
+    renderTelemetryCharts();
     startTimer();
     updatePhase("baseline", null, state.baseline);
     $("#liveSection").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -654,10 +753,15 @@ elements.stopButton.addEventListener("click", async () => {
 });
 
 elements.refreshButton.addEventListener("click", () => loadData({ announce: true }));
+elements.telemetryServiceSelect.addEventListener("change", () => {
+  state.telemetryService = elements.telemetryServiceSelect.value;
+  renderTelemetryCharts();
+});
 elements.viewReportButton.addEventListener("click", () => elements.reportDialog.showModal());
 elements.closeReportButton.addEventListener("click", () => elements.reportDialog.close());
 elements.reportDialog.addEventListener("click", (event) => { if (event.target === elements.reportDialog) elements.reportDialog.close(); });
 
 renderPolicy();
 updatePhase("idle", null, null);
+renderTelemetryCharts();
 loadData();

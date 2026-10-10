@@ -31,7 +31,7 @@ MIN_FAILED_REQUESTS = 3   # abort on error rate only with at least this many fai
 MIN_SPANS_LATENCY = 5     # a p95 from fewer spans is noise
 CONSECUTIVE_BREACHES = 2
 RECOVERY_SAMPLES = max(1, int(os.getenv("RECOVERY_REQUIRED_SAMPLES", "2")))
-RECOVERY_TIMEOUT_S = max(POLL_S, int(os.getenv("RECOVERY_TIMEOUT_SECONDS", "45")))
+RECOVERY_TIMEOUT_S = max(POLL_S, int(os.getenv("RECOVERY_TIMEOUT_SECONDS", "180")))
 MAX_SPAN_MS = 60_000      # longer spans are streams (flagd EventStream), not request latency
 ERROR_CODES = (2, "STATUS_CODE_ERROR")  # OTLP status codes: 0 unset, 1 ok, 2 error
 METRICS = ("error_rate", "p95_ms")
@@ -56,6 +56,7 @@ def live_metrics(services, window_s=WINDOW_S):
         durs = sorted(x["dur"] for x in mine if x["dur"] < MAX_SPAN_MS)
         errors = sum(x["status"] in ERROR_CODES for x in mine)
         out[s] = {"n": len(mine), "errors": errors,
+                  "request_rate": len(mine) / max(window_s, 1),
                   "error_rate": 100 * errors / len(mine) if len(mine) >= MIN_SPANS_ERROR else None,
                   "p95_ms": durs[math.ceil(0.95 * len(durs)) - 1] if len(durs) >= MIN_SPANS_LATENCY else None}
     return out
@@ -184,7 +185,7 @@ def watch(plan, baseline, services, thresholds=None, stop_event=None, on_sample=
 
 def wait_for_recovery(plan, baseline, services, on_sample=None, on_progress=None):
     """After rollback: poll until everything is within the baseline thresholds for RECOVERY_SAMPLES in a row.
-    Returns {recovered, seconds} where seconds = time from rollback to the first sample of that streak."""
+    Returns {recovered, seconds} where seconds = time from rollback until the healthy streak is verified."""
     thr = baseline["thresholds"]["services"]
     restart_limits = {n: t["restarts"] for n, t in baseline["thresholds"]["containers"].items()}
     start, streak, first_ok, last_breaches = time.monotonic(), 0, None, {}
@@ -206,13 +207,21 @@ def wait_for_recovery(plan, baseline, services, on_sample=None, on_progress=None
             else:
                 streak, first_ok = streak + 1, first_ok if first_ok is not None else t
                 if streak >= RECOVERY_SAMPLES:
-                    return {"recovered": True, "seconds": round(first_ok, 1)}
+                    verified_at = round(time.monotonic() - start, 1)
+                    return {
+                        "recovered": True,
+                        "seconds": verified_at,
+                        "first_healthy_seconds": round(first_ok, 1),
+                        "healthy_samples": streak,
+                        "required_samples": RECOVERY_SAMPLES,
+                    }
             last_breaches = breaches
             if on_progress is not None:
                 on_progress({
                     "elapsed_s": round(t, 1),
                     "healthy_samples": streak,
                     "required_samples": RECOVERY_SAMPLES,
+                    "timeout_s": RECOVERY_TIMEOUT_S,
                     "breaches": breaches,
                 })
             time.sleep(max(0, POLL_S - (time.monotonic() - tick)))
@@ -222,7 +231,14 @@ def wait_for_recovery(plan, baseline, services, on_sample=None, on_progress=None
     note = f"not within thresholds after {RECOVERY_TIMEOUT_S}s"
     if detail:
         note += f" ({detail})"
-    return {"recovered": False, "seconds": None, "note": note}
+    return {
+        "recovered": False,
+        "seconds": None,
+        "elapsed_seconds": RECOVERY_TIMEOUT_S,
+        "healthy_samples": streak,
+        "required_samples": RECOVERY_SAMPLES,
+        "note": note,
+    }
 
 
 def impact_table(baseline, peaks):

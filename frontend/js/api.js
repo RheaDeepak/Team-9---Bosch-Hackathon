@@ -12,6 +12,25 @@ export function resolveApiBaseUrl(locationLike = globalThis.location, configured
   return "";
 }
 
+export function resolveGrafanaBaseUrl(locationLike = globalThis.location, configuredUrl = globalThis.CHAOS_COPILOT_GRAFANA_URL) {
+  if (typeof configuredUrl === "string" && configuredUrl.trim()) return configuredUrl.trim().replace(/\/$/, "");
+  const protocol = locationLike?.protocol === "https:" ? "https:" : "http:";
+  const hostname = locationLike?.hostname || "127.0.0.1";
+  return `${protocol}//${hostname}:8080/grafana`;
+}
+
+export function buildGrafanaPanelUrl({ baseUrl, panelId, service = "frontend" }) {
+  const params = new URLSearchParams({
+    orgId: "1",
+    panelId: String(panelId),
+    "var-service": service,
+    from: "now-15m",
+    to: "now",
+    refresh: "5s",
+  });
+  return `${baseUrl.replace(/\/$/, "")}/d-solo/W2gX2zHVk/demo-dashboard?${params}`;
+}
+
 export class ApiError extends Error {
   constructor(message, status = 0) {
     super(message);

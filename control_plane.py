@@ -11,10 +11,11 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 import guard
-from inject import ACTIVE_FILE, ROLLBACK_ACTIONS, inject, rollback
+from inject import ACTIVE_FILE, ROLLBACK_ACTIONS, inject, rollback, verify_active, verify_recovered
 from metrics import current_snapshot, load_baseline
 from planner import judge_hypothesis, propose_experiment
 from policy import ALLOWED_FAULTS, MAX_DURATION_S, MAX_NETWORK_DELAY_MS, PROTECTED, validate
+from traffic_spike import MAX_DURATION_SECONDS as MAX_TRAFFIC_DURATION_S, MAX_PEAK_USERS as MAX_TRAFFIC_USERS
 
 
 ACTIVE_STATES = {"approved", "baseline", "injecting", "observing", "rolling_back", "recovering", "analyzing"}
@@ -106,6 +107,8 @@ def proposal_view(experiment: dict[str, Any]) -> dict[str, Any]:
     parameters = {"duration_seconds": plan["duration_s"]}
     if fault == "network_delay":
         parameters["delay_ms"] = magnitude
+    elif fault == "traffic_spike":
+        parameters.update(plan.get("parameters", {}))
     return {
         "id": experiment["id"],
         "title": title,
@@ -135,12 +138,20 @@ def policy_checks(plan: dict[str, Any], result: dict[str, Any]) -> list[dict[str
     magnitude_ok = isinstance(magnitude, (int, float)) and not isinstance(magnitude, bool) and magnitude >= 0
     if fault == "network_delay":
         magnitude_ok = magnitude_ok and 0 < magnitude <= MAX_NETWORK_DELAY_MS
+    elif fault == "traffic_spike":
+        magnitude_ok = (
+            magnitude_ok
+            and magnitude <= MAX_TRAFFIC_USERS
+            and not any("traffic_spike parameters invalid" in reason for reason in reasons)
+            and not any("traffic_spike magnitude" in reason for reason in reasons)
+        )
+    duration_bound = MAX_TRAFFIC_DURATION_S if fault == "traffic_spike" else MAX_DURATION_S
     checks = [
         check("Proposal schema is complete", not any("missing field" in reason for reason in reasons), "All six planner fields are required"),
         check("Fault type is allowlisted", fault in ALLOWED_FAULTS, str(fault)),
         check("Target is not protected", bool(target) and target not in PROTECTED, str(target)),
         check("Target exists in the dependency map", not any("not a service" in reason for reason in reasons), str(target)),
-        check("Duration is within the safety bound", isinstance(duration, (int, float)) and not isinstance(duration, bool) and 0 < duration <= MAX_DURATION_S, f"{duration}s ≤ {MAX_DURATION_S}s"),
+        check("Duration is within the safety bound", isinstance(duration, (int, float)) and not isinstance(duration, bool) and 0 < duration <= duration_bound, f"{duration}s ≤ {duration_bound}s"),
         check("Fault magnitude is bounded", magnitude_ok, f"{magnitude}{'ms' if fault == 'network_delay' else ''}"),
         check("Rollback implementation is available", fault in ROLLBACK_ACTIONS, ROLLBACK_ACTIONS.get(fault, "Unavailable")),
     ]
@@ -153,8 +164,10 @@ class ExperimentManager:
         *,
         planner: Callable[[str | None], tuple[dict[str, Any], str, str]] = propose_experiment,
         validator: Callable[[dict[str, Any]], dict[str, Any]] = validate,
-        injector: Callable[[dict[str, Any]], dict[str, Any]] = inject,
+        injector: Callable[..., dict[str, Any]] = inject,
         rollback_fn: Callable[[dict[str, Any] | None], bool] = rollback,
+        active_verifier: Callable[[dict[str, Any]], dict[str, Any]] = verify_active,
+        recovery_verifier: Callable[[dict[str, Any]], dict[str, Any]] = verify_recovered,
         snapshotter: Callable[[], dict[str, Any]] = current_snapshot,
         baseline_loader: Callable[[], dict[str, Any] | None] = load_baseline,
         judge: Callable[[dict[str, Any], dict[str, Any]], dict[str, str]] = judge_hypothesis,
@@ -167,6 +180,8 @@ class ExperimentManager:
         self._validator = validator
         self._injector = injector
         self._rollback = rollback_fn
+        self._active_verifier = active_verifier
+        self._recovery_verifier = recovery_verifier
         self._snapshotter = snapshotter
         self._baseline_loader = baseline_loader
         self._judge = judge
@@ -201,6 +216,8 @@ class ExperimentManager:
             "policy": None,
             "approval": None,
             "live_metrics": None,
+            "fault_evidence": None,
+            "fault_recovery": None,
             "report": None,
             "error": None,
         }
@@ -310,6 +327,8 @@ class ExperimentManager:
 
     def _set_guard_metrics(self, experiment_id: str, metrics: dict[str, Any], containers: dict[str, Any]) -> None:
         self._set_live_metrics(experiment_id, {"services": metrics, "containers": containers})
+        with self._lock:
+            self._require_locked(experiment_id)["live_services"] = copy.deepcopy(metrics)
 
     def _run(self, experiment_id: str) -> None:
         active_handle = None
@@ -346,8 +365,13 @@ class ExperimentManager:
                 raise InterruptedError("aborted before fault injection")
 
             self._set_state(experiment_id, "injecting", f"Injecting {plan['fault']} into {plan['target']}.", "fault_injecting")
-            active_handle = self._injector(plan)
+            active_handle = self._injector(plan, experiment_id)
             injected = True
+            active_evidence = self._active_verifier(active_handle)
+            if not active_evidence.get("verified"):
+                raise RuntimeError("executor could not verify the approved fault is active")
+            with self._lock:
+                self._require_locked(experiment_id)["fault_evidence"] = copy.deepcopy(active_evidence)
             self._record_phase_event(experiment_id, "fault_verified", "The bounded fault is active on the approved target.")
 
             self._set_state(experiment_id, "observing", "The completed backend guard is comparing Jaeger spans and container health with the baseline.", "observation_started")
@@ -368,10 +392,25 @@ class ExperimentManager:
         finally:
             if injected or active_handle is not None or ACTIVE_FILE.exists():
                 self._set_state(experiment_id, "rolling_back", "Rollback invoked for every active fault handle.", "rollback_invoked")
-                rollback_ok = self._rollback(active_handle)
+                try:
+                    rollback_ok = self._rollback(active_handle)
+                except Exception as exc:
+                    self._finish_failed(experiment_id, f"Rollback raised {type(exc).__name__}: {exc}. Manual operator action is required.")
+                    return
                 if not rollback_ok:
                     self._finish_failed(experiment_id, "Rollback could not be verified. Manual operator action is required.")
                     return
+                if active_handle is not None:
+                    try:
+                        fault_recovery = self._recovery_verifier(active_handle)
+                    except Exception as exc:
+                        self._finish_failed(experiment_id, f"Executor-specific recovery verification failed: {type(exc).__name__}: {exc}")
+                        return
+                    if not fault_recovery.get("verified"):
+                        self._finish_failed(experiment_id, "Rollback ran, but executor-specific recovery could not be verified.")
+                        return
+                    with self._lock:
+                        self._require_locked(experiment_id)["fault_recovery"] = copy.deepcopy(fault_recovery)
                 self._record_phase_event(experiment_id, "rollback_completed", "Rollback completed and the fault handle was cleared.")
 
         if run_error:
@@ -428,7 +467,7 @@ class ExperimentManager:
             "availability": None if error_rate is None else max(0.0, 100.0 - error_rate),
             "error_rate": error_rate,
             "p95_latency_ms": p95,
-            "throughput_rps": None,
+            "throughput_rps": (frontend_impact or {}).get("request_rate", {}).get("peak"),
         }
         scoring = score_experiment(base_summary, fault_summary, recovery_seconds, guard.RECOVERY_TIMEOUT_S)
         measured = {
@@ -544,6 +583,21 @@ class ExperimentManager:
             {"label": "Frontend p95 latency", "value": _comparison(baseline.get("p95_latency_ms"), fault.get("p95_latency_ms"), " ms"), "tone": _tone(fault.get("p95_latency_ms"), baseline.get("p95_latency_ms"), higher_is_better=False)},
             {"label": "Verified rollback", "value": f"{recovery_seconds:.1f} seconds", "tone": "good"},
         ]
+        if experiment["plan"].get("fault") == "traffic_spike":
+            active = experiment.get("fault_evidence") or {}
+            restored = experiment.get("fault_recovery") or {}
+            evidence.extend([
+                {
+                    "label": "Locust users",
+                    "value": f"{active.get('expected_users', '—')} requested / {active.get('observed_users', '—')} observed",
+                    "tone": "good" if active.get("verified") else "warn",
+                },
+                {
+                    "label": "Load state restored",
+                    "value": f"{restored.get('expected_users', '—')} users / {restored.get('observed_users', '—')} observed",
+                    "tone": "good" if restored.get("verified") else "warn",
+                },
+            ])
         remediation = _remediation_for(experiment["plan"])
         return {
             "experiment_id": experiment["id"],
@@ -560,6 +614,8 @@ class ExperimentManager:
             "confidence": confidence,
             "summary": f"{experiment['plan']['target']} was tested with {experiment['plan']['fault']}; rollback was verified.",
             "evidence": evidence,
+            "fault_evidence": experiment.get("fault_evidence"),
+            "fault_recovery": experiment.get("fault_recovery"),
             "ai_interpretation": judge,
             "remediation": remediation,
             "limitations": [f"No data for: {', '.join(missing)}"] if missing else [],
@@ -583,4 +639,6 @@ def _remediation_for(plan: dict[str, Any]) -> str:
     target = plan.get("target", "the dependency")
     if plan.get("fault") == "network_delay":
         return f"Add a bounded timeout, retry budget, and circuit breaker around calls to {target}; preserve a degraded response path when the latency budget is exhausted."
+    if plan.get("fault") == "traffic_spike":
+        return "Tune frontend concurrency and autoscaling from the measured saturation point; preserve request limits and backpressure for downstream services."
     return f"Add graceful fallback behavior for {target}, cap caller timeouts, and verify that core journeys remain available while the dependency restarts."

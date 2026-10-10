@@ -3,15 +3,24 @@ import os
 
 import networkx as nx
 from dotenv import load_dotenv
+from pydantic import ValidationError
 
 from discovery import load_graph
+from traffic_spike import (
+    FAULT_TYPE as TRAFFIC_SPIKE,
+    TARGET_SERVICE as TRAFFIC_SPIKE_TARGET,
+    TrafficSpikeParameters,
+)
 
 load_dotenv()
 
-ALLOWED_FAULTS = ("container_stop", "network_delay")
+ALLOWED_FAULTS = ("container_stop", "network_delay", TRAFFIC_SPIKE)
 MAX_DURATION_S = int(os.getenv("MAX_FAULT_DURATION_SECONDS", "120"))
 MAX_NETWORK_DELAY_MS = int(os.getenv("MAX_NETWORK_DELAY_MS", "1000"))
-PROTECTED = {"frontend-proxy", "otel-collector", "jaeger", "prometheus", "grafana", "opensearch", "flagd"}
+PROTECTED = {
+    "frontend-proxy", "otel-collector", "jaeger", "prometheus", "grafana", "opensearch", "flagd",
+    "load-generator",
+}
 REQUIRED_KEYS = ("target", "fault", "magnitude", "duration_s", "hypothesis", "reasoning")
 
 
@@ -46,6 +55,22 @@ def validate(plan, graph=None):
             reasons.append(f"magnitude {magnitude!r} must be a non-negative number")
         elif fault == "network_delay" and not 0 < magnitude <= MAX_NETWORK_DELAY_MS:
             reasons.append(f"network delay {magnitude}ms outside 1-{MAX_NETWORK_DELAY_MS}ms")
+    if fault == TRAFFIC_SPIKE:
+        try:
+            parameters = TrafficSpikeParameters.model_validate(plan.get("parameters"))
+        except ValidationError as exc:
+            details = "; ".join(
+                f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}"
+                for item in exc.errors(include_url=False)
+            )
+            reasons.append(f"traffic_spike parameters invalid ({details})")
+        else:
+            if target != TRAFFIC_SPIKE_TARGET:
+                reasons.append(f"traffic_spike target must be {TRAFFIC_SPIKE_TARGET!r}")
+            if magnitude != parameters.peak_users:
+                reasons.append("traffic_spike magnitude must equal parameters.peak_users")
+            if duration != parameters.duration_seconds:
+                reasons.append("traffic_spike duration_s must equal parameters.duration_seconds")
     if "duration_s" in plan and (not _is_num(duration) or not 0 < duration <= MAX_DURATION_S):
         reasons.append(f"duration {duration!r}s must be between 1 and {MAX_DURATION_S}s")
     if "target" in plan:

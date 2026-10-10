@@ -102,6 +102,9 @@ The responsibilities are intentionally separated:
 
 - The UI consumes real readiness, topology, baseline, proposal, policy,
   experiment, event, and report responses.
+- The live section charts request rate, error rate, and p95 latency per service,
+  colors samples by experiment phase, and deep-links to the corresponding
+  provisioned Grafana panels.
 - The STOP flow waits for backend-confirmed rollback in live mode; it no longer
   simulates recovery after sending a real abort request.
 - Terminal `completed`, `aborted`, and `failed` states close the live stream
@@ -180,6 +183,9 @@ Docker state. Two consecutive threshold breaches, loss of guard telemetry, or
 the operator's STOP signal abort the fault window. The UI receives these live
 samples and phases through SSE, with polling as a fallback. STOP is wired into
 the guard's wait loop, so it interrupts promptly without skipping rollback.
+The same samples feed the in-app live charts, including an estimated request
+rate for the selected service. Each chart links to Grafana's 15-minute panel
+view for detailed Prometheus-backed inspection.
 
 ### Step 5: Guaranteed rollback
 

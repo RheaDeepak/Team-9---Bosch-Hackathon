@@ -1,10 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeBaseline, normalizePolicy, normalizeReadiness, normalizeTopology, resolveApiBaseUrl } from "./api.js";
+import { buildGrafanaPanelUrl, normalizeBaseline, normalizePolicy, normalizeReadiness, normalizeTopology, resolveApiBaseUrl, resolveGrafanaBaseUrl } from "./api.js";
 
 test("routes a standalone local frontend to the FastAPI port", () => {
   assert.equal(resolveApiBaseUrl({ protocol: "http:", hostname: "127.0.0.1", port: "4173" }), "http://127.0.0.1:8000");
   assert.equal(resolveApiBaseUrl({ protocol: "http:", hostname: "127.0.0.1", port: "8000" }), "");
+});
+
+test("builds Grafana deep links for the selected service", () => {
+  const baseUrl = resolveGrafanaBaseUrl({ protocol: "http:", hostname: "127.0.0.1" });
+  assert.equal(baseUrl, "http://127.0.0.1:8080/grafana");
+  const url = new URL(buildGrafanaPanelUrl({ baseUrl, panelId: 12, service: "product-catalog" }));
+  assert.equal(url.pathname, "/grafana/d-solo/W2gX2zHVk/demo-dashboard");
+  assert.equal(url.searchParams.get("panelId"), "12");
+  assert.equal(url.searchParams.get("var-service"), "product-catalog");
 });
 
 test("normalizes readiness maps without treating failed checks as ready", () => {

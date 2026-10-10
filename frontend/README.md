@@ -9,6 +9,12 @@ the planner choose the most informative safe target and fault from topology and
 baseline evidence. An operator can expand the optional goal control to provide
 a hint, but no goal selection is required.
 
+The live experiment section also maintains request-rate, error-rate, and p95
+latency timelines for the frontend or AI-selected target. These charts use the
+same Jaeger span samples as the safety guard, retain phase history, and link to
+the matching provisioned Grafana panels. Grafana keeps its iframe protection;
+the detailed dashboard opens in a separate tab.
+
 ## Run the integrated application
 
 ```powershell
