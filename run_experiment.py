@@ -211,10 +211,10 @@ def propose(goal=None):
     return {"plan": plan, "source": source, "note": note, "validation": validate(plan)}
 
 
-def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None, on_watch=None, stop=None):
+def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None, on_watch=None, stop=None, on_normal=None):
     """Inject, guard, always roll back, wait for recovery, judge, save. Returns the result dict
     ({"refused": reason} if nothing was injected).
-    Hooks for the UI: on_phase(name), on_watch({service: {baseline, abort}}), on_sample(...), stop (Event)."""
+    Hooks for the UI: on_phase(name), on_watch({service: {baseline, abort}}), on_normal(samples), on_sample(...), stop (Event)."""
     phase = on_phase or (lambda name: None)
 
     baseline = load_baseline()
@@ -240,6 +240,14 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
     if on_watch:
         on_watch({s: {"baseline": {m: (baseline["services"][s][m] or {}).get("mean") for m in guard.METRICS},
                       "abort": {m: thr[s].get(m) for m in guard.METRICS}} for s in services})
+
+    try:  # the minutes before the fault, for the "Normal" charts; the experiment never depends on it
+        normal = guard.history(services)
+    except Exception as e:
+        normal = None
+        emit(f"No pre-fault history ({type(e).__name__}); the Normal charts fall back to the baseline averages.")
+    if on_normal:
+        on_normal(normal)
 
     try:  # restarts that already happened (e.g. a stack restart since the baseline) are not this experiment's damage
         restart_limits = guard.restart_counts(set(services) | {plan["target"]})
@@ -325,7 +333,7 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         "forced_abort_test": FORCE_ABORT_TEST, "guard": g, "rollback_verified": rolled_back,
         "fault_evidence": fault_evidence, "fault_recovery": fault_recovery,
         "recovery": recovery, "impact": impact, "amplification": amplified, "score": score,
-        "container_resources": containers, "verdict": verdict,
+        "container_resources": containers, "verdict": verdict, "normal": normal,
         "grafana_window_ms": grafana.window_ms(injected_at, ended_at) if injected_at else None,
     }
     (RESULTS_DIR / f"{result_id}.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
