@@ -1,0 +1,251 @@
+{
+  "id": "20261010T102019Z",
+  "plan": {
+    "target": "cart",
+    "fault": "container_stop",
+    "magnitude": 0,
+    "duration_s": 60,
+    "hypothesis": "Stopping cart for 60s makes add-to-cart, view-cart and checkout fail visibly (error rate rises on frontend and checkout) and the system recovers once cart restarts.",
+    "reasoning": "Safe default: cart is on the checkout path and is called by both frontend and checkout, so it exercises the core purchase journey, yet it is not a protected service."
+  },
+  "plan_source": "fallback",
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ]
+  },
+  "started_at": "2026-10-10T10:20:19+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": true,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: frontend-proxy p95_ms (517.1ms > 0.0ms); cart p95_ms (2.5ms > 0.0ms); frontend p95_ms (803.5ms > 0.0ms)",
+    "elapsed_s": 7.1,
+    "peaks": {
+      "cart": {
+        "error_rate": 0.0,
+        "p95_ms": 2.4869
+      },
+      "checkout": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 803.505168
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 517.073
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 1.0209382716049382,
+        "memory_mb": 34.44921875
+      },
+      "frontend": {
+        "cpu_percent": 4.215137844611529,
+        "memory_mb": 125.9296875
+      },
+      "checkout": {
+        "cpu_percent": 0.06578222778473092,
+        "memory_mb": 10.2421875
+      },
+      "cart": {
+        "cpu_percent": null,
+        "memory_mb": null
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "cart": {
+            "n": 26,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 2.4869
+          },
+          "checkout": {
+            "n": 3,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 75,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 803.505168
+          },
+          "frontend-proxy": {
+            "n": 59,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 517.073
+          }
+        },
+        "breaches": {
+          "cart p95_ms": "2.5ms > 0.0ms",
+          "frontend p95_ms": "803.5ms > 0.0ms",
+          "frontend-proxy p95_ms": "517.1ms > 0.0ms"
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "cart": {
+            "n": 23,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 2.4869
+          },
+          "checkout": {
+            "n": 3,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 64,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 803.505168
+          },
+          "frontend-proxy": {
+            "n": 59,
+            "errors": 0,
+            "error_rate": 0.0,
+            "p95_ms": 517.073
+          }
+        },
+        "breaches": {
+          "cart p95_ms": "2.5ms > 0.0ms",
+          "frontend p95_ms": "803.5ms > 0.0ms",
+          "frontend-proxy p95_ms": "517.1ms > 0.0ms"
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": true,
+    "seconds": 0.0
+  },
+  "impact": [
+    {
+      "service": "cart",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 2.017674418604651,
+        "peak": 2.4869,
+        "change": 0.469225581395349
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 803.505168,
+        "change": 769.8778253426574
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 517.073,
+        "change": 484.3873939393939
+      }
+    }
+  ],
+  "amplification": [],
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 1.0209382716049382
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 34.44921875
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 4.215137844611529
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 125.9296875
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 0.06578222778473092
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 10.2421875
+      }
+    },
+    {
+      "container": "cart",
+      "cpu_percent": {
+        "baseline": 0.14628476840824492,
+        "peak": null
+      },
+      "memory_mb": {
+        "baseline": 55.3525390625,
+        "peak": null
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "inconclusive",
+    "explanation": "The experiment was aborted after 7.1 seconds (intended duration 60s) due to safety threshold breaches on latency. Because the experiment was stopped early, the predicted rise in error rates on the frontend and checkout services did not have time to manifest, making it impossible to confirm or deny the hypothesis.",
+    "model": "gemini-3-flash-preview"
+  }
+}

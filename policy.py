@@ -20,33 +20,50 @@ def blast_radius(g, target):
 
 
 def validate(plan, graph=None):
-    """Return {valid, reasons, blast_radius}; reasons lists every failed check."""
-    reasons = []
+    """Return {valid, reasons, blast_radius, checks}.
+    `reasons` lists every failed check; `checks` lists all of them, passed or not, for display."""
+    reasons, checks = [], []
+
+    def check(name, ok, passed, failed):
+        checks.append({"name": name, "passed": bool(ok), "detail": passed if ok else failed})
+        if not ok:
+            reasons.append(failed)
+
     if graph is None:
         try:
             graph, _ = load_graph()
         except (OSError, ValueError, KeyError) as e:
             graph = nx.DiGraph()
-            reasons.append(f"dependency map unavailable ({e}); cannot verify target")
+            check("Dependency map available", False, "", f"dependency map unavailable ({e}); cannot verify target")
     if not isinstance(plan, dict):
-        return {"valid": False, "reasons": ["plan is not a JSON object"], "blast_radius": []}
+        check("Plan is a JSON object", False, "", "plan is not a JSON object")
+        return {"valid": False, "reasons": reasons, "blast_radius": [], "checks": checks}
 
-    reasons += [f"missing field: {k}" for k in REQUIRED_KEYS if k not in plan]
+    missing = [k for k in REQUIRED_KEYS if k not in plan]
+    checks.append({"name": "Plan is complete", "passed": not missing,
+                   "detail": "all fields present" if not missing else "missing: " + ", ".join(missing)})
+    reasons += [f"missing field: {k}" for k in missing]
     fault, magnitude, duration, target = (plan.get(k) for k in ("fault", "magnitude", "duration_s", "target"))
 
-    if "fault" in plan and fault not in ALLOWED_FAULTS:
-        reasons.append(f"fault {fault!r} not allowed (allowed: {', '.join(ALLOWED_FAULTS)})")
+    if "fault" in plan:
+        check("Fault type is allowed", fault in ALLOWED_FAULTS, f"{fault} is on the allowlist",
+              f"fault {fault!r} not allowed (allowed: {', '.join(ALLOWED_FAULTS)})")
     if "magnitude" in plan:
         if not _is_num(magnitude) or magnitude < 0:
-            reasons.append(f"magnitude {magnitude!r} must be a non-negative number")
-        elif fault == "network_delay" and not 0 < magnitude <= MAX_NETWORK_DELAY_MS:
-            reasons.append(f"network delay {magnitude}ms outside 1-{MAX_NETWORK_DELAY_MS}ms")
-    if "duration_s" in plan and (not _is_num(duration) or not 0 < duration <= MAX_DURATION_S):
-        reasons.append(f"duration {duration!r}s must be between 1 and {MAX_DURATION_S}s")
+            check("Magnitude within cap", False, "", f"magnitude {magnitude!r} must be a non-negative number")
+        elif fault == "network_delay":
+            check("Magnitude within cap", 0 < magnitude <= MAX_NETWORK_DELAY_MS,
+                  f"{magnitude} ms delay (cap {MAX_NETWORK_DELAY_MS} ms)",
+                  f"network delay {magnitude}ms outside 1-{MAX_NETWORK_DELAY_MS}ms")
+        else:
+            check("Magnitude within cap", True, "no magnitude needed for this fault", "")
+    if "duration_s" in plan:
+        check("Duration within cap", _is_num(duration) and 0 < duration <= MAX_DURATION_S,
+              f"{duration} s (cap {MAX_DURATION_S} s)", f"duration {duration!r}s must be between 1 and {MAX_DURATION_S}s")
     if "target" in plan:
-        if target not in graph:
-            reasons.append(f"target {target!r} is not a service in the dependency map")
-        if target in PROTECTED:
-            reasons.append(f"target {target!r} is protected")
+        check("Target exists in the dependency map", target in graph, f"{target} is a discovered service",
+              f"target {target!r} is not a service in the dependency map")
+        check("Target is not protected", target not in PROTECTED, f"{target} is not on the protected list",
+              f"target {target!r} is protected")
 
-    return {"valid": not reasons, "reasons": reasons, "blast_radius": blast_radius(graph, target)}
+    return {"valid": not reasons, "reasons": reasons, "blast_radius": blast_radius(graph, target), "checks": checks}
