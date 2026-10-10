@@ -3,3 +3,4 @@ networkx
 pyyaml
 matplotlib
 docker
+python-dotenv

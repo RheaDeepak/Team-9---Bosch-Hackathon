@@ -131,15 +131,16 @@ def _attrs(obj):
     return {a["key"]: next(iter(a["value"].values()), None) for a in obj.get("attributes", [])}
 
 
-def fetch_spans(extra_services=(), url=TRACES_URL):
-    """Sample traces from Jaeger (OTLP JSON) -> {(trace_id, span_id): span dict}."""
+def fetch_spans(extra_services=(), url=TRACES_URL, lookback=TRACE_LOOKBACK, limits=None):
+    """Sample traces from Jaeger (OTLP JSON) -> {(trace_id, span_id): span dict}.
+    `limits` ({service: max traces}) overrides the default service list."""
     now = datetime.now(timezone.utc)
     fmt = "%Y-%m-%dT%H:%M:%SZ"
     spans = {}
-    limits = {**{s: EXTRA_LIMIT for s in extra_services}, **{s: TRACE_LIMIT for s in TRACE_SERVICES}}
+    limits = limits or {**{s: EXTRA_LIMIT for s in extra_services}, **{s: TRACE_LIMIT for s in TRACE_SERVICES}}
     for svc, limit in limits.items():
         params = {"query.service_name": svc, "query.num_traces": limit,
-                  "query.start_time_min": (now - TRACE_LOOKBACK).strftime(fmt),
+                  "query.start_time_min": (now - lookback).strftime(fmt),
                   "query.start_time_max": now.strftime(fmt)}
         resp = requests.get(url, params=params, timeout=60)
         resp.raise_for_status()
@@ -151,7 +152,8 @@ def fetch_spans(extra_services=(), url=TRACES_URL):
                     spans[(s["traceId"], s["spanId"])] = {
                         "trace": s["traceId"], "parent": s.get("parentSpanId", ""),
                         "svc": svc_name, "name": s["name"], "kind": s.get("kind", 0),
-                        "start": start, "dur": (end - start) / 1e6, "attrs": _attrs(s)}
+                        "start": start, "dur": (end - start) / 1e6, "attrs": _attrs(s),
+                        "status": s.get("status", {}).get("code", 0)}  # 0 unset, 1 ok, 2 error
     return spans
 
 
