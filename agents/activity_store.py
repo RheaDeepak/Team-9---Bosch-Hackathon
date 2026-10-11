@@ -132,8 +132,7 @@ def load(run_id, sessions_dir=None):
 
 def latest(mode=None, sessions_dir=None):
     if sessions_dir is None:
-        with _lock:
-            live = next((e["run_id"] for e in reversed(_events) if mode is None or e["mode"] == mode), None)
+        live = latest_live(mode)
         if live:
             return live
     with connect(sessions_dir) as conn:
@@ -145,6 +144,13 @@ def latest(mode=None, sessions_dir=None):
             sql, args = sql + " WHERE r.mode=?", (mode,)
         row = conn.execute(sql + " ORDER BY COALESCE(e.last_sequence, 0) DESC, r.started_at DESC LIMIT 1", args).fetchone()
     return row["run_id"] if row else None
+
+
+def latest_live(mode=None):
+    """Return the newest run observed by this server process, never a saved replay."""
+    with _lock:
+        return next((e["run_id"] for e in reversed(_events)
+                     if mode is None or e["mode"] == mode), None)
 
 
 def all_live(after=0):

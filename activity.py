@@ -128,8 +128,7 @@ class Recorder(_sqlite.Recorder):
 
 
 def latest_run_id(mode=None):
-    store_dir = SESSIONS_DIR if SESSIONS_DIR != Path("sessions") else None
-    return _sqlite.latest(mode, store_dir)
+    return _sqlite.latest_live(mode)
 
 
 def events(run_id=None, after=0, sessions_dir=None, mode=None):
@@ -137,7 +136,7 @@ def events(run_id=None, after=0, sessions_dir=None, mode=None):
         new = _sqlite.all_live(after)
         return None, new, (new[-1]["seq"] if new else after)
     store_dir = sessions_dir if sessions_dir is not None else (SESSIONS_DIR if SESSIONS_DIR != Path("sessions") else None)
-    run_id = run_id or _sqlite.latest(mode, store_dir)
+    run_id = run_id or _sqlite.latest_live(mode)
     if not run_id or not valid_run_id(run_id):
         return run_id, [], after
     loaded = load_session(run_id, sessions_dir)

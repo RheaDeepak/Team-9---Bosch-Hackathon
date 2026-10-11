@@ -363,8 +363,11 @@ def _feed_mode(mode):
 
 @app.get("/api/agent-events")
 def api_agent_events(run: str = "", after: int = 0, mode: str = ""):
-    """Structured agent steps for the activity feed: the newest run (of `mode`, if given) unless `run` is given,
-    only those after `after`. mode=all streams every agent's steps of this server session."""
+    """Structured agent steps for the live feed or an explicitly selected saved session.
+
+    A blank ``run`` streams only work observed since this server started; callers
+    must supply a run ID to replay a persisted SQLite/legacy session.
+    """
     run_id, evs, last = activity.events(run or None, after, mode=_feed_mode(mode))
     return {"run_id": run_id, "events": evs, "last": last}
 

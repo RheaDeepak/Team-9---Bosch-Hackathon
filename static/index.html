@@ -1468,7 +1468,7 @@ async function loadFindings() {
   }
   renderFindings(); applyOverlay(); renderRanking();
   if (shownResult && !$('resultPanel').classList.contains('hide')) renderResult(shownResult, shownNote);
-  if (fdata.run_id && !aFeed.run) { aFeed.viewRun = ''; aFeed.poll(); }
+  if (fdata.status && fdata.status.running && !aFeed.run) { aFeed.viewRun = ''; aFeed.poll(); }
 }
 function filterFindingsBy(svc, scroll = true) {
   fview.svc = svc || ''; renderFindings();
