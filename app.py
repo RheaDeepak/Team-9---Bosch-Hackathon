@@ -325,7 +325,8 @@ def api_ranking():
     def view(c):
         a = by_id.get(c["id"], {})
         return {"id": c["id"], **{k: c[k] for k in CANDIDATE_FIELDS}, "in_top_k": c["id"] in by_id,
-                **{k: c[k] for k in ("parameters", "candidate_id", "capability_version") if k in c},
+                **{k: c[k] for k in ("parameters", "candidate_id", "capability_version", "unavailable",
+                                     "unavailable_reason") if k in c},
                 "adjusted_risk": a.get("adjusted_risk"), "adjusted_priority": a.get("adjusted_priority"),
                 "reason": a.get("reason"), "evidence": a.get("evidence") or []}
 

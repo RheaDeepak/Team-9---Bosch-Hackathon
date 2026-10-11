@@ -71,7 +71,9 @@ Method:
  "hypothesis": str,
  "predictions": [{{"svc": str, "metric": "error_rate"|"p95_ms", "direction": "up"|"down"|"flat",
                   "min_factor": number}}]}}
-Rules: one ranking entry per candidate; chosen must be one of the candidate ids. predictions name the target or
+Rules: one ranking entry per candidate; chosen must be one of the candidate ids. Fault-type diversity: the brief
+says how often each fault type has been run. When two candidates' priorities are within 0.05 of each other, prefer
+the one whose fault type has been run least (an untested fault type teaches more than another of the same kind). predictions name the target or
 services in its blast radius; min_factor is the expected peak/baseline ratio (>= 1 when direction is up).
     network_delay slows calls (p95 up; errors only where a caller times out); container_stop makes calls fail
     (error_rate up) until the container is back; traffic_spike increases the existing fixed Locust journey load
@@ -403,8 +405,8 @@ def tool_loop(api_key, system, contents, decls, toolbox, log, post, max_tool_cal
 
 # ---- the agent -------------------------------------------------------------------------
 
-def _brief(top, g):
-    """First user message: the candidates and the edges into each target."""
+def _brief(top, g, fault_runs=None):
+    """First user message: the candidates, the edges into each target, and how often each fault type has run."""
     cands = []
     for c in top:
         t = c["target"]
@@ -413,14 +415,18 @@ def _brief(top, g):
                       "callers": {u: ranker._mode(d) + (f" {d['type']}" if d.get("type") else "")
                                   for u, _, d in g.in_edges(t, data=True)},
                       "blast_radius": blast_radius(g, t)})
+    runs = {f: (fault_runs or {}).get(f, 0) for f in ranker.ALLOWED_FAULTS}
     return ("Candidates (ranker scores are 0..1, higher priority = run first):\n" + json.dumps(cands, indent=1)
-            + f"\nProtected services (never targets): {sorted(PROTECTED)}")
+            + f"\nProtected services (never targets): {sorted(PROTECTED)}"
+            + "\nFault types run so far (all services): " + ", ".join(f"{f} {n}x" for f, n in runs.items())
+            + ". Prefer the less-run fault type when priorities are within 0.05.")
 
 
 def _investigate(api_key, top, g, toolbox, log, post, trail=None):
     """Planning conversation over the top-K. Returns (final text, model, tool calls used). `trail` collects
     what the tools found, so a run that hits the cap can still hand over its evidence."""
-    contents = [{"role": "user", "parts": [{"text": _brief(top, g)}]}]
+    fault_runs = Counter(r["fault"] for r in toolbox.history)
+    contents = [{"role": "user", "parts": [{"text": _brief(top, g, fault_runs)}]}]
     with llm.listening(lambda kind, text: log(kind, text)):
         return tool_loop(api_key, SYSTEM_PROMPT, contents, TOOL_DECLS, toolbox, log, post, MAX_TOOL_CALLS,
                          MAX_LLM_CALLS, trail=[] if trail is None else trail)
@@ -507,7 +513,9 @@ def top_k(ranking, k):
     variants of one service would spend the tool budget twice on the same question.
     The mildest delay usually tops each service, so a plain top-k would be all network_delay:
     when the shortlist lacks a fault kind that exists in the ranking, its best candidate (on a
-    service not yet listed) takes the last slot."""
+    service not yet listed) takes the last slot. Unavailable candidates (e.g. traffic_spike without a ready load
+    generator) are shown in the ranking but never shortlisted, so the agent can never choose one."""
+    ranking = [c for c in ranking if not c.get("unavailable")]
     seen, out = set(), []
     for c in ranking:
         if c["target"] not in seen:
