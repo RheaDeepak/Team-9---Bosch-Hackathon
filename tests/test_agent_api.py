@@ -63,20 +63,19 @@ class AgentApiTest(unittest.TestCase):
         self.assertEqual(sessions[0]["run_id"], "0badf00d")
         self.assertEqual(sessions[0]["steps"], 3)
 
-    def test_one_row_per_service_and_fault_with_the_other_magnitudes_inside(self):
+    def test_ranking_returns_individual_candidates_in_rank_order(self):
         with mock.patch.object(ranker, "rank_from_files", self.ranking):
             body = self.client.get("/api/ranking").json()
         keys = [(c["target"], c["fault"]) for c in body["candidates"]]
-        self.assertEqual(len(keys), len(set(keys)))
-        self.assertEqual(body["services"], len({k[0] for k in keys}))
-        self.assertEqual(body["total"], sum(1 + len(c["variants"]) for c in body["candidates"]))
-        self.assertIn(("pay", "container_stop"), keys)                     # a stop is never hidden behind a delay
-        pay = next(c for c in body["candidates"] if c["target"] == "pay" and c["fault"] == "network_delay")
-        self.assertEqual(len(pay["variants"]), 2)                          # 200 is the row; 500 and 1000 are inside
-        self.assertTrue(all(v["fault"] == "network_delay" and v["rank"] > pay["rank"] for v in pay["variants"]))
+        self.assertLess(len(set(keys)), len(keys))  # magnitude variants remain visible as candidates
+        self.assertEqual(body["total"], len(body["candidates"]))
         self.assertEqual([c["rank"] for c in body["candidates"]], sorted(c["rank"] for c in body["candidates"]))
+        first = body["candidates"][0]
+        self.assertIn("blast_radius", first)
+        self.assertIn("checked", first)
+        self.assertIn("rejected", body)
 
-    def test_the_row_shows_the_variant_the_agent_examined(self):
+    def test_the_agent_findings_stay_with_the_examined_candidate(self):
         ranking, _ = self.ranking()
         stop = next(c for c in ranking if c["id"] == "pay:container_stop:0")
         plan = {"ranking": {"chosen": stop["id"], "top_k": [{"candidate_id": stop["id"], "reason": "r", "evidence": []}]}}
@@ -84,7 +83,7 @@ class AgentApiTest(unittest.TestCase):
             body = self.client.get("/api/ranking").json()
         pay = next(c for c in body["candidates"] if c["id"] == "pay:container_stop:0")
         self.assertTrue(pay["in_top_k"])
-        self.assertEqual(pay["variants"], [])
+        self.assertEqual(pay["reason"], "r")
 
 
 if __name__ == "__main__":

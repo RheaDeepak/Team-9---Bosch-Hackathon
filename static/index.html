@@ -63,13 +63,21 @@ main[data-mode="review"] #resultPanel { order:-8; } main[data-mode="review"] #li
 .card.is-live { border-color:#6b2a2d; box-shadow:0 0 0 1px rgba(255,118,115,.22), 0 16px 48px -16px rgba(207,52,52,.4); }
 .sub { font-size:11.5px; font-weight:650; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin:0 0 var(--s2); }
 .block { margin-top:var(--s5); }
-.agent-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:var(--s5); align-items:start; }
-.agent-col { min-width:0; } .agent-col > .sub { display:flex; justify-content:space-between; gap:var(--s2); }
-#rankPanel th[scope=row] { white-space:normal; min-width:200px; text-align:left; font-weight:inherit; } #rankPanel td { white-space:nowrap; vertical-align:top; }
-.pbar { display:block; height:6px; min-width:64px; border-radius:3px; background:var(--surface-3); margin-top:5px; } .pbar i { display:block; height:100%; border-radius:3px; background:var(--accent-solid); }
-tr.chosen-row > * { background:var(--ok-soft); }
-tr.unavailable-row > * { opacity:.55; }                  /* listed for completeness; it cannot run right now */
-.rank-node { background:none; border:0; padding:0; font:inherit; font-weight:650; color:var(--accent); cursor:pointer; text-align:left; } .rank-node:hover { text-decoration:underline; }
+.plan-note { margin:0 0 var(--s4); font-size:12.5px; color:var(--text-3); }
+.candidate-list { display:grid; gap:var(--s3); }
+.candidate-card { padding:var(--s4); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); transition:border-color var(--ease), box-shadow var(--ease); }
+.candidate-card:hover, .candidate-card:focus-within { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent-soft); }
+.candidate-card.top-pick { border-color:var(--accent-solid); background:linear-gradient(110deg,var(--accent-soft),var(--surface-2) 46%); }
+.candidate-head { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
+.candidate-rank { font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; }
+.candidate-title { background:none; border:0; padding:0; color:var(--text); font:600 15px/1.35 var(--font); text-align:left; cursor:pointer; }
+.candidate-title:hover { color:var(--accent); }
+.score { margin:var(--s3) 0; display:flex; height:9px; overflow:hidden; border-radius:99px; background:var(--surface-3); }
+.score i { display:block; min-width:3px; } .score .impact { background:#38bdf8; } .score .info { background:#2fbf9b; } .score .penalty { background:#f0524f; } .score .fit { background:#a78bfa; }
+.score-legend { display:flex; flex-wrap:wrap; gap:4px 10px; color:var(--text-3); font-size:11.5px; } .score-legend span::before { content:''; display:inline-block; width:7px; height:7px; margin-right:4px; border-radius:50%; background:var(--c); }
+.candidate-move { margin:var(--s2) 0; color:var(--accent); font-size:12.5px; }.candidate-reason { margin:var(--s2) 0; color:var(--text-2); }.candidate-hypothesis { margin:var(--s2) 0; font-size:12.5px; color:var(--text-3); }.candidate-chips { margin-top:var(--s2); }.candidate-chips .chip { margin:0 4px 4px 0; }
+.collapsed-candidate { display:flex; gap:var(--s2); align-items:center; padding:8px 0; color:var(--text-2); }.collapsed-candidate b { color:var(--text); }.collapsed-candidate span:last-child { margin-left:auto; font-variant-numeric:tabular-nums; }
+.rejected { margin-top:var(--s4); }.rejected summary { cursor:pointer; color:var(--text-3); }.rejected ul { margin:var(--s2) 0 0; padding-left:20px; color:var(--text-3); font-size:12.5px; }
 .factors { list-style:none; margin:6px 0 0; padding:0; font-size:12.5px; color:var(--text-2); } .factors li { display:flex; gap:8px; justify-content:space-between; }
 .factors .pos { color:var(--ok); } .factors .neg { color:var(--bad); } .factors b { font-variant-numeric:tabular-nums; font-weight:600; }
 .why-box { margin-top:var(--s3); } .why-box p { color:var(--text-2); overflow-wrap:anywhere; margin:0 0 var(--s2); }
@@ -87,7 +95,6 @@ tr.unavailable-row > * { opacity:.55; }                  /* listed for completen
 .mtag { flex:none; font-size:10.5px; font-weight:650; letter-spacing:.05em; text-transform:uppercase; padding:0 6px; border-radius:4px; background:var(--surface-3); color:var(--accent); }
 .mtag.analysis { color:var(--warn); }
 .calls { font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; }
-@media (max-width:980px) { .agent-grid { grid-template-columns:minmax(0,1fr); } }
 .panel { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3) var(--s4); min-width:0; }
 .panel > .sub { margin-bottom:var(--s3); }
 
@@ -346,7 +353,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
       <div><h1>Chaos Copilot</h1><p class="cc-label">Resilience operations</p></div>
     </div>
     <nav class="steps-nav" aria-label="Steps">
-      <a href="#readiness" data-for="readiness">Readiness</a><a href="#workflowSec" data-for="workflowSec">Workflow</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a><a href="#agentSec" data-for="agentSec">Agent</a>
+      <a href="#readiness" data-for="readiness">Readiness</a><a href="#workflowSec" data-for="workflowSec">Workflow</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a>
       <a href="#live" data-for="live">Live</a><a href="#grafanaSec" data-for="grafanaSec">Grafana</a><a href="#resultPanel" data-for="resultPanel">Result</a><a href="#historySec" data-for="historySec">History</a><a href="#findingsSec" data-for="findingsSec">Findings</a>
     </nav>
     <div class="top-status">
@@ -417,44 +424,23 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="planSec" class="card primary">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>04</b>Decide</span><h2>Experiment plan</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>04</b>Decide</span><h2>Plan</h2></div>
       <div class="card-actions">
         <label class="field"><span class="sr">Learning goal (optional)</span><select id="goalSel"><option value="">No preference: let the AI explore</option></select></label>
         <button id="propose" class="btn btn-primary" type="button">Propose experiment</button>
+        <label class="field"><span class="sr">Replay a saved planning session</span><select id="sessionSel"><option value="">Live / latest session</option></select></label>
+        <button id="refreshRanking" class="btn btn-sm" type="button">Refresh</button>
       </div>
     </header>
     <div class="card-body">
       <div id="retestNote" class="notice info hide" role="status"></div>
-      <div id="plan"><p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p></div>
+      <p id="planNote" class="plan-note">Ranker candidates include every fault allowed by policy. Propose an experiment to add the planning agent’s checks and reasoning.</p>
+      <div id="rankPanel" class="muted">Loading candidates…</div>
       <div id="decision" class="decision hide">
         <p class="human-gate"><svg class="cc-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/></svg><span><b>Human approval required.</b> Nothing is injected until you approve. The safety policy has already decided whether approval is possible.</span></p>
         <label class="chk"><input type="checkbox" id="reviewed" disabled aria-describedby="approveHint"> I reviewed the hypothesis and blast radius</label>
         <div class="btns"><button id="reject" class="btn btn-quiet-danger" type="button" disabled>Reject</button><button id="approve" class="btn btn-go" type="button" disabled aria-describedby="approveHint">Approve and run</button></div>
         <span id="approveHint" class="muted" aria-live="polite"></span>
-      </div>
-    </div>
-  </section>
-
-  <section id="agentSec" class="card">
-    <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>05</b>Explain</span><h2>Planning agent</h2></div>
-      <div class="card-actions">
-        <label class="field"><span class="sr">Replay a saved agent session</span><select id="sessionSel"><option value="">Live / latest session</option></select></label>
-        <button id="refreshRanking" class="btn btn-sm" type="button">Refresh ranking</button>
-      </div>
-    </header>
-    <div class="card-body agent-grid">
-      <div class="agent-col">
-        <h3 class="sub">Candidate ranking <span id="rankMeta" class="muted"></span></h3>
-        <label class="field" style="margin-bottom:8px"><span class="sr">Show candidates with this fault</span><select id="rankFault"><option value="">All faults</option><option value="container_stop">Container stop only</option><option value="network_delay">Network delay only</option></select></label>
-        <div id="rankPanel" class="muted">Loading…</div>
-      </div>
-      <div class="agent-col">
-        <h3 class="sub">Agent activity <span><span id="feedCalls" class="calls muted"></span> <span id="feedRun" class="muted"></span></span></h3>
-        <div class="feedbar"><div class="seg" role="group" aria-label="Show the activity of">
-          <button type="button" data-feed-mode="planning" aria-pressed="true">Planning</button><button type="button" data-feed-mode="analysis" aria-pressed="false">Analysis</button><button type="button" data-feed-mode="all" aria-pressed="false">All</button></div></div>
-        <p id="feedEmpty" class="muted">No planning activity yet. Propose an experiment and every step shows up here as it happens.</p>
-        <ol id="feed" class="feed" aria-label="Agent activity, one entry per step; open an entry for details"></ol>
       </div>
     </div>
   </section>
@@ -962,16 +948,6 @@ function planFacts(p) {
 }
 const SOURCE_LABEL = { llm: 'Planned by LLM', rank_agent: 'Planned by agent', ranker_fallback: 'Ranker #1 (LLM not used)', 'deterministic-capability': 'Tested capability', fallback: 'FALLBACK PLAN' };
 const fix2 = x => x == null ? '&ndash;' : Number(x).toFixed(2);
-function rankingHtml(r) {
-  if (!r || !(r.top_k || []).length) return '';
-  const chosen = r.top_k.find(c => c.candidate_id === r.chosen) || {};
-  const ev = chosen.evidence || [], pr = r.predictions || [];
-  return `<details class="block" open><summary>Why this experiment: ${r.top_k.length} candidates compared${r.capped ? ' (tool cap reached)' : ''}</summary>
-    ${chosen.reason ? `<p>${esc(chosen.reason)}</p>` : ''}
-    ${ev.length ? `<h3 class="sub">Evidence</h3><ul>${ev.map(e => `<li><code>${esc(e.tool)}</code> ${esc(e.finding)}</li>`).join('')}</ul>` : ''}
-    ${pr.length ? `<h3 class="sub">Predictions</h3><ul>${pr.map(x => `<li>${esc(x.svc)} ${esc(x.metric)} ${esc(x.direction)} (&times;${esc(x.min_factor)})</li>`).join('')}</ul>` : ''}
-    <p class="muted"><a href="#agentSec">Full ranking and the agent's steps</a></p></details>`;
-}
 const agentStats = { run: '', llm: 0, tools: 0, last: null, seen: new Set() };       // what the planning agent has done so far, from its events
 function noteAgentEvents(evs) {                                    // called by the feed for every batch of events
   for (const e of evs) {
@@ -992,7 +968,7 @@ function agentRunningHtml() {                                      // while POST
     : 'LLM call in progress: waiting for the model';
   return `<p class="plan-empty"><span class="spin"></span><b>The planning agent is running and making LLM calls.</b> It asks the model which of the top candidates to investigate,
     runs read-only tool calls (at most ${AGENT_TOOL_CAP}) on what the model asks for, then asks it to choose.
-    <span class="muted">Now: ${esc(now)}. LLM calls so far: ${fresh ? a.llm : 0}, tool calls: ${fresh ? a.tools : 0} of ${AGENT_TOOL_CAP}. Every step is in the Planning agent card below.</span></p>`;
+    <span class="muted">Now: ${esc(now)}. LLM calls so far: ${fresh ? a.llm : 0}, tool calls: ${fresh ? a.tools : 0} of ${AGENT_TOOL_CAP}.</span></p>`;
 }
 const AGENT_TOOL_CAP = 8;
 function renderPlan() {
@@ -1012,35 +988,9 @@ function renderPlan() {
   $('approveHint').textContent = !canDecide ? '' : !v.valid ? 'Blocked by the safety gate.' : !(readiness && readiness.ready) ? 'Readiness checks are failing.'
     : !trafficReady ? 'Traffic spike is unavailable because the Locust executor or rollback path is not ready.'
     : !$('reviewed').checked ? 'Tick the box to confirm you reviewed the plan.' : '';
-  if (!p) {
-    $('plan').innerHTML = proposing ? ($('goalSel').value
-      ? '<p class="plan-empty"><span class="spin"></span><b>Making an LLM call.</b> The planner asks the model for one experiment that fits your goal (up to a minute).</p>'
-      : agentRunningHtml())
-      : '<p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p>';
-    return;
-  }
-  const faultName = FAULT_LABELS[p.fault] || p.fault;
-  const key = JSON.stringify([p, v, s.source, s.note]);
-  if (key === lastPlanHtml) return;                       // the poll runs every second: do not rebuild (and deselect) unchanged text
-  lastPlanHtml = key;
-  $('plan').innerHTML = `<div class="plan-grid">
-    <div class="plan-main">
-      <div class="plan-headline"><span class="plan-target">${esc(p.target)}</span>
-        <span class="pill ${p.fault === 'container_stop' ? 'bad' : 'warn'}">${esc(faultName)}</span>
-        <span class="pill ${['llm', 'rank_agent'].includes(s.source) ? 'info' : 'warn'}">${esc(SOURCE_LABEL[s.source] || 'FALLBACK PLAN')}</span></div>
-      <dl class="facts">${planFacts(p)}</dl>
-      <div class="prose"><h3 class="sub">Hypothesis</h3><p>${esc(p.hypothesis)}</p><h3 class="sub">Reasoning</h3><p>${esc(p.reasoning)}</p>
-        <p class="muted">${esc(s.note)}</p></div>
-      ${rankingHtml(p.ranking)}
-    </div>
-    <aside class="plan-side">
-      <h3 class="sub">Safety gate</h3><span class="pill ${v.valid ? 'ok' : 'bad'}">${v.valid ? 'ALL CHECKS PASSED' : 'BLOCKED'}</span>
-      <ul class="gate">${(v.checks || []).map(c => `<li><span class="ic ${c.passed ? 'ok' : 'no'}">${c.passed ? '&#10003;' : '&#10007;'}</span><span>${esc(c.name)} <small class="muted">${esc(c.detail)}</small></span></li>`).join('')}</ul>
-      ${(v.checks || []).length ? '' : v.reasons.length ? `<ul class="reasons">${v.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
-      <h3 class="sub">Blast radius</h3>
-      <div>${v.blast_radius.length ? v.blast_radius.map(n => `<span class="chip blast">${esc(n)}</span>`).join('') : '<span class="muted">none</span>'}</div>
-      <p class="muted" style="font-size:12px;margin-top:6px">Everything that depends on ${esc(p.target)}.</p>
-    </aside></div>`;
+  $('planNote').innerHTML = proposing ? agentRunningHtml() : p
+    ? `${esc(SOURCE_LABEL[s.source] || 'Plan')} · ${esc(s.note || 'Agent reasoning and checks are shown on the candidate cards.')}`
+    : 'Ranker candidates include every fault allowed by policy. Propose an experiment to add the planning agent’s checks and reasoning.';
 }
 
 /* ---------- 4. live ---------- */
@@ -1669,6 +1619,12 @@ function renderRanking() {
       ${(chosen.evidence || []).length ? `<ul>${chosen.evidence.map(e => `<li><code>${esc(e.tool)}</code> ${esc(e.finding)}</li>`).join('')}</ul>` : ''}</div>`
       : '<p class="muted" style="margin-top:8px">Nothing chosen yet: this is the ranker\'s view before the agent investigates.</p>'}`;
 }
+const planTitle = r => r.fault === 'network_delay' ? `Add ${r.magnitude} ms delay to ${r.target} for 60 s` : r.fault === 'container_stop' ? `Stop ${r.target} for 60 s` : `Increase traffic to ${r.target} for 60 s`;
+function unifiedScore(r) { const parts = { impact: 0, info: 0, penalty: 0, fit: 0 }, why = { impact: [], info: [], penalty: [], fit: [] }; for (const f of r.factors || []) { const k = f.kind === 'penalty' ? 'penalty' : /coverage|novelty|severity|escalation/.test(f.name || '') ? 'fit' : f.kind === 'info' ? 'info' : 'impact'; parts[k] += Math.abs(Number(f.contribution) || 0); why[k].push(f.label); } const total = Object.values(parts).reduce((a, b) => a + b, 0) || 1; return `<div class="score" aria-label="Total score ${fix2(r.priority)}">${Object.entries(parts).map(([k, v]) => `<i class="${k}" style="width:${100 * v / total}%" title="${esc(k)}: ${fix2(v)}. ${esc(why[k].join('; ') || 'No contributing factors')}"></i>`).join('')}</div>`; }
+const SCORE_LEGEND = `<div class="score-legend" aria-label="Score legend"><span style="--c:#38bdf8">impact potential</span><span style="--c:#2fbf9b">informativeness</span><span style="--c:#f0524f">risk penalty</span><span style="--c:#a78bfa">fault fit</span></div>`;
+function unifiedCandidate(r, agentRanks) { const ar = agentRanks.get(r.id), move = ar && ar !== r.rank ? `<p class="candidate-move">${ar < r.rank ? '↑ moved up' : '↓ moved down'} from #${r.rank} — ${esc(r.reason)}</p>` : '', checks = (r.checked || []).map(x => `<span class="chip">${esc(x)}</span>`).join(''), blast = (r.blast_radius || []).map(x => `<span class="chip blast">${esc(x)}</span>`).join('') || '<span class="muted">none</span>', hypothesis = r.id === rankData.chosen && status && status.plan ? status.plan.hypothesis : `This will reveal how ${r.target} and its callers handle ${r.fault.replace('_', ' ')}.`; return `<article class="candidate-card${r.rank === 1 ? ' top-pick' : ''}" data-node="${esc(r.target)}" tabindex="0"><div class="candidate-head"><span class="candidate-rank">#${r.rank}</span>${r.rank === 1 ? '<span class="pill ok">Top pick</span>' : ''}<button class="candidate-title" type="button" data-node="${esc(r.target)}">${esc(planTitle(r))}</button><span class="pill">score ${fix2(r.priority)}</span></div>${unifiedScore(r)}${move}<p class="candidate-reason">${esc(r.reason || r.why)}</p><p class="candidate-hypothesis"><b>Hypothesis:</b> ${esc(hypothesis)}</p><div class="candidate-chips"><b class="sub">Checked</b> ${checks || '<span class="muted">No agent checks recorded.</span>'}</div><div class="candidate-chips"><b class="sub">Expected blast radius</b> ${blast}</div></article>`; }
+function renderUnifiedRanking() { const d = rankData; if (!d) return; const rows = d.candidates, adjusted = rows.filter(r => r.adjusted_priority != null).sort((a, b) => b.adjusted_priority - a.adjusted_priority), ranks = new Map(adjusted.map((r, i) => [r.id, i + 1])), open = rows.slice(0, 5), rest = rows.slice(5); $('rankPanel').classList.remove('muted'); $('rankPanel').innerHTML = `${SCORE_LEGEND}<div class="candidate-list">${open.map(r => unifiedCandidate(r, ranks)).join('')}</div>${rest.length ? `<details class="block"><summary>Show all candidates (${rest.length} more)</summary><div class="candidate-list">${rest.map(r => `<div class="collapsed-candidate" data-node="${esc(r.target)}"><b>#${r.rank}</b><span>${esc(planTitle(r))}</span><span>${fix2(r.priority)}</span></div>`).join('')}</div></details>` : ''}${(d.rejected || []).length ? `<details class="rejected"><summary>Rejected by policy (${d.rejected.length})</summary><ul>${d.rejected.map(r => `<li>${esc(planTitle(r))} — ${esc(r.reason)}</li>`).join('')}</ul></details>` : ''}`; }
+function renderRanking() { renderUnifiedRanking(); }
 async function loadRanking() {
   try { rankData = await api('/api/ranking'); renderRanking(); }
   catch (e) { $('rankPanel').textContent = 'Ranking unavailable: ' + e.message; }
@@ -1715,7 +1671,7 @@ function makeFeed(o) {
   };
   return f;
 }
-const mainFeed = makeFeed({ list: 'feed', empty: 'feedEmpty', runLabel: 'feedRun', calls: 'feedCalls', mode: 'planning' });
+const mainFeed = { mode: 'planning', run: '', viewRun: '', ignoreRun: '', reset() {}, async poll() {} };
 const aFeed = makeFeed({ list: 'afeed', empty: 'afeedEmpty', runLabel: 'afeedRun', calls: 'afeedCalls', mode: 'analysis', follow: true, emptyOnlyWithRun: true });
 function setFeedMode(mode) {
   mainFeed.mode = mode; mainFeed.viewRun = ''; mainFeed.ignoreRun = ''; mainFeed.reset();
@@ -1734,10 +1690,9 @@ async function loadSessions() {
     $('sessionSel').value = [...$('sessionSel').options].some(o => o.value === cur) ? cur : '';
   } catch (e) { /* optional */ }
 }
-$('rankFault').onchange = renderRanking;
 $('sessionSel').onchange = () => { mainFeed.viewRun = $('sessionSel').value; mainFeed.ignoreRun = ''; mainFeed.reset(); mainFeed.poll(); };
 $('refreshRanking').onclick = () => withBusy($('refreshRanking'), 'Refreshing…', async () => { await loadRanking(); await loadSessions(); });
-$('rankPanel').onclick = e => { const b = e.target.closest('[data-node]'); if (b) { selectNode(b.dataset.node); $('graphSec').scrollIntoView({ block: 'start' }); } };
+$('rankPanel').onmouseover = $('rankPanel').onclick = e => { const b = e.target.closest('[data-node]'); if (b) { selectNode(b.dataset.node); } };
 
 /* ---------- polling ---------- */
 let lastMode = 'idle', modeReady = false;
@@ -1788,7 +1743,7 @@ $('bannerClose').onclick = () => banner('');
 $('focus').onchange = () => { chartSig = ''; renderCharts(status); };
 $('gService').onchange = () => { gSel = $('gService').value; updateGrafana(); };
 $('propose').onclick = async () => { $('propose').disabled = true; $('sessionSel').value = ''; mainFeed.viewRun = '';
-  if (mainFeed.mode === 'planning') { mainFeed.ignoreRun = mainFeed.run; mainFeed.reset(); $('feedEmpty').classList.remove('hide'); }
+  if (mainFeed.mode === 'planning') { mainFeed.ignoreRun = mainFeed.run; mainFeed.reset(); }
   chartSig = ''; viewedResult = null; renderResult(null);
   await act('/api/propose', 'Propose', { goal: $('goalSel').value || null }, $('propose')); await poll(); };
 $('reviewed').onchange = renderPlan;
