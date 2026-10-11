@@ -1,0 +1,1246 @@
+{
+  "id": "20261011T032343Z",
+  "plan": {
+    "target": "frontend",
+    "fault": "traffic_spike",
+    "magnitude": 8,
+    "duration_s": 20,
+    "hypothesis": "Applying a traffic spike to the frontend service will increase request rate and push p95 latency upward as concurrent user journeys saturate the service handlers.",
+    "reasoning": "Traffic spike on frontend tests user journey resilience under load. Fault type traffic_spike has 0 runs so far, giving it priority due to diversity.",
+    "parameters": {
+      "baseline_users": 5,
+      "peak_users": 8,
+      "spawn_rate_per_second": 2,
+      "duration_seconds": 20,
+      "journey_profile": "astronomy-shop-default"
+    },
+    "candidate_id": "traffic-spike-core-v1",
+    "capability_version": "traffic-spike-v1"
+  },
+  "plan_source": "rank_agent",
+  "ranking": {
+    "source": "rank_agent",
+    "note": "model gemini-3.5-flash-lite, 8 tool calls (cap reached)",
+    "model": "gemini-3.5-flash-lite",
+    "run_id": "7c150a5e",
+    "tool_calls": 8,
+    "chosen": "frontend:traffic_spike:8",
+    "predictions": [
+      {
+        "svc": "frontend",
+        "metric": "p95_ms",
+        "direction": "up",
+        "min_factor": 1.2
+      },
+      {
+        "svc": "frontend",
+        "metric": "error_rate",
+        "direction": "flat",
+        "min_factor": 1.0
+      }
+    ],
+    "top_k": [
+      {
+        "candidate_id": "shipping:container_stop:0",
+        "rank": 1,
+        "risk": 0.473,
+        "info": 0.667,
+        "priority": 0.473,
+        "why": "service never tested; on checkout path; blast radius 5 | penalty: blast 5 at severity 1.0, stop reach 0.5",
+        "outage": 0.0,
+        "factors": [
+          {
+            "name": "novelty",
+            "kind": "info",
+            "score": 1.0,
+            "contribution": 0.158,
+            "label": "service never tested"
+          },
+          {
+            "name": "checkout_path",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.11,
+            "label": "on checkout path"
+          },
+          {
+            "name": "safety",
+            "kind": "penalty",
+            "score": 0.438,
+            "contribution": -0.088,
+            "label": "blast 5 at severity 1.0, stop reach 0.5"
+          },
+          {
+            "name": "blast_radius",
+            "kind": "risk",
+            "score": 0.625,
+            "contribution": 0.069,
+            "label": "blast radius 5"
+          },
+          {
+            "name": "fan_in",
+            "kind": "risk",
+            "score": 0.667,
+            "contribution": 0.055,
+            "label": "fan-in 2 (2 sync, 0 async)"
+          },
+          {
+            "name": "clarity",
+            "kind": "info",
+            "score": 0.986,
+            "contribution": 0.044,
+            "label": "clean baseline (noise 0.01)"
+          },
+          {
+            "name": "uncertainty",
+            "kind": "info",
+            "score": 0.6,
+            "contribution": 0.041,
+            "label": "no prior verdict"
+          },
+          {
+            "name": "coverage",
+            "kind": "info",
+            "score": 0.591,
+            "contribution": 0.04,
+            "label": "container_stop run 9x system-wide"
+          },
+          {
+            "name": "journeys",
+            "kind": "risk",
+            "score": 0.25,
+            "contribution": 0.021,
+            "label": "in 2 user journeys"
+          },
+          {
+            "name": "partial",
+            "kind": "info",
+            "score": 0.4,
+            "contribution": 0.018,
+            "label": "likely partial degradation"
+          },
+          {
+            "name": "traffic",
+            "kind": "risk",
+            "score": 0.053,
+            "contribution": 0.006,
+            "label": "traffic 0.09 req/s"
+          },
+          {
+            "name": "recovery",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "past recovery Nones"
+          },
+          {
+            "name": "escalation",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "escalate: Nonems held"
+          },
+          {
+            "name": "prior_abort",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "guard aborted before"
+          },
+          {
+            "name": "outage",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "stops 2 user journeys (near-total outage)"
+          }
+        ],
+        "adjusted_risk": 0.45,
+        "adjusted_priority": 0.49,
+        "evidence": [
+          {
+            "tool": "get_edges",
+            "finding": "shipping is called by checkout and frontend synchronously for quote and order shipping."
+          }
+        ],
+        "reason": "Shipping container stop directly impacts checkout and order placement flows."
+      },
+      {
+        "candidate_id": "frontend:traffic_spike:8",
+        "rank": 2,
+        "risk": 0.428,
+        "info": 0.759,
+        "priority": 0.466,
+        "why": "service never tested; traffic 1.71 req/s; in 8 user journeys | penalty: blast 3 at severity 0.8, entry point: users hit it directly",
+        "outage": 0.2,
+        "factors": [
+          {
+            "name": "novelty",
+            "kind": "info",
+            "score": 1.0,
+            "contribution": 0.158,
+            "label": "service never tested"
+          },
+          {
+            "name": "traffic",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.099,
+            "label": "traffic 1.71 req/s"
+          },
+          {
+            "name": "journeys",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.074,
+            "label": "in 8 user journeys"
+          },
+          {
+            "name": "coverage",
+            "kind": "info",
+            "score": 1.0,
+            "contribution": 0.068,
+            "label": "traffic_spike never run yet"
+          },
+          {
+            "name": "safety",
+            "kind": "penalty",
+            "score": 0.3,
+            "contribution": -0.06,
+            "label": "blast 3 at severity 0.8"
+          },
+          {
+            "name": "outage",
+            "kind": "penalty",
+            "score": 0.2,
+            "contribution": -0.05,
+            "label": "entry point: users hit it directly"
+          },
+          {
+            "name": "clarity",
+            "kind": "info",
+            "score": 0.965,
+            "contribution": 0.043,
+            "label": "clean baseline (noise 0.03)"
+          },
+          {
+            "name": "uncertainty",
+            "kind": "info",
+            "score": 0.6,
+            "contribution": 0.041,
+            "label": "no prior verdict"
+          },
+          {
+            "name": "blast_radius",
+            "kind": "risk",
+            "score": 0.375,
+            "contribution": 0.037,
+            "label": "blast radius 3"
+          },
+          {
+            "name": "partial",
+            "kind": "info",
+            "score": 0.72,
+            "contribution": 0.032,
+            "label": "likely partial degradation"
+          },
+          {
+            "name": "fan_in",
+            "kind": "risk",
+            "score": 0.333,
+            "contribution": 0.025,
+            "label": "fan-in 1 (1 sync, 0 async)"
+          },
+          {
+            "name": "checkout_path",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "on checkout path"
+          },
+          {
+            "name": "recovery",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "past recovery Nones"
+          },
+          {
+            "name": "escalation",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "escalate: None users held"
+          },
+          {
+            "name": "prior_abort",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "guard aborted at None users"
+          }
+        ],
+        "adjusted_risk": 0.4,
+        "adjusted_priority": 0.47,
+        "evidence": [
+          {
+            "tool": "get_baseline",
+            "finding": "frontend handles active user traffic of ~1.71 req/s."
+          }
+        ],
+        "reason": "Traffic spike on frontend tests user journey resilience under load. Fault type traffic_spike has 0 runs so far, giving it priority due to diversity."
+      },
+      {
+        "candidate_id": "astronomy-db:network_delay:200",
+        "rank": 3,
+        "risk": 0.418,
+        "info": 0.582,
+        "priority": 0.452,
+        "why": "service never tested; blast radius 8; on checkout path",
+        "outage": 0.0,
+        "factors": [
+          {
+            "name": "novelty",
+            "kind": "info",
+            "score": 1.0,
+            "contribution": 0.158,
+            "label": "service never tested"
+          },
+          {
+            "name": "blast_radius",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.066,
+            "label": "blast radius 8"
+          },
+          {
+            "name": "checkout_path",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.066,
+            "label": "on checkout path"
+          },
+          {
+            "name": "uncertainty",
+            "kind": "info",
+            "score": 0.6,
+            "contribution": 0.041,
+            "label": "no prior verdict"
+          },
+          {
+            "name": "partial",
+            "kind": "info",
+            "score": 0.92,
+            "contribution": 0.041,
+            "label": "likely partial degradation"
+          },
+          {
+            "name": "safety",
+            "kind": "penalty",
+            "score": 0.2,
+            "contribution": -0.04,
+            "label": "blast 8 at severity 0.2"
+          },
+          {
+            "name": "traffic",
+            "kind": "risk",
+            "score": 0.519,
+            "contribution": 0.034,
+            "label": "traffic 0.89 req/s via callers"
+          },
+          {
+            "name": "fan_in",
+            "kind": "risk",
+            "score": 0.667,
+            "contribution": 0.033,
+            "label": "fan-in 2 (2 sync, 0 async)"
+          },
+          {
+            "name": "journeys",
+            "kind": "risk",
+            "score": 0.625,
+            "contribution": 0.031,
+            "label": "in 5 user journeys"
+          },
+          {
+            "name": "clarity",
+            "kind": "info",
+            "score": 0.5,
+            "contribution": 0.023,
+            "label": "no baseline metrics"
+          },
+          {
+            "name": "recovery",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "past recovery Nones"
+          },
+          {
+            "name": "escalation",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "escalate: Nonems held"
+          },
+          {
+            "name": "coverage",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "network_delay run 22x system-wide"
+          },
+          {
+            "name": "prior_abort",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "guard aborted at Nonems"
+          },
+          {
+            "name": "outage",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "stops 5 user journeys (near-total outage)"
+          }
+        ],
+        "adjusted_risk": 0.41,
+        "adjusted_priority": 0.44,
+        "evidence": [
+          {
+            "tool": "get_edges",
+            "finding": "astronomy-db is called by product-catalog and accounting."
+          }
+        ],
+        "reason": "Database network delay propagates to multiple services."
+      }
+    ]
+  },
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ],
+    "checks": [
+      {
+        "name": "Plan is complete",
+        "passed": true,
+        "detail": "all fields present"
+      },
+      {
+        "name": "Fault type is allowed",
+        "passed": true,
+        "detail": "traffic_spike is on the allowlist"
+      },
+      {
+        "name": "Magnitude within cap",
+        "passed": true,
+        "detail": "8 users (cap 10)"
+      },
+      {
+        "name": "Traffic spike parameters are bounded",
+        "passed": true,
+        "detail": "typed parameters match the approved user count and duration"
+      },
+      {
+        "name": "Duration within cap",
+        "passed": true,
+        "detail": "20 s (cap 30 s)"
+      },
+      {
+        "name": "Target exists in the dependency map",
+        "passed": true,
+        "detail": "frontend is a discovered service"
+      },
+      {
+        "name": "Target is not protected",
+        "passed": true,
+        "detail": "frontend is not on the protected list"
+      }
+    ]
+  },
+  "started_at": "2026-10-11T03:23:43+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": false,
+    "reason": "duration elapsed (20s)",
+    "elapsed_s": 20.0,
+    "peaks": {
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 49.675803
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 65.326
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 13.592323232323233,
+        "memory_mb": 65.796875
+      },
+      "frontend": {
+        "cpu_percent": 58.13361486486487,
+        "memory_mb": 224.046875
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "frontend": {
+            "n": 84,
+            "errors": 0,
+            "request_rate": 2.8,
+            "error_rate": 0.0,
+            "p95_ms": 43.07137
+          },
+          "frontend-proxy": {
+            "n": 101,
+            "errors": 0,
+            "request_rate": 3.3666666666666667,
+            "error_rate": 0.0,
+            "p95_ms": 65.326
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 79
+          },
+          "cart": {
+            "ok": true,
+            "ms": 62
+          }
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "frontend": {
+            "n": 90,
+            "errors": 0,
+            "request_rate": 3.0,
+            "error_rate": 0.0,
+            "p95_ms": 46.724607
+          },
+          "frontend-proxy": {
+            "n": 104,
+            "errors": 0,
+            "request_rate": 3.466666666666667,
+            "error_rate": 0.0,
+            "p95_ms": 48.418
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 12
+          },
+          "cart": {
+            "ok": true,
+            "ms": 13
+          }
+        }
+      },
+      {
+        "t": 10.0,
+        "metrics": {
+          "frontend": {
+            "n": 101,
+            "errors": 0,
+            "request_rate": 3.3666666666666667,
+            "error_rate": 0.0,
+            "p95_ms": 49.675803
+          },
+          "frontend-proxy": {
+            "n": 110,
+            "errors": 0,
+            "request_rate": 3.6666666666666665,
+            "error_rate": 0.0,
+            "p95_ms": 48.159
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 14
+          },
+          "cart": {
+            "ok": true,
+            "ms": 12
+          }
+        }
+      },
+      {
+        "t": 15.0,
+        "metrics": {
+          "frontend": {
+            "n": 90,
+            "errors": 0,
+            "request_rate": 3.0,
+            "error_rate": 0.0,
+            "p95_ms": 43.477295
+          },
+          "frontend-proxy": {
+            "n": 71,
+            "errors": 0,
+            "request_rate": 2.3666666666666667,
+            "error_rate": 0.0,
+            "p95_ms": 44.356
+          }
+        },
+        "breaches": {},
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 16
+          },
+          "cart": {
+            "ok": true,
+            "ms": 19
+          }
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "fault_evidence": {
+    "verified": true,
+    "verified_at": "2026-10-11T03:23:46+00:00",
+    "expected_users": 8,
+    "observed_users": 8,
+    "observed_state": "running",
+    "observed_rps": 1.0,
+    "observed_spawn_rate_per_second": 2.0,
+    "locust_version": "2.46.6",
+    "journey_profile": "astronomy-shop-default"
+  },
+  "fault_recovery": {
+    "verified": true,
+    "verified_at": "2026-10-11T03:24:11+00:00",
+    "expected_running": true,
+    "observed_running": true,
+    "expected_users": 5,
+    "observed_users": 5,
+    "expected_spawn_rate_per_second": 1.0,
+    "observed_spawn_rate_per_second": 1.0,
+    "observed_rps": 1.5
+  },
+  "recovery": {
+    "recovered": true,
+    "seconds": 0.0,
+    "first_healthy_seconds": 0.0,
+    "healthy_samples": 2,
+    "required_samples": 2,
+    "elapsed_seconds": 8.0,
+    "metrics_confirmed": true,
+    "metrics_seconds": 0.0,
+    "samples": [
+      {
+        "t": 0.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 29
+          },
+          "cart": {
+            "ok": true,
+            "ms": 25
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      },
+      {
+        "t": 5.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 12
+          },
+          "cart": {
+            "ok": true,
+            "ms": 17
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      }
+    ]
+  },
+  "impact": [
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 49.675803,
+        "change": 16.04846034265737
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 65.326,
+        "change": 32.64039393939393
+      }
+    }
+  ],
+  "amplification": [],
+  "score": {
+    "impact_score": 6.2,
+    "resilience_score": 94,
+    "severity": "Low",
+    "confidence": "High confidence",
+    "availability_pct": 100.0,
+    "components": {
+      "error_impact": 0.0,
+      "latency_impact": 0.25,
+      "availability_loss": 0.0,
+      "recovery_impact": 0.0
+    },
+    "limitations": []
+  },
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 13.592323232323233
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 65.796875
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 58.13361486486487
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 224.046875
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "held",
+    "explanation": "The hypothesis stated that a traffic spike on the frontend service would increase request rate and push p95 latency upward. The experimental results show that the frontend p95 latency increased by 16.05ms and the frontend-proxy p95 latency increased by 32.64ms, while maintaining 0% error rate and 100% probe availability. The system recovered immediately.",
+    "claims": [
+      {
+        "claim": "Applying a traffic spike to the frontend service will increase request rate and push p95 latency upward",
+        "evidence": "frontend p95_ms increased by 16.05ms (baseline 33.63 to peak 49.68); frontend-proxy p95_ms increased by 32.64ms (baseline 32.69 to peak 65.33)",
+        "status": "supported"
+      }
+    ],
+    "recommendation": "Implement horizontal pod autoscaling (HPA) for the frontend service to automatically scale out and mitigate p95 latency degradation during high concurrent traffic spikes.",
+    "model": "gemini-3.5-flash-lite",
+    "skipped_models": []
+  },
+  "normal": [
+    {
+      "t": -120,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -115,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -110,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -105,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -100,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -95,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -90,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -85,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -80,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -75,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -70,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -65,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -60,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -55,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -50,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -45,
+      "services": {
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -40,
+      "services": {
+        "frontend": {
+          "n": 29,
+          "errors": 0,
+          "request_rate": 0.9666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 63.267204
+        },
+        "frontend-proxy": {
+          "n": 21,
+          "errors": 0,
+          "request_rate": 0.7,
+          "error_rate": 0.0,
+          "p95_ms": 65.263
+        }
+      }
+    },
+    {
+      "t": -35,
+      "services": {
+        "frontend": {
+          "n": 129,
+          "errors": 0,
+          "request_rate": 4.3,
+          "error_rate": 0.0,
+          "p95_ms": 54.727819
+        },
+        "frontend-proxy": {
+          "n": 96,
+          "errors": 0,
+          "request_rate": 3.2,
+          "error_rate": 0.0,
+          "p95_ms": 58.019
+        }
+      }
+    },
+    {
+      "t": -30,
+      "services": {
+        "frontend": {
+          "n": 214,
+          "errors": 0,
+          "request_rate": 7.133333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 52.222984
+        },
+        "frontend-proxy": {
+          "n": 156,
+          "errors": 0,
+          "request_rate": 5.2,
+          "error_rate": 0.0,
+          "p95_ms": 56.634
+        }
+      }
+    },
+    {
+      "t": -25,
+      "services": {
+        "frontend": {
+          "n": 275,
+          "errors": 0,
+          "request_rate": 9.166666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 50.994778
+        },
+        "frontend-proxy": {
+          "n": 213,
+          "errors": 0,
+          "request_rate": 7.1,
+          "error_rate": 0.0,
+          "p95_ms": 53.657
+        }
+      }
+    },
+    {
+      "t": -20,
+      "services": {
+        "frontend": {
+          "n": 345,
+          "errors": 0,
+          "request_rate": 11.5,
+          "error_rate": 0.0,
+          "p95_ms": 51.749037
+        },
+        "frontend-proxy": {
+          "n": 288,
+          "errors": 0,
+          "request_rate": 9.6,
+          "error_rate": 0.0,
+          "p95_ms": 54.333
+        }
+      }
+    },
+    {
+      "t": -15,
+      "services": {
+        "frontend": {
+          "n": 411,
+          "errors": 0,
+          "request_rate": 13.7,
+          "error_rate": 0.0,
+          "p95_ms": 48.037158
+        },
+        "frontend-proxy": {
+          "n": 364,
+          "errors": 0,
+          "request_rate": 12.133333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 53.349
+        }
+      }
+    },
+    {
+      "t": -10,
+      "services": {
+        "frontend": {
+          "n": 429,
+          "errors": 0,
+          "request_rate": 14.3,
+          "error_rate": 0.0,
+          "p95_ms": 48.026459
+        },
+        "frontend-proxy": {
+          "n": 391,
+          "errors": 0,
+          "request_rate": 13.033333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 53.657
+        }
+      }
+    },
+    {
+      "t": -5,
+      "services": {
+        "frontend": {
+          "n": 418,
+          "errors": 0,
+          "request_rate": 13.933333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 40.38041
+        },
+        "frontend-proxy": {
+          "n": 414,
+          "errors": 0,
+          "request_rate": 13.8,
+          "error_rate": 0.0,
+          "p95_ms": 60.845
+        }
+      }
+    },
+    {
+      "t": 0,
+      "services": {
+        "frontend": {
+          "n": 345,
+          "errors": 0,
+          "request_rate": 11.5,
+          "error_rate": 0.0,
+          "p95_ms": 43.459012
+        },
+        "frontend-proxy": {
+          "n": 404,
+          "errors": 0,
+          "request_rate": 13.466666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 57.546
+        }
+      }
+    }
+  ],
+  "grafana_window_ms": [
+    1791688906420,
+    1791689105150
+  ]
+}
