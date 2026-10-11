@@ -15,7 +15,7 @@ import docker
 import requests
 import uvicorn
 from fastapi import Body, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import activity
@@ -27,6 +27,7 @@ import discovery
 import planner
 import ranker
 import report
+import report_pdf
 import grafana
 import guard
 import inject
@@ -584,6 +585,17 @@ def api_report():
         return HTMLResponse(report.render_html(analysis_agent.latest_or_deterministic()))
     except (OSError, ValueError, KeyError) as e:
         raise HTTPException(503, f"report unavailable: {e}")
+
+
+@app.get("/api/report.pdf")
+def api_report_pdf():
+    """The findings report as a PDF (read-only; generated when missing or older than the results)."""
+    try:
+        if report_pdf.is_stale():
+            report_pdf.build_pdf()
+        return FileResponse(report_pdf.PDF_PATH, media_type="application/pdf", filename="chaos-copilot-findings-report.pdf")
+    except (OSError, ValueError, KeyError) as e:
+        raise HTTPException(503, f"PDF report unavailable: {e}")
 
 
 app.mount("/", StaticFiles(directory=BASE_DIR / "static", html=True), name="static")
