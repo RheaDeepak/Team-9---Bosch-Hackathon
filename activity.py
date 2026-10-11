@@ -114,3 +114,60 @@ def list_sessions(sessions_dir=None, limit=30, mode=None):
         rows.append({"run_id": p.stem, "mode": _mode(evs[0]), "started": evs[0]["ts"], "steps": len(evs),
                      "outcome": (decision or {}).get("summary", "")[:80]})
     return sorted(rows, key=lambda r: r["started"], reverse=True)[:limit]
+
+
+# New runs use SQLite. Keep the public functions and JSONL reader above as a
+# compatibility layer for sessions recorded before the LangGraph migration.
+from agents import activity_store as _sqlite  # noqa: E402
+
+
+class Recorder(_sqlite.Recorder):
+    def __init__(self, run_id, sessions_dir=None, mode="planning", prompt_version=None):
+        store_dir = sessions_dir if sessions_dir is not None else (SESSIONS_DIR if SESSIONS_DIR != Path("sessions") else None)
+        super().__init__(run_id, store_dir, mode, prompt_version)
+
+
+def latest_run_id(mode=None):
+    return _sqlite.latest_live(mode)
+
+
+def events(run_id=None, after=0, sessions_dir=None, mode=None):
+    if not run_id and mode == "all":
+        new = _sqlite.all_live(after)
+        return None, new, (new[-1]["seq"] if new else after)
+    store_dir = sessions_dir if sessions_dir is not None else (SESSIONS_DIR if SESSIONS_DIR != Path("sessions") else None)
+    run_id = run_id or _sqlite.latest_live(mode)
+    if not run_id or not valid_run_id(run_id):
+        return run_id, [], after
+    loaded = load_session(run_id, sessions_dir)
+    new = [event for event in loaded if event["seq"] > after]
+    return run_id, new, (new[-1]["seq"] if new else after)
+
+
+def load_session(run_id, sessions_dir=None):
+    if not valid_run_id(run_id):
+        return []
+    store_dir = sessions_dir if sessions_dir is not None else (SESSIONS_DIR if SESSIONS_DIR != Path("sessions") else None)
+    rows = _sqlite.load(run_id, store_dir)
+    if rows:
+        return rows
+    try:
+        lines = (Path(sessions_dir or SESSIONS_DIR) / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()
+        return [json.loads(line) for line in lines if line.strip()]
+    except (OSError, ValueError):
+        return []
+
+
+def list_sessions(sessions_dir=None, limit=30, mode=None):
+    store_dir = sessions_dir if sessions_dir is not None else (SESSIONS_DIR if SESSIONS_DIR != Path("sessions") else None)
+    rows = {row["run_id"]: row for row in _sqlite.runs(store_dir, mode, limit)}
+    for path in Path(sessions_dir or SESSIONS_DIR).glob("*.jsonl"):
+        if not valid_run_id(path.stem) or path.stem in rows:
+            continue
+        evs = load_session(path.stem, sessions_dir)
+        if not evs or (mode is not None and _mode(evs[0]) != mode):
+            continue
+        decision = next((e for e in reversed(evs) if e.get("type") == "decision"), None)
+        rows[path.stem] = {"run_id": path.stem, "mode": _mode(evs[0]), "started": evs[0]["ts"],
+                           "steps": len(evs), "outcome": (decision or {}).get("summary", "")[:80]}
+    return sorted(rows.values(), key=lambda row: row["started"], reverse=True)[:limit]

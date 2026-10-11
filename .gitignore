@@ -8,3 +8,6 @@ agent_log.jsonl
 rankings/
 sessions/
 reports/
+state/*.sqlite3
+state/*.sqlite3-wal
+state/*.sqlite3-shm

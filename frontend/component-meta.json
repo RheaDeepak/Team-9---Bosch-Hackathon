@@ -1,0 +1,66 @@
+{
+  "_about": "Implementation maturity of each component, kept apart from runtime state on purpose. Edit this file when a component's status changes: implementation is one of implemented | in_development | planned. Nothing here is live state. Keep static/component-meta.json and frontend/component-meta.json identical (tests/test_design_system.py).",
+  "updated": "2026-10-11",
+  "components": [
+    {
+      "id": "topology",
+      "name": "Topology Discovery",
+      "summary": "Builds the service dependency map from Jaeger traces and the compose config.",
+      "module": "discovery.py",
+      "implementation": "implemented",
+      "evidence": "discovery.py writes dependency_map.json; the topology endpoint serves it.",
+      "notes": []
+    },
+    {
+      "id": "planner",
+      "name": "Experiment Planner",
+      "summary": "Proposes one experiment: the ranker scores candidates, an LLM agent investigates the top ones, a deterministic plan is the fallback.",
+      "module": "planner.py",
+      "implementation": "implemented",
+      "evidence": "planner.py, ranker.py and rank_agent.py are merged and tested; the fallback plan is used when the LLM is unavailable.",
+      "notes": []
+    },
+    {
+      "id": "policy",
+      "name": "Safety Policy Engine",
+      "summary": "Deterministic checks decide whether a plan may run. The LLM never decides.",
+      "module": "policy.py",
+      "implementation": "implemented",
+      "evidence": "policy.validate() runs on every proposal and again server side at approval.",
+      "notes": []
+    },
+    {
+      "id": "executor",
+      "name": "Experiment Executor",
+      "summary": "Injects the approved fault on the allow-listed target and always rolls it back.",
+      "module": "inject.py",
+      "implementation": "implemented",
+      "evidence": "container_stop, network_delay and traffic_spike are in policy.ALLOWED_FAULTS with rollback in inject.py and traffic_spike.py.",
+      "notes": [
+        { "text": "Packet-loss fault", "status": "planned" }
+      ]
+    },
+    {
+      "id": "guard",
+      "name": "Telemetry Guard",
+      "summary": "Watches Jaeger spans, probes and container health during the fault; aborts on a breach; verifies recovery.",
+      "module": "guard.py",
+      "implementation": "implemented",
+      "evidence": "guard.watch and guard.wait_for_recovery are covered by the flow integration tests.",
+      "notes": [
+        { "text": "Business-journey recovery assertions", "status": "planned" }
+      ]
+    },
+    {
+      "id": "analysis",
+      "name": "Analysis & Scoring",
+      "summary": "Scores each run deterministically, asks an LLM for a verdict, and turns saved results into findings.",
+      "module": "analysis.py",
+      "implementation": "implemented",
+      "evidence": "score_experiment, judge_hypothesis, analysis.py and analysis_agent.py are merged and tested.",
+      "notes": [
+        { "text": "Per-journey scoring", "status": "planned" }
+      ]
+    }
+  ]
+}

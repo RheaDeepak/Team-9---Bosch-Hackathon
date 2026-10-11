@@ -12,6 +12,7 @@ from test_analysis import CART_DOWN, baseline, graph, row  # noqa: E402
 
 import analysis  # noqa: E402
 import analysis_agent  # noqa: E402
+from agents.models import AnalysisDecision  # noqa: E402
 import guard  # noqa: E402
 import ranker  # noqa: E402
 import report  # noqa: E402
@@ -139,8 +140,10 @@ class EvidenceInFindingsTest(unittest.TestCase):
         ev = w["evidence_ids"][:1]
         answer = {"findings": [{"id": w["id"], "title": "t", "service": w["service"], "pattern": w["pattern"],
                                 "severity": "High", "severity_score": 60, "root_cause": "checkout fails",
-                                "evidence_ids": ev, "fix": "f", "verify_by": "v", "agent_adjustment": "looks bad"}],
+                                "evidence_ids": ev, "fix": "f", "verify_by": "v", "confidence": 0.5,
+                                "agent_adjustment": "looks bad"}],
                   "summary": "s", "strengths": []}
+        answer = AnalysisDecision.model_validate(answer)   # the LangGraph agent's structured output
         with self.assertRaisesRegex(ValueError, "low-evidence"):
             analysis_agent.check_answer(answer, [w], data)
 

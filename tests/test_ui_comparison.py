@@ -20,6 +20,13 @@ class UiHelpersTest(unittest.TestCase):
     def test_agent_status_text(self):
         self.run_js("test_ui_agent_status.js")
 
+    def test_workflow_models(self):
+        self.run_js("test_ui_workflow.js")
+
+    def test_api_ui_package_tests(self):                 # frontend/js/*.test.js: api adapter, workflow models, graph layout
+        out = subprocess.run(["node", "--test"], cwd=HERE.parent / "frontend", capture_output=True, text=True, timeout=120)
+        self.assertEqual(out.returncode, 0, out.stdout[-2000:] + out.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
