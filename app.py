@@ -21,6 +21,8 @@ from fastapi.staticfiles import StaticFiles
 import activity
 import analysis
 import analysis_agent
+from agents.activity_store import connect as connect_agent_store
+from agents.planning import CapabilityUnavailable
 import discovery
 import planner
 import ranker
@@ -196,6 +198,7 @@ def _traffic_capability():
 
 @asynccontextmanager
 async def lifespan(app):
+    connect_agent_store().close()
     if inject.ACTIVE_FILE.exists():  # a previous run died mid-experiment: undo it first
         ok = exp._recover_crashed_run(_log)
         STATE["startup_note"] = ("Rolled back a leftover experiment from a previous run." if ok
@@ -293,6 +296,10 @@ def api_propose(body: dict = Body(default=None)):
         STATE.update(_blank(), phase="proposing")
     try:
         p = exp.propose(goal)
+    except CapabilityUnavailable as e:
+        with LOCK:
+            STATE.update(_blank())
+        raise HTTPException(409, str(e))
     except Exception as e:
         with LOCK:
             STATE.update(_blank())
@@ -364,7 +371,7 @@ def api_agent_events(run: str = "", after: int = 0, mode: str = ""):
 
 @app.get("/api/agent-sessions")
 def api_agent_sessions(mode: str = ""):
-    """Saved agent sessions (sessions/<run_id>.jsonl), newest first, for replay; optionally of one agent."""
+    """Saved SQLite agent sessions, plus legacy JSONL sessions, newest first."""
     m = _feed_mode(mode)
     return activity.list_sessions(mode=None if m == "all" else m)
 

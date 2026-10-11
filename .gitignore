@@ -3,3 +3,11 @@
 __pycache__/
 approved_experiment.json
 active_experiment.json
+agent_log.jsonl
+.venv/
+rankings/
+sessions/
+reports/
+state/*.sqlite3
+state/*.sqlite3-wal
+state/*.sqlite3-shm

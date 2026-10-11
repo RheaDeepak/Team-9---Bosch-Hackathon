@@ -28,10 +28,11 @@ operator UI**. It:
 - validates it through deterministic policy before approval;
 - executes bounded container-stop or network-delay faults;
 - guarantees rollback on completion, abort, or execution error;
-- streams experiment state and telemetry to a single-screen web UI; and
+- streams experiment state and telemetry to a single-screen web UI;
+- plots live request-rate, error-rate, and latency timelines with Grafana panel links; and
 - generates deterministic impact and resilience scores.
 
-See [INTEGRATION_REPORT.md](INTEGRATION_REPORT.md) for the component map,
+See [plans/INTEGRATION_REPORT.md](plans/INTEGRATION_REPORT.md) for the component map,
 endpoint contract, safety flow, and judge-facing demo explanation.
 
 ## Run the integrated application
@@ -49,7 +50,7 @@ Update `.env` if the Astronomy Shop checkout or local ports differ, then start
 the API and UI together:
 
 ```powershell
-python -m uvicorn api:app --host 127.0.0.1 --port 8000
+python app.py
 ```
 
 Open <http://127.0.0.1:8000>. FastAPI serves the frontend and all `/api/*`
@@ -77,14 +78,14 @@ actions with an idempotent rollback path.
 ```mermaid
 flowchart LR
     Operator[Operator UI] --> API[Chaos Copilot API]
-    API --> Planner[AI planner]
+    API --> Planner[LangGraph planning graph]
     Planner --> Policy[Safety policy]
     Policy --> Runner[Experiment runner]
     Runner --> Faults[Bounded fault executors]
     Faults --> Shop[OpenTelemetry Astronomy Shop]
     Shop --> OTel[OpenTelemetry Collector]
     OTel --> Observability[Prometheus and Jaeger]
-    Observability --> Analyzer[Analyzer and scorer]
+    Observability --> Analyzer[LangGraph analysis graph]
     Analyzer --> Reports[Findings and reports]
     Reports --> Operator
 ```
@@ -98,6 +99,13 @@ Draft -> Validated -> Approved -> Baseline -> Injecting -> Observing
 
 At most one experiment may be active in the MVP. Every active path, including
 abort and error paths, must pass through rollback.
+
+Planning and post-experiment analysis are separate LangGraph workflows. They use
+Gemini through `langchain-google-genai`, Pydantic structured output, bounded
+read-only tool sets, and deterministic fallbacks. Checkpoints, queryable run
+metadata, and append-only UI events share `state/agent_runs.sqlite3`; older
+`sessions/*.jsonl` files remain readable for replay but are no longer written.
+Set `LLM_MODEL` and optional comma-separated `LLM_FALLBACK_MODELS` in `.env`.
 
 ## Safety model
 
@@ -130,7 +138,7 @@ default, including `chaos-copilot`, `otel-collector`, `prometheus`, `jaeger`,
 | --- | --- |
 | Discovery | Compose inventory enriched with Jaeger trace relationships |
 | Baseline | Repeatable load with availability, errors, throughput, and p50/p95 latency |
-| Planning | Provider-neutral LLM returns a schema-validated JSON proposal |
+| Planning | Gemini tool calling selects an immutable deterministic candidate through LangGraph |
 | Policy | Deterministic validation of target, severity, duration, approval, and rollback |
 | Faults | Container kill, container pause, and bounded network delay/loss |
 | Observation | Explicit baseline, fault, and recovery windows from Prometheus and Jaeger |
@@ -185,6 +193,31 @@ your machine. Follow the upstream
 [Docker deployment documentation](https://opentelemetry.io/docs/demo/docker-deployment/)
 and confirm the storefront and Jaeger UI are reachable before continuing.
 
+To use the Grafana panels in the experiment UI, also pass this repository's
+[`grafana-embed.yaml`](grafana-embed.yaml) override. It only lets Grafana be embedded in an
+iframe (`GF_SECURITY_ALLOW_EMBEDDING=true`), so the demo repository is never modified. For
+the default deployment (full demo plus observability):
+
+```powershell
+# run from the opentelemetry-demo checkout; adjust the path to this repository
+docker compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
+  -f C:\path\to\Team-9---Bosch-Hackathon\grafana-embed.yaml up -d
+```
+
+If the demo is already running, recreate only Grafana with the same `-f` files (add any others
+you started with, e.g. `compose.extras.yaml`) plus the override:
+
+```powershell
+docker compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
+  -f C:\path\to\Team-9---Bosch-Hackathon\grafana-embed.yaml up -d --no-deps grafana
+```
+
+Recreating the container resets Grafana's own database (provisioned dashboards reload from
+files). Without the override the experiment UI still works; the Grafana panels stay blank and
+the readiness panel says so.
+
+If `product-catalog` turns unhealthy and pins its 20 MiB limit (product pages time out), add a `compose.chaos-override.yaml` in the demo checkout that raises its memory to 64M (`GOMEMLIMIT=52MiB`), and pass it with `-f` like the override above.
+
 ### 2. Create a Python environment
 
 PowerShell:
@@ -221,19 +254,76 @@ On success, the command prints graph statistics and journey data, then rewrites
 dependencies are returned, leave the Astronomy Shop load generator running and
 try again after it has produced recent traces.
 
+## Run the experiment UI
+
+Beyond topology discovery the repo now contains the experiment loop: plan
+(`planner.py`), validate (`policy.py`), inject and roll back (`inject.py`),
+guard (`guard.py`), and report (`run_experiment.py`), with a web UI on top.
+
+**Prerequisites**
+
+1. Astronomy Shop running via Docker Compose, with every feature flag off.
+2. `pip install -r requirements.txt`
+3. `.env` containing `LLM_API_KEY` (a Gemini key; see `.env.example`). Without it the planner uses a built-in
+   fallback plan (stop `cart` for 60 s) and says so.
+4. `python discovery.py` (writes `dependency_map.json`) and `python metrics.py` (writes `baseline.json`, about
+   5 minutes). Re-capture the baseline whenever traffic or flags change.
+
+**Start the UI**
+
+```bash
+python app.py
+# open http://127.0.0.1:8000
+```
+
+The server binds to `127.0.0.1` only. Flow: check the readiness panel, **Propose experiment**, read the plan and
+blast radius, **Approve**, watch the live charts, press **STOP** at any time, read the result. Past results are
+under `results/` and listed in the History panel.
+
+**Terminal mode** still works: `python run_experiment.py` proposes, prints, and asks `y/n`.
+
+**What the UI shows**
+
+- **Keyboard and screen readers:** a skip link, a real button for every action, and an *Inspect service* menu plus zoom
+  buttons as the keyboard route into the dependency graph. Phase changes (plan proposed, fault active, rolling back,
+  result ready) are announced, errors appear in a dismissible banner under the top bar, and focus follows the layout when
+  the live view or the result moves to the top.
+
+- **Layout:** a top bar with a step navigation (it highlights where you are). The page re-composes around what matters
+  now: the live view comes first while a fault runs, the result comes first once it is over, and readiness folds into
+  one line when everything is green. It works down to phone width; the red STOP becomes a full-width bar at the bottom.
+
+- **Dependency graph:** services laid out left to right by call depth (callers on the left, data stores and the
+  flag service on the right), with edge width for call volume and node height for fan-in. Click a service to see
+  its role, live container health, criticality, baseline numbers, and what it calls and is called by; hover an
+  edge for its protocol, operations and latency. Pick a user journey (or the checkout path) to light up its route
+  with numbered steps. Protected services are marked and can never be targeted.
+- **Optional learning goal** next to *Propose experiment* (graceful degradation, critical dependency, recovery time,
+  timeout behaviour). It steers the AI; the safety policy still decides.
+- **Safety gate:** every policy check is listed as passed or failed, and *Approve* needs the "I reviewed the
+  hypothesis and blast radius" box ticked.
+- **Result:** a resilience score out of 100 (deterministic: error rise, latency rise, shop-probe availability,
+  recovery time), a claim-by-claim verdict, amplification ratios, and a recommended next move.
+
+**Tests:** `python -m unittest discover -s tests` (no containers are touched; the LLM and Docker are stubbed).
+
+**Safety.** STOP, a threshold breach and Ctrl+C all take the same rollback path. On startup `app.py` (and
+`run_experiment.py`) first rolls back any fault left in `active_experiment.json` by a crashed run. Stopping the
+server while an experiment runs aborts it and waits for the rollback. The guard reads recent spans from Jaeger
+rather than Prometheus, because span metrics reach Prometheus only once a minute.
+
 ## Repository contents
 
 ```text
 .
-├── CHAOS_COPILOT_PRD.md   # Product requirements and implementation phases
-├── INTEGRATION_REPORT.md   # Architecture, demo flow, and judge explanation
+├── plans/                  # Product plans and integration documentation
 ├── README.md              # Project setup and overview
-├── api.py                 # REST/SSE API and static frontend hosting
-├── control_plane.py       # State machine, rollback, scoring, and reports
+├── app.py                 # Canonical FastAPI server and experiment control path
+├── agents/                # LangGraph workflows, typed models, tools, prompts, and SQLite store
 ├── discovery.py           # Trace- and Compose-based topology discovery
 ├── dependency_map.json    # Sample generated graph and journey data
 ├── dependency_map.png     # Sample generated graph visualization
-├── frontend/              # Single-screen operator console
+├── static/                # Single-screen operator console
 ├── tests/                 # Safe tests with fake fault/telemetry adapters
 ├── requirements.txt       # Python dependencies
 └── .env.example           # Runtime endpoints and safety configuration
@@ -264,7 +354,7 @@ Keep changes scoped to Chaos Copilot and preserve the upstream Astronomy Shop's
 business behavior. New instrumentation must follow the OpenTelemetry Demo's
 telemetry-schema conventions. Before proposing a change:
 
-1. read the [PRD](CHAOS_COPILOT_PRD.md) and the applicable `AGENTS.md` files;
+1. read the [PRD](plans/CHAOS_COPILOT_PRD.md) and the applicable `AGENTS.md` files;
 2. implement one approved phase or milestone at a time;
 3. add tests for policy, state transitions, executors, rollback, and reporting;
 4. manually verify changes against the local Compose sandbox; and
