@@ -173,15 +173,42 @@ button.chip.link { transition:background-color var(--ease); } button.chip.link:h
 
 /* ================= 3. Plan ================= */
 .plan-empty { padding:var(--s4) 0 var(--s2); color:var(--text-3); }
-.plan-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:var(--s5); }
-.plan-headline { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3); margin-bottom:var(--s3); }
-.plan-target { font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1.15; overflow-wrap:anywhere; }
-.facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:var(--s3); margin:0 0 var(--s4); }
-.fact { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s2) var(--s3); min-width:0; }
-.fact dt { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-3); }
-.fact dd { margin:2px 0 0; font-weight:600; overflow-wrap:anywhere; }
-.prose p { color:var(--text-2); overflow-wrap:anywhere; margin-bottom:var(--s3); } .prose .sub { margin-top:var(--s3); }
-.plan-side { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s4); align-self:start; }
+.plan-sum { margin:0 0 var(--s2); font-size:var(--fs-title); font-weight:700; letter-spacing:-.01em; line-height:1.3; overflow-wrap:anywhere; }
+.plan-pills { display:flex; flex-wrap:wrap; gap:var(--s2); margin-bottom:var(--s4); }
+.pc-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--s3); }
+.pc-card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3) var(--s4) var(--s4); min-width:0; }
+.pc-card h3 { display:flex; align-items:center; gap:var(--s2); margin:0 0 var(--s2); font-size:var(--fs-section); font-weight:650; color:var(--text); }
+.pc-card h3 .cc-svg { width:16px; height:16px; color:var(--accent); }
+.pc-text { margin:0; color:var(--text-2); overflow-wrap:anywhere; }
+.pc-text.clamp { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.pc-more { background:none; border:0; padding:2px 0; margin-top:2px; color:var(--accent); font:inherit; font-size:var(--fs-small); cursor:pointer; }
+.pc-more:hover { text-decoration:underline; }
+.pc-full[hidden] { display:none; }
+.pc-full { margin-top:var(--s2); font-size:var(--fs-small); color:var(--text-2); overflow-wrap:anywhere; }
+.pc-full p { margin:0 0 var(--s2); } .pc-full ul { margin:0; padding-left:18px; }
+.pc-sub { margin:var(--s3) 0 var(--s1); font-size:var(--fs-label); font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); }
+.pc-preds { list-style:none; margin:0; padding:0; }
+.pc-preds li { display:grid; grid-template-columns:minmax(0,1fr) auto 1.5em 3.6em; gap:var(--s2); align-items:baseline; padding:3px 0; border-top:1px solid var(--line); font-size:var(--fs-small); font-variant-numeric:tabular-nums; }
+.pc-preds li:first-child { border-top:0; }
+.pc-preds .svc { overflow-wrap:anywhere; font-weight:600; } .pc-preds .met { color:var(--text-3); }
+.pc-preds .arr { text-align:center; font-weight:700; } .pc-preds .arr.up { color:var(--bad); } .pc-preds .arr.down { color:var(--ok); }
+.pc-preds .fac { text-align:right; color:var(--text-2); }
+.pc-facts { margin:0; padding-left:18px; color:var(--text-2); } .pc-facts li { margin:3px 0; overflow-wrap:anywhere; }
+.pc-test { margin:0; display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px var(--s3); font-size:var(--fs-small); }
+.pc-test dt { color:var(--text-3); font-weight:600; } .pc-test dd { margin:0; color:var(--text-2); overflow-wrap:anywhere; }
+.pc-test .chip { font-size:11.5px; }
+.pc-note { margin:var(--s3) 0 0; font-size:var(--fs-small); color:var(--text-3); overflow-wrap:anywhere; }
+.pc-note a { margin-left:var(--s2); }
+.gate-strip { margin-top:var(--s3); border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface-2); font-size:var(--fs-small); }
+.gate-strip > summary { display:flex; flex-wrap:wrap; align-items:center; gap:6px var(--s2); padding:var(--s2) var(--s3); cursor:pointer; color:var(--text-2); }
+.gate-strip > summary .more { margin-left:auto; color:var(--accent); }
+.gate-strip[open] > summary .more { font-size:0; } .gate-strip[open] > summary .more::after { content:"hide details"; font-size:var(--fs-small); }
+.gate-strip.blocked { border-color:var(--bad); background:var(--bad-soft); }
+.gate-strip.blocked > summary { color:var(--bad); font-weight:600; }
+.gate-body { padding:0 var(--s3) var(--s3); }
+.gate-body .gate { margin:var(--s1) 0 var(--s2); }
+.gate-body details > summary { cursor:pointer; color:var(--accent); font-size:var(--fs-small); }
+@media (max-width:860px) { .pc-cards { grid-template-columns:minmax(0,1fr); } }
 .gate { list-style:none; margin:var(--s3) 0 var(--s4); padding:0; }
 .gate li { display:flex; gap:var(--s2); margin:6px 0; font-size:13px; }
 .gate .ic { font-weight:800; width:16px; flex:none; text-align:center; } .gate .ic.ok { color:var(--ok); } .gate .ic.no { color:var(--bad); }
@@ -287,14 +314,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 .svc-table td:nth-child(2) { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .scorewrap { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s3); }
 
-/* ================= Emergency stop ================= */
-#stop { position:fixed; right:var(--s5); bottom:calc(var(--s5) + env(safe-area-inset-bottom)); z-index:40; display:none; align-items:center; gap:var(--s2);
-  background:var(--bad-solid); border:2px solid #ff8a87; color:#fff; font-size:13px; font-weight:800; letter-spacing:.03em; padding:8px 16px; border-radius:var(--r-sm);
-  box-shadow:0 6px 20px rgba(207,52,52,.45); transition:background-color var(--ease), transform .08s ease, box-shadow var(--ease); }
-#stop::before { content:""; width:10px; height:10px; border-radius:2px; background:#fff; flex:none; }
-#stop:hover:not(:disabled) { background:var(--bad-hover); box-shadow:0 12px 40px rgba(224,69,69,.6); } #stop:active:not(:disabled) { transform:translateY(1px); }
-#stop:focus-visible { outline:3px solid #fff; outline-offset:3px; border-radius:var(--r-md); }
-#stop.show { display:inline-flex; }
+.stop-note { font-size:var(--fs-small); color:var(--text-2); }
 
 /* ================= Responsive ================= */
 @media (max-width:1000px) {
@@ -320,11 +340,10 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
   .toolbar .field { flex:1 1 100%; } .toolbar .field select { flex:1; }
   .kv { grid-template-columns:1fr; gap:0; } .kv dd { margin-bottom:var(--s2); }
   .kpis { width:100%; } .kpi { flex:1; min-width:0; }
-  .plan-target { font-size:22px; }
+  .plan-sum { font-size:18px; }
   .decision .btns { margin-left:0; width:100%; } .decision .btns .btn { flex:1; }
   .scorebar { padding:var(--s4); }
   th, td { padding:8px 10px; }
-  #stop { left:var(--s3); right:var(--s3); bottom:calc(var(--s3) + env(safe-area-inset-bottom)); justify-content:center; padding:12px 16px; min-height:44px; }
 }
 @media (prefers-reduced-motion:reduce) {
   html { scroll-behavior:auto; }
@@ -333,8 +352,6 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 .human-gate { display:flex; gap:var(--s2); align-items:flex-start; width:100%; margin:0; padding:8px 12px; border-radius:var(--r-sm); background:var(--warn-soft); color:var(--text); font-size:var(--fs-small); border:1px solid rgba(251,191,36,.3); }
 .human-gate .cc-svg { color:var(--warn); margin-top:2px; }
 .cmp-ic { display:inline-grid; vertical-align:-2px; margin-right:6px; } .cmp-ic.ok { color:var(--ok); } .cmp-ic.bad { color:var(--bad); }
-.wf-note { margin:var(--s3) 0 0; font-size:var(--fs-small); color:var(--text-3); }
-main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { order:-9; }
 </style>
 </head>
 <body>
@@ -346,7 +363,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
       <div><h1>Chaos Copilot</h1><p class="cc-label">Resilience operations</p></div>
     </div>
     <nav class="steps-nav" aria-label="Steps">
-      <a href="#readiness" data-for="readiness">Readiness</a><a href="#workflowSec" data-for="workflowSec">Workflow</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a><a href="#agentSec" data-for="agentSec">Agent</a>
+      <a href="#readiness" data-for="readiness">Readiness</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a><a href="#agentSec" data-for="agentSec">Agent</a>
       <a href="#live" data-for="live">Live</a><a href="#grafanaSec" data-for="grafanaSec">Grafana</a><a href="#resultPanel" data-for="resultPanel">Result</a><a href="#historySec" data-for="historySec">History</a><a href="#findingsSec" data-for="findingsSec">Findings</a>
     </nav>
     <div class="top-status">
@@ -356,7 +373,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
     </div>
   </div>
 </header>
-<button id="stop" type="button" aria-label="Emergency stop: abort the experiment and roll the fault back">STOP EXPERIMENT</button>
+<aside id="ccDock" aria-label="Activity dashboard"></aside>
 <div id="srStatus" class="sr" role="status" aria-live="polite"></div>
 <main id="main" tabindex="-1" data-mode="idle">
   <div id="banner" role="alert"><span id="bannerText"></span><button id="bannerClose" class="banner-x" type="button" aria-label="Dismiss message">&times;</button></div>
@@ -372,23 +389,9 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
     </div>
   </section>
 
-  <section id="workflowSec" class="card">
-    <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>02</b>Workflow</span><h2>Agent &amp; Workflow Activity</h2></div>
-      <div class="card-actions"><span id="wfElapsed" class="cc-chip outline hide"></span></div>
-    </header>
-    <div class="card-body">
-      <div class="cc-steps-meta"><span class="cc-label">Experiment lifecycle</span><span id="wfHeadline" class="muted" role="status"></span></div>
-      <div id="wfSteps"></div>
-      <p class="wf-note">Deterministic policy, not the LLM, decides whether an experiment may run, and a human approves it before anything is injected.</p>
-      <h3 class="sub" style="margin-top:var(--s4)">Components <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(what each does now, and how far it is built)</span></h3>
-      <div id="wfAgents"><p class="muted">Loading components…</p></div>
-    </div>
-  </section>
-
   <section id="graphSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>03</b>Understand</span><h2>Dependency graph</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>02</b>Understand</span><h2>Dependency graph</h2></div>
     </header>
     <div class="card-body">
       <div class="toolbar">
@@ -417,7 +420,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="planSec" class="card primary">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>04</b>Decide</span><h2>Experiment plan</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>03</b>Decide</span><h2>Experiment plan</h2></div>
       <div class="card-actions">
         <label class="field"><span class="sr">Learning goal (optional)</span><select id="goalSel"><option value="">No preference: let the AI explore</option></select></label>
         <button id="propose" class="btn btn-primary" type="button">Propose experiment</button>
@@ -437,7 +440,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="agentSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>05</b>Explain</span><h2>Planning agent</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>04</b>Explain</span><h2>Planning agent</h2></div>
       <div class="card-actions">
         <label class="field"><span class="sr">Replay a saved agent session</span><select id="sessionSel"><option value="">Live / latest session</option></select></label>
         <button id="refreshRanking" class="btn btn-sm" type="button">Refresh ranking</button>
@@ -461,8 +464,8 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="live" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>06</b>Observe</span><h2 id="liveTitle" tabindex="-1"><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
-      <div class="card-actions"><span id="faultPill" class="pill warn"></span></div>
+      <div class="card-title"><span class="eyebrow"><b>05</b>Observe</span><h2 id="liveTitle" tabindex="-1"><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
+      <div class="card-actions"><span id="stopNote" class="stop-note hide">Use STOP in the Activity panel.</span><span id="faultPill" class="pill warn"></span></div>
     </header>
     <div class="card-body">
       <div class="run-top">
@@ -480,7 +483,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="grafanaSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>07</b>Correlate</span><h2>Grafana: Spanmetrics <span id="gRange" class="pill info"></span></h2></div>
+      <div class="card-title"><span class="eyebrow"><b>06</b>Correlate</span><h2>Grafana: Spanmetrics <span id="gRange" class="pill info"></span></h2></div>
       <div class="card-actions">
         <label class="field">Service <select id="gService"></select></label>
         <a id="gLink" class="btn btn-sm" href="#" target="_blank" rel="noopener">Open full dashboard in Grafana<span class="sr"> (opens in a new tab)</span></a>
@@ -499,7 +502,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="resultPanel" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>08</b>Learn</span><h2 id="resultTitle" tabindex="-1">Result</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>07</b>Learn</span><h2 id="resultTitle" tabindex="-1">Result</h2></div>
       <div class="card-actions"><span id="resultNote" class="muted"></span></div>
     </header>
     <div class="card-body"><div id="result"></div></div>
@@ -507,15 +510,16 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="historySec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>09</b>Review</span><h2>History</h2></div>
-      <div class="card-actions"><button id="refreshHistory" class="btn btn-sm" type="button">Refresh</button></div>
+      <div class="card-title"><span class="eyebrow"><b>08</b>Review</span><h2>History</h2></div>
+      <div class="card-actions"><label class="chk" title="Excluded runs feed no finding or score"><input type="checkbox" id="hideExcluded" checked> Hide excluded runs</label>
+        <button id="refreshHistory" class="btn btn-sm" type="button">Refresh</button></div>
     </header>
     <div class="card-body"><div id="history" class="muted">Loading…</div></div>
   </section>
 
   <section id="findingsSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>10</b>Improve</span><h2>Findings <span id="findingsPill" class="pill">loading</span></h2></div>
+      <div class="card-title"><span class="eyebrow"><b>09</b>Improve</span><h2>Findings <span id="findingsPill" class="pill">loading</span></h2></div>
       <div class="card-actions">
         <label class="chk"><input type="checkbox" id="autoAnalyse"> Auto-analyse after each experiment</label>
         <a class="btn btn-sm" href="/api/report" target="_blank" rel="noopener">Open full report<span class="sr"> (opens in a new tab)</span></a>
@@ -569,7 +573,7 @@ function phaseMessage(s) {
   const p = s.plan, r = s.result;
   switch (s.phase) {
     case 'proposed': return p ? `Plan proposed: ${p.fault.replace('_', ' ')} on ${p.target}. Safety gate ${s.validation && s.validation.valid ? 'passed' : 'blocked'}. Review it, then approve or reject.` : '';
-    case 'monitoring': return 'Fault active. The red emergency stop button is near the top of the page.';
+    case 'monitoring': return 'Fault active. Use STOP in the Activity panel to abort.';
     case 'rolling_back': return 'Rolling back the fault.';
     case 'recovering': return 'Rollback finished. Waiting for the system to recover.';
     case 'done': return r ? `Experiment finished, ${r.guard.aborted ? 'aborted' : 'completed'}. Resilience ${r.score ? r.score.resilience_score : 'unknown'} out of 100. Verdict: ${r.verdict.verdict}.` : 'Experiment finished.';
@@ -605,23 +609,24 @@ async function loadReadiness(quiet = false) {
   renderPlan();
 }
 
-/* ---------- 3. workflow: lifecycle stepper + Agent & Workflow Activity ---------- */
+/* ---------- 3. workflow models: the lifecycle and the six components, shown by the Activity dock ---------- */
 /* wf:pure begin (no DOM; unit-tested by tests/test_ui_workflow.js, which supplies ChaosUI). Maps app.py's real phases and
    fields onto the shared models; it never invents a state, a timestamp or an event. */
 const LIFECYCLE = [
   { id: 'proposed', label: 'Proposed' }, { id: 'validated', label: 'Validated' }, { id: 'approved', label: 'Approved', checkpoint: true },
   { id: 'injecting', label: 'Injecting' }, { id: 'monitoring', label: 'Observing' }, { id: 'rolling_back', label: 'Rolling back' },
   { id: 'recovering', label: 'Recovering' }, { id: 'analyzing', label: 'Analyzing' }, { id: 'done', label: 'Completed' }];
+const STAGE = { proposing: 'Drafting', starting: 'Starting', injecting: 'Injecting', monitoring: 'Monitoring', rolling_back: 'Rolling back', recovering: 'Recovering', analyzing: 'Analyzing' };
 const PHASE_HEADLINE = { proposing: 'Drafting a proposal', starting: 'Approved; preparing to inject', injecting: 'Injecting the fault', monitoring: 'Fault active; the guard is watching',
                          rolling_back: 'Rolling the fault back', recovering: 'Fault removed; waiting for recovery', analyzing: 'Scoring the run' };
 function lifecycleModel(s) {
   const U = ChaosUI, v = s && s.validation, r = s && s.result;
-  if (!s || s.phase === 'idle') return { steps: U.buildSteps(LIFECYCLE, null, null), headline: 'No experiment in progress', outcome: null };
+  if (!s || s.phase === 'idle') return { steps: U.buildSteps(LIFECYCLE, null, null), headline: 'No experiment in progress', outcome: null, stage: 'Idle' };
   if (s.phase === 'proposed') return v && !v.valid
-    ? { steps: U.buildSteps(LIFECYCLE, 'validated', 'failed'), headline: 'Blocked by the safety policy: nothing can run', outcome: 'failed' }
-    : { steps: U.buildSteps(LIFECYCLE, 'approved', null), headline: 'Waiting for human approval; nothing has been injected', outcome: null };
-  if (s.phase === 'refused') return { steps: U.buildSteps(LIFECYCLE, 'injecting', 'failed'), headline: `Not injected: ${s.refused || 'refused'}`, outcome: 'failed' };
-  if (s.phase === 'error') return { steps: U.buildSteps(LIFECYCLE, s.fault_started_ts ? 'monitoring' : 'injecting', 'failed'), headline: `Failed: ${s.refused || 'unexpected error'}`, outcome: 'failed' };
+    ? { steps: U.buildSteps(LIFECYCLE, 'validated', 'failed'), headline: 'Blocked by the safety policy: nothing can run', outcome: 'failed', stage: 'Blocked by policy' }
+    : { steps: U.buildSteps(LIFECYCLE, 'approved', null), headline: 'Waiting for human approval; nothing has been injected', outcome: null, stage: 'Awaiting approval' };
+  if (s.phase === 'refused') return { steps: U.buildSteps(LIFECYCLE, 'injecting', 'failed'), headline: `Not injected: ${s.refused || 'refused'}`, outcome: 'failed', stage: 'Not injected' };
+  if (s.phase === 'error') return { steps: U.buildSteps(LIFECYCLE, s.fault_started_ts ? 'monitoring' : 'injecting', 'failed'), headline: `Failed: ${s.refused || 'unexpected error'}`, outcome: 'failed', stage: 'Failed' };
   if (s.phase === 'done') {
     const g = (r && r.guard) || {}, rbBad = !!r && r.rollback_verified === false, recBad = !!r && !(r.recovery && r.recovery.recovered);
     const steps = LIFECYCLE.map(st => ({ ...st, state: 'done' })), set = (id, patch) => Object.assign(steps.find(t => t.id === id), patch);
@@ -631,10 +636,10 @@ function lifecycleModel(s) {
     if (g.aborted) { set('monitoring', { note: stopped ? 'stopped' : 'guard abort' }); set('done', { label: 'Aborted', state: 'aborted', note: stopped ? 'stopped by operator' : 'auto-abort' }); }
     else if (rbBad || recBad) set('done', { label: 'Needs attention', state: 'failed' });
     const outcome = g.aborted ? 'aborted' : rbBad || recBad ? 'failed' : 'completed';
-    return { steps, outcome, headline: g.aborted ? `Aborted and rolled back: ${g.reason}` : outcome === 'failed' ? 'Finished, but rollback or recovery was not verified' : 'Completed: rolled back and recovered' };
+    return { steps, outcome, stage: g.aborted ? 'Aborted' : outcome === 'failed' ? 'Needs attention' : 'Completed', headline: g.aborted ? `Aborted and rolled back: ${g.reason}` : outcome === 'failed' ? 'Finished, but rollback or recovery was not verified' : 'Completed: rolled back and recovered' };
   }
   const at = s.phase === 'proposing' ? 'proposed' : s.phase;
-  return { steps: U.buildSteps(LIFECYCLE, at, null), headline: PHASE_HEADLINE[s.phase] || '', outcome: null };
+  return { steps: U.buildSteps(LIFECYCLE, at, null), headline: PHASE_HEADLINE[s.phase] || '', outcome: null, stage: STAGE[s.phase] || '' };
 }
 const AGENT_ORDER = ['topology', 'planner', 'policy', 'executor', 'guard', 'analysis'];
 const FALLBACK_NAMES = { topology: 'Topology Discovery', planner: 'Experiment Planner', policy: 'Safety Policy Engine', executor: 'Experiment Executor', guard: 'Telemetry Guard', analysis: 'Analysis & Scoring' };
@@ -686,27 +691,32 @@ function agentModel(ctx) {
   return AGENT_ORDER.map(id => { const m = byId[id] || {};
     return { id, name: m.name || FALLBACK_NAMES[id], summary: m.summary || '', module: m.module, maturity: m.implementation || 'unknown', notes: m.notes || [], runtime: rt[id], latest: latest[id] || '' }; });
 }
+// The compact dashboard's model: stage + elapsed, active fault, the six rows (icon, name, runtime chip, latest line), the 3 newest events.
+function dockModel(s, life, rows) {
+  const plan = s.plan, ph = s.phase || 'idle', over = ['done', 'refused', 'error'].includes(ph);
+  const fault = plan ? [plan.fault, plan.target, plan.fault === 'network_delay' ? `${plan.magnitude} ms` : plan.fault === 'traffic_spike' ? `${plan.magnitude} users` : null].filter(Boolean).join(' \u00b7 ') : '';
+  return { active: ph !== 'idle', running: !!s.running, stage: life.stage, headline: life.headline, steps: life.steps, fault,
+    faultLabel: s.running ? 'Active fault' : over ? 'Last fault' : 'Proposed fault',
+    elapsed: (s.running || ph === 'done') && s.elapsed_s > 0 ? ChaosUI.mmss(s.elapsed_s) : '',
+    rows: rows.map(r => ({ id: r.id, name: r.name, runtime: r.runtime, latest: r.latest, summary: r.summary, module: r.module, maturity: r.maturity, notes: r.notes })),
+    events: (s.events || []).slice(-3).reverse().map(e => ({ time: e.ts, text: e.msg })) };
+}
 /* wf:pure end */
 
-let compMeta = null, graphState = { state: 'loading' }, lastWf = '', lastConn = '';
+let compMeta = null, graphState = { state: 'loading' }, lastConn = '', dock = null, stopPending = false;
 async function loadCompMeta() { try { compMeta = (await api('component-meta.json')).components || []; } catch (e) { compMeta = []; } renderWorkflow(); }
 function setConn(state) {
   if (state === lastConn) return; lastConn = state;
   const el = $('connChip'), [kind, label, ic] = state === 'ok' ? ['ok', 'API connected', 'check'] : ['bad', 'API unreachable', 'plug'];
   el.className = 'cc-chip ' + kind; el.innerHTML = ChaosUI.icon(ic) + label;
 }
-function renderWorkflow() {
-  const s = status || { phase: 'idle' }, el = $('wfElapsed');
-  const timing = s.running || s.phase === 'done';                       // the backend's own timer; shown only when it means something
-  el.classList.toggle('hide', !(timing && s.elapsed_s > 0)); el.textContent = `${s.running ? 'Elapsed' : 'Ran'} ${ChaosUI.mmss(s.elapsed_s)}`;
+function renderWorkflow() {                                               // feeds the Activity dock, the one place the lifecycle and components are shown
+  const s = status || { phase: 'idle' };
   const life = lifecycleModel(s);
   const fresh = typeof agentStats !== 'undefined' && agentStats.run && agentStats.run !== (mainFeed.ignoreRun || '');
   const rows = agentModel({ status: s, meta: compMeta || [], graph: graphState, goal: $('goalSel').value,
     agent: fresh ? { llm: agentStats.llm, tools: agentStats.tools, cap: AGENT_TOOL_CAP } : null });
-  const sig = JSON.stringify([life, rows, compMeta === null]);
-  if (sig === lastWf) return; lastWf = sig;
-  $('wfSteps').innerHTML = ChaosUI.stepperHtml(life); $('wfHeadline').textContent = life.headline;
-  $('wfAgents').innerHTML = ChaosUI.agentsHtml(rows);
+  if (dock) dock.render(dockModel(s, life, rows), { visible: !!s.running, pending: stopPending, disabled: false });   // the dock's STOP is the only STOP
 }
 
 /* ---------- 2. graph ---------- */
@@ -933,11 +943,7 @@ function highlight() {
 
 /* ---------- 3. plan ---------- */
 let lastPlanKey = '', lastPlanHtml = '';
-const FAULTS = {
-  container_stop: 'Container stop (docker stop, restarted on rollback)',
-  network_delay: 'Network delay (tc netem on the target\'s egress)',
-  traffic_spike: 'Traffic spike (bounded Locust users, original load restored on rollback)'
-};
+let planOpen = {};                                           // plan card toggles the user opened, kept across re-renders
 const FAULT_LABELS = { container_stop: 'Container stop', network_delay: 'Network delay', traffic_spike: 'Traffic spike' };
 function magnitudeText(p) {
   if (p.fault === 'network_delay') return `${p.magnitude} ms added delay`;
@@ -947,31 +953,66 @@ function magnitudeText(p) {
   }
   return 'n/a (container is stopped)';
 }
-function planFacts(p) {
-  const x = p.parameters || {};
-  if (p.fault === 'traffic_spike') return `
-    <div class="fact"><dt>Fault</dt><dd>${esc(FAULTS[p.fault])}</dd></div>
-    <div class="fact"><dt>Original load</dt><dd>${esc(x.baseline_users)} users</dd></div>
-    <div class="fact"><dt>Peak load</dt><dd>${esc(x.peak_users)} users</dd></div>
-    <div class="fact"><dt>Spawn rate</dt><dd>${esc(x.spawn_rate_per_second)} users/s</dd></div>
-    <div class="fact"><dt>Duration</dt><dd>${esc(x.duration_seconds)}&nbsp;s</dd></div>
-    <div class="fact"><dt>Journey</dt><dd>${esc(String(x.journey_profile || '').replaceAll('-', ' '))}</dd></div>`;
-  return `<div class="fact"><dt>Fault</dt><dd>${esc(FAULTS[p.fault] || p.fault)}</dd></div>
-    <div class="fact"><dt>Magnitude</dt><dd>${esc(magnitudeText(p))}</dd></div>
-    <div class="fact"><dt>Duration</dt><dd>${esc(p.duration_s)}&nbsp;s</dd></div>`;
-}
 const SOURCE_LABEL = { llm: 'Planned by LLM', rank_agent: 'Planned by agent', ranker_fallback: 'Ranker #1 (LLM not used)', 'deterministic-capability': 'Tested capability', fallback: 'FALLBACK PLAN' };
 const fix2 = x => x == null ? '&ndash;' : Number(x).toFixed(2);
-function rankingHtml(r) {
-  if (!r || !(r.top_k || []).length) return '';
-  const chosen = r.top_k.find(c => c.candidate_id === r.chosen) || {};
-  const ev = chosen.evidence || [], pr = r.predictions || [];
-  return `<details class="block" open><summary>Why this experiment: ${r.top_k.length} candidates compared${r.capped ? ' (tool cap reached)' : ''}</summary>
-    ${chosen.reason ? `<p>${esc(chosen.reason)}</p>` : ''}
-    ${ev.length ? `<h3 class="sub">Evidence</h3><ul>${ev.map(e => `<li><code>${esc(e.tool)}</code> ${esc(e.finding)}</li>`).join('')}</ul>` : ''}
-    ${pr.length ? `<h3 class="sub">Predictions</h3><ul>${pr.map(x => `<li>${esc(x.svc)} ${esc(x.metric)} ${esc(x.direction)} (&times;${esc(x.min_factor)})</li>`).join('')}</ul>` : ''}
-    <p class="muted"><a href="#agentSec">Full ranking and the agent's steps</a></p></details>`;
+/* plan:pure begin (no DOM): the plan card's text, built only from the plan, its validation and the guard preview */
+const planDuration = p => p.fault === 'traffic_spike' ? ((p.parameters || {}).duration_seconds ?? p.duration_s) : p.duration_s;
+function planQuestion(p, v) {                                 // what the run answers, from who depends on the target
+  const near = (v && v.blast_radius) || [], stop = p.fault === 'container_stop';
+  if (p.fault === 'traffic_spike') return 'does the storefront keep up?';
+  if (p.target !== 'checkout' && near.includes('checkout')) return stop ? 'does checkout fail gracefully?' : 'does checkout slow down or fail?';
+  if (p.target === 'frontend' || near.includes('frontend')) return stop ? 'does the storefront degrade gracefully?' : 'does the storefront slow down?';
+  if (near.length) return `do the ${near.length} service${near.length === 1 ? '' : 's'} that depend on it cope?`;
+  return 'does it recover cleanly?';
 }
+function planSummary(p, v) {
+  const x = p.parameters || {};
+  const what = p.fault === 'container_stop' ? `Stop ${p.target}`
+    : p.fault === 'network_delay' ? `Add ${p.magnitude} ms delay to ${p.target}`
+    : p.fault === 'traffic_spike' ? `Raise traffic on ${p.target} from ${x.baseline_users} to ${x.peak_users} users`
+    : `${FAULT_LABELS[p.fault] || p.fault} on ${p.target}`;
+  return `${what} for ${planDuration(p)} s: ${planQuestion(p, v)}`;
+}
+const PRED_METRIC = { p95_ms: 'p95', p99_ms: 'p99', error_rate: 'errors' };
+const PRED_ARROW = { up: ['↑', 'up', 'rises'], down: ['↓', 'down', 'falls'] };
+function predictionRows(r) {                                  // [{svc, metric, arrow, cls, said, factor}]
+  return ((r && r.predictions) || []).map(x => {
+    const [arrow, cls, said] = PRED_ARROW[x.direction] || ['→', 'flat', 'stays the same'];
+    const f = Number(x.min_factor);
+    return { svc: x.svc, metric: PRED_METRIC[x.metric] || x.metric, arrow, cls, said,
+             factor: isFinite(f) && f > 1 && x.direction !== 'flat' ? `≥${Math.round(f * 10) / 10}×` : '' };
+  });
+}
+function chosenCandidate(r) { return r && (r.top_k || []).find(c => c.candidate_id === r.chosen) || null; }
+function whyFacts(r) {                                         // 2-3 short facts: the ranker's reasons, then the agent's evidence
+  const c = chosenCandidate(r);
+  if (!c) return [];
+  const why = String(c.why || '').split('|')[0].split(';').map(t => t.trim()).filter(Boolean);
+  const ev = (c.evidence || []).filter(e => e && e.finding).map(e => {
+    const f = String(e.finding).trim();
+    return `${f.length > 110 ? f.slice(0, 108) + '…' : f} (${String(e.tool || 'agent').replaceAll('_', ' ')})`;
+  });
+  const out = [...why.slice(0, 2), ...ev.slice(0, 1)];
+  for (const t of [...why.slice(2), ...ev.slice(1)]) if (out.length < 3) out.push(t);
+  return out.slice(0, 3);
+}
+const fmtNum = x => { const n = Number(x); return String(n >= 100 ? Math.round(n) : Math.round(n * 10) / 10); };
+function rangeText(vals, unit) {
+  const v = vals.filter(x => x != null && isFinite(x)).map(Number);
+  if (!v.length) return '';
+  const lo = Math.min(...v), hi = Math.max(...v);
+  return fmtNum(lo) === fmtNum(hi) ? `${fmtNum(lo)}${unit}` : `${fmtNum(lo)}–${fmtNum(hi)}${unit}`;
+}
+function abortText(g) {                                        // from /api/status guard_preview; '' when it is not there
+  if (!g || !(g.services || []).length) return '';
+  const lim = Object.values(g.abort || {});
+  const err = rangeText(lim.map(x => x.error_rate), '%'), p95 = rangeText(lim.map(x => x.p95_ms), ' ms');
+  const parts = [err && `error rate above ${err}`, p95 && `p95 above ${p95}`].filter(Boolean);
+  if (!parts.length) return '';
+  const each = lim.length > 1 ? ' (each service’s baseline limit)' : ' (baseline limit)';
+  return `${parts.join(' or ')}${each} for ${g.breaches_in_a_row} samples in a row; stops anyway at ${g.max_duration_s} s`;
+}
+/* plan:pure end */
 const agentStats = { run: '', llm: 0, tools: 0, last: null, seen: new Set() };       // what the planning agent has done so far, from its events
 function noteAgentEvents(evs) {                                    // called by the feed for every batch of events
   for (const e of evs) {
@@ -1001,7 +1042,7 @@ function renderPlan() {
   $('propose').disabled = !!running || proposing;
   $('propose').innerHTML = proposing ? `<span class="spin"></span>${$('goalSel').value ? 'LLM call…' : 'Agent running…'}` : 'Propose experiment';
   const canDecide = s && s.phase === 'proposed' && p;
-  const planKey = p ? JSON.stringify(p) : ''; if (planKey !== lastPlanKey) { lastPlanKey = planKey; $('reviewed').checked = false; }
+  const planKey = p ? JSON.stringify(p) : ''; if (planKey !== lastPlanKey) { lastPlanKey = planKey; $('reviewed').checked = false; planOpen = {}; }
   const trafficReady = p && p.fault === 'traffic_spike'
     ? !!(readiness && readiness.checks.find(c => c.name === 'Traffic spike' && c.ok)) : true;
   const safe = !!(canDecide && v && v.valid && readiness && readiness.ready && trafficReady);
@@ -1020,28 +1061,84 @@ function renderPlan() {
     return;
   }
   const faultName = FAULT_LABELS[p.fault] || p.fault;
-  const key = JSON.stringify([p, v, s.source, s.note]);
+  const g = s.guard_preview || null;
+  const key = JSON.stringify([p, v, s.source, s.note, g]);
   if (key === lastPlanHtml) return;                       // the poll runs every second: do not rebuild (and deselect) unchanged text
   lastPlanHtml = key;
-  $('plan').innerHTML = `<div class="plan-grid">
-    <div class="plan-main">
-      <div class="plan-headline"><span class="plan-target">${esc(p.target)}</span>
-        <span class="pill ${p.fault === 'container_stop' ? 'bad' : 'warn'}">${esc(faultName)}</span>
-        <span class="pill ${['llm', 'rank_agent'].includes(s.source) ? 'info' : 'warn'}">${esc(SOURCE_LABEL[s.source] || 'FALLBACK PLAN')}</span></div>
-      <dl class="facts">${planFacts(p)}</dl>
-      <div class="prose"><h3 class="sub">Hypothesis</h3><p>${esc(p.hypothesis)}</p><h3 class="sub">Reasoning</h3><p>${esc(p.reasoning)}</p>
-        <p class="muted">${esc(s.note)}</p></div>
-      ${rankingHtml(p.ranking)}
+  const r = p.ranking, c = chosenCandidate(r), preds = predictionRows(r), facts = whyFacts(r);
+  const checks = v.checks || [], failed = checks.filter(k => !k.passed), blast = v.blast_radius || [];
+  const more = (id, label) => `<button type="button" class="pc-more" data-pt="${id}" aria-expanded="${!!planOpen[id]}" aria-controls="pt-${id}">${planOpen[id] ? 'Show less' : label}</button>`;
+  const long = t => String(t || '').length > 110;
+  const x = p.parameters || {};
+  const faultLine = p.fault === 'traffic_spike'
+    ? `${faultName}: ${x.baseline_users} → ${x.peak_users} users at ${x.spawn_rate_per_second}/s${x.journey_profile ? ', ' + String(x.journey_profile).replaceAll('-', ' ') : ''}, ${planDuration(p)} s`
+    : `${faultName}${p.fault === 'network_delay' ? ` +${p.magnitude} ms` : ''}, ${p.duration_s} s`;
+  const watched = g && (g.services || []).length ? g.services : [p.target, ...blast];
+  const abort = abortText(g);
+  const passIf = `${preds.length ? 'the predictions hold' : 'the hypothesis holds'} and the system recovers${g ? ` within ${g.recovery_timeout_s} s` : ''}`;
+  const reasonFull = [p.reasoning, c && c.reason && c.reason !== p.reasoning ? c.reason : ''].filter(Boolean);
+  const evidence = (c && c.evidence) || [];
+  const gateOpen = planOpen.gate ?? !v.valid;              // a blocked plan opens its failures by default
+  const checkLi = k => `<li><span class="ic ${k.passed ? 'ok' : 'no'}" aria-hidden="true">${k.passed ? '&#10003;' : '&#10007;'}</span><span>${esc(k.name)}<span class="sr">: ${k.passed ? 'passed' : 'failed'}</span> <small class="muted">${esc(k.detail)}</small></span></li>`;
+  const blastChips = `<div>${blast.length ? blast.map(n => `<span class="chip blast">${esc(n)}</span>`).join('') : '<span class="muted">none</span>'}</div>`;
+  const gateSummary = v.valid
+    ? `${ChaosUI.chip('ok', 'Safety gate passed', 'check')}<span>${checks.length}/${checks.length} checks &middot; blast radius: ${blast.length} service${blast.length === 1 ? '' : 's'}</span>`
+    : `${ChaosUI.icon('x')}<span>Blocked by the safety gate &middot; ${failed.length || (v.reasons || []).length} check${(failed.length || (v.reasons || []).length) === 1 ? '' : 's'} failed</span>`;
+  const gateBody = v.valid
+    ? `<ul class="gate">${checks.map(checkLi).join('')}</ul><h4 class="pc-sub">Blast radius: everything that depends on ${esc(p.target)}</h4>${blastChips}`
+    : `${failed.length ? `<ul class="gate">${failed.map(checkLi).join('')}</ul>` : ''}
+       ${!checks.length && (v.reasons || []).length ? `<ul class="reasons">${v.reasons.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+       ${checks.length ? `<details data-pt="gateAll"${planOpen.gateAll ? ' open' : ''}><summary>Show all ${checks.length} checks and the blast radius</summary>
+         <ul class="gate">${checks.map(checkLi).join('')}</ul><h4 class="pc-sub">Blast radius</h4>${blastChips}</details>` : ''}`;
+  $('plan').innerHTML = `
+    <p class="plan-sum">${esc(planSummary(p, v))}</p>
+    <div class="plan-pills"><span class="pill ${p.fault === 'container_stop' ? 'bad' : 'warn'}">${esc(faultName)}</span>
+      <span class="pill ${['llm', 'rank_agent'].includes(s.source) ? 'info' : 'warn'}">${esc(SOURCE_LABEL[s.source] || 'FALLBACK PLAN')}</span>
+      ${r && (r.top_k || []).length ? `<span class="pill">1 of ${r.top_k.length} candidates</span>` : ''}</div>
+    <div class="pc-cards">
+      <section class="pc-card" aria-labelledby="pc-h-expect"><h3 id="pc-h-expect">${ChaosUI.icon('analysis')}We expect</h3>
+        <p class="pc-text${long(p.hypothesis) && !planOpen.hyp ? ' clamp' : ''}" id="pt-hyp">${esc(p.hypothesis)}</p>
+        ${long(p.hypothesis) ? more('hyp', 'Show full') : ''}
+        ${preds.length ? `<h4 class="pc-sub">Predictions</h4><ul class="pc-preds" aria-label="Predicted changes">${preds.map(q => `<li>
+          <span class="svc">${esc(q.svc)}</span><span class="met">${esc(q.metric)}</span><span class="arr ${q.cls}" aria-hidden="true">${q.arrow}</span><span class="fac">${esc(q.factor)}</span>
+          <span class="sr">${esc(q.metric)} ${q.said}${q.factor ? ' by at least ' + esc(q.factor.replace('≥', '').replace('×', ' times')) : ''}</span></li>`).join('')}</ul>` : ''}
+      </section>
+      <section class="pc-card" aria-labelledby="pc-h-why"><h3 id="pc-h-why">${ChaosUI.icon('planner')}Why this one</h3>
+        ${facts.length ? `<ul class="pc-facts">${facts.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`
+          : `<p class="pc-text${long(p.reasoning) && !planOpen.why ? ' clamp' : ''}" id="pt-why">${esc(p.reasoning)}</p>`}
+        ${facts.length && (reasonFull.length || evidence.length) ? `${more('why', 'Show full')}
+          <div class="pc-full" id="pt-why"${planOpen.why ? '' : ' hidden'}>${reasonFull.map(t => `<p>${esc(t)}</p>`).join('')}
+            ${evidence.length ? `<h4 class="pc-sub">Evidence</h4><ul>${evidence.map(e => `<li><code>${esc(e.tool)}</code> ${esc(e.finding)}</li>`).join('')}</ul>` : ''}</div>`
+          : !facts.length && long(p.reasoning) ? more('why', 'Show full') : ''}
+      </section>
+      <section class="pc-card" aria-labelledby="pc-h-how"><h3 id="pc-h-how">${ChaosUI.icon('guard')}How we'll test it</h3>
+        <dl class="pc-test">
+          <dt>Fault</dt><dd>${esc(faultLine)}</dd>
+          <dt>Watching</dt><dd>${watched.map(n => `<span class="chip ${n === p.target ? 'target' : 'blast'}">${esc(n)}</span>`).join('')}</dd>
+          ${abort ? `<dt>Abort if</dt><dd>${esc(abort)}</dd>` : ''}
+          ${g && g.rollback ? `<dt>Rollback</dt><dd>${esc(g.rollback)}</dd>` : ''}
+          <dt>Pass if</dt><dd>${esc(passIf)}</dd>
+        </dl>
+      </section>
     </div>
-    <aside class="plan-side">
-      <h3 class="sub">Safety gate</h3><span class="pill ${v.valid ? 'ok' : 'bad'}">${v.valid ? 'ALL CHECKS PASSED' : 'BLOCKED'}</span>
-      <ul class="gate">${(v.checks || []).map(c => `<li><span class="ic ${c.passed ? 'ok' : 'no'}">${c.passed ? '&#10003;' : '&#10007;'}</span><span>${esc(c.name)} <small class="muted">${esc(c.detail)}</small></span></li>`).join('')}</ul>
-      ${(v.checks || []).length ? '' : v.reasons.length ? `<ul class="reasons">${v.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
-      <h3 class="sub">Blast radius</h3>
-      <div>${v.blast_radius.length ? v.blast_radius.map(n => `<span class="chip blast">${esc(n)}</span>`).join('') : '<span class="muted">none</span>'}</div>
-      <p class="muted" style="font-size:12px;margin-top:6px">Everything that depends on ${esc(p.target)}.</p>
-    </aside></div>`;
+    ${s.note || (r && (r.top_k || []).length) ? `<p class="pc-note">${esc(s.note || '')}${r && (r.top_k || []).length ? `<a href="#agentSec">Full ranking and the agent's steps</a>` : ''}</p>` : ''}
+    <details class="gate-strip ${v.valid ? 'passed' : 'blocked'}" data-pt="gate"${gateOpen ? ' open' : ''}>
+      <summary>${gateSummary}<span class="more">details</span></summary>
+      <div class="gate-body">${gateBody}</div>
+    </details>`;
+  announce(`Plan for ${p.target}: ${v.valid ? 'Safety gate passed' : 'Blocked by the safety gate'}`);
 }
+$('plan').addEventListener('click', e => {                   // "Show full" toggles: flip in place, remember across re-renders
+  const b = e.target.closest('button[data-pt]');
+  if (!b) return;
+  const id = b.dataset.pt, open = planOpen[id] = !planOpen[id], target = $('pt-' + id);
+  b.setAttribute('aria-expanded', String(open)); b.textContent = open ? 'Show less' : 'Show full';
+  if (target) target.classList.contains('pc-full') ? (target.hidden = !open) : target.classList.toggle('clamp', !open);
+});
+$('plan').addEventListener('toggle', e => {                  // <details> in the card: remember what the user opened or closed
+  const d = e.target;
+  if (d.matches && d.matches('details[data-pt]')) planOpen[d.dataset.pt] = d.open;
+}, true);
 
 /* ---------- 4. live ---------- */
 /* cmp:pure begin (no DOM, no Chart.js: unit-tested from tests/test_ui_comparison.js) */
@@ -1235,9 +1332,9 @@ function renderEvents(s) {
 }
 function renderLive(s) {
   const show = !['idle', 'proposing', 'proposed'].includes(s.phase); $('live').classList.toggle('hide', !show);
-  $('stop').classList.toggle('show', !!s.running);
+  $('stopNote').classList.toggle('hide', !s.running);
   $('live').classList.toggle('is-live', !!s.running);
-  if (!s.running) { $('stop').disabled = false; $('stop').textContent = 'STOP EXPERIMENT'; }
+  if (!s.running) stopPending = false;
   if (!show) return;
   $('elapsed').textContent = Math.round(s.elapsed_s) + 's';
   $('fault').textContent = s.plan ? `${s.plan.fault} on ${s.plan.target} (${magnitudeText(s.plan)})` : '-';
@@ -1320,17 +1417,25 @@ async function loadHistory() {
   catch (e) { $('history').className = ''; $('history').innerHTML = `<p class="pos">Could not load history: ${esc(e.message)}</p>`; return; }
   renderHistory();
 }
+const QUALITY_PILL = { ok: ['ok', 'ok'], low_evidence: ['warn', 'low evidence'], excluded: ['', 'excluded'] };
+function qualityPill(r) {
+  const [cls, label] = QUALITY_PILL[r.quality] || ['', r.quality || 'unknown'];
+  return `<span class="pill ${cls}" title="${esc(r.quality_reason || 'enough evidence')}">${esc(label)}</span><span class="sr">: ${esc(r.quality_reason || 'enough evidence')}</span>`;
+}
 function renderHistory() {
-  const rows = historyAll ? historyRows : historyRows.slice(0, 8);
+  const hidden = $('hideExcluded').checked ? historyRows.filter(r => r.quality === 'excluded').length : 0;
+  const shown = $('hideExcluded').checked ? historyRows.filter(r => r.quality !== 'excluded') : historyRows;
+  const rows = historyAll ? shown : shown.slice(0, 8);
   $('history').className = '';
   $('history').innerHTML = !historyRows.length ? '<p class="muted">No saved results yet.</p>' :
-    `<div class="table-wrap${historyAll ? ' scroll' : ''}"><table><tr><th>Started (UTC)</th><th>Experiment</th><th>Outcome</th><th>Verdict</th><th>Recovered</th><th>Rollback</th></tr>${rows.map(r =>
+    `<div class="table-wrap${historyAll ? ' scroll' : ''}"><table><tr><th>Started (UTC)</th><th>Experiment</th><th>Outcome</th><th>Verdict</th><th>Recovered</th><th>Rollback</th><th>Data</th></tr>${rows.map(r =>
       `<tr class="click" data-id="${esc(r.id)}"><td><button type="button" class="rowbtn" aria-label="Open the ${esc(r.fault.replace('_', ' '))} on ${esc(r.target)} result from ${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))} UTC">${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))}</button></td>
        <td>${esc(r.fault)} on <b>${esc(r.target)}</b>${r.fault === 'network_delay' ? ` ${esc(r.magnitude)}&nbsp;ms` : r.fault === 'traffic_spike' ? ` ${esc((r.parameters || {}).baseline_users)}→${esc((r.parameters || {}).peak_users)} users` : ''}</td>
        <td><span class="pill ${r.aborted ? 'warn' : 'ok'}">${r.aborted ? 'aborted' : 'completed'}</span></td>
        <td><span class="pill ${verdictClass(r.verdict)}">${esc(r.verdict)}</span></td>
-       <td>${r.recovered ? 'yes' : 'no'}</td><td>${r.rollback_verified ? 'verified' : '<b class="pos">FAILED</b>'}</td></tr>`).join('')}</table></div>`
-    + (historyRows.length > 8 ? `<button id="historyMore" class="btn btn-sm history-more" type="button">${historyAll ? 'Show latest 8' : `Show all ${historyRows.length}`}</button>` : '');
+       <td>${r.recovered ? 'yes' : 'no'}</td><td>${r.rollback_verified ? 'verified' : '<b class="pos">FAILED</b>'}</td><td>${qualityPill(r)}</td></tr>`).join('')}</table></div>`
+    + (hidden ? `<p class="note">${hidden} excluded run${hidden === 1 ? '' : 's'} hidden (they feed no finding or score). Untick &ldquo;Hide excluded runs&rdquo; to see them.</p>` : '')
+    + (shown.length > 8 ? `<button id="historyMore" class="btn btn-sm history-more" type="button">${historyAll ? 'Show latest 8' : `Show all ${shown.length}`}</button>` : '');
   document.querySelectorAll('#history tr.click').forEach(tr => { tr.onclick = () => openResult(tr.dataset.id); });      // mouse: the whole row
   document.querySelectorAll('#history .rowbtn').forEach(b => { b.onclick = ev => { ev.stopPropagation(); openResult(b.closest('tr').dataset.id); }; });   // keyboard: the button
   if ($('historyMore')) $('historyMore').onclick = () => { historyAll = !historyAll; renderHistory(); };
@@ -1419,7 +1524,7 @@ function findingHtml(f, a, ex) {
   return `<details class="finding" data-id="${esc(f.id)}"${findingsOpen.has(f.id) ? ' open' : ''}>
     <summary><span class="pill ${SEV_PILL[f.severity]}">${esc(f.severity)}</span><b>${esc(f.title)}</b>
       ${adj ? `<span class="pill info" title="${esc(f.agent_adjustment || '')}">AI adjusted: ${esc(f.deterministic_severity)} &rarr; ${esc(f.severity)}</span>` : ''}
-      <span class="muted">${esc(f.edge || f.service)} &middot; score ${esc(f.severity_score)} &middot; ${f.runs.length} run${f.runs.length === 1 ? '' : 's'} &middot; ${f.source === 'agent' ? 'AI-checked' : 'rules'}</span></summary>
+      <span class="muted">${esc(f.edge || f.service)} &middot; score ${esc(f.severity_score)} &middot; ${(n => `based on ${n} run${n === 1 ? '' : 's'}`)(f.runs.length)}${(m => m ? ` (${m} low evidence)` : '')(f.runs.filter(r => ex[r] && ex[r].quality === 'low_evidence').length)} &middot; ${f.source === 'agent' ? 'AI-checked' : 'rules'}</span></summary>
     <div class="fbody">
       <dl class="kv"><dt>Root cause</dt><dd>${evText(f.root_cause)}${f.root_cause_replaced ? ' <span class="muted">(the agent quoted numbers that are not in the evidence, so the rule\'s own text is shown)</span>' : ''}</dd>
         ${adj ? `<dt>AI adjusted</dt><dd>${esc(f.deterministic_severity)} &rarr; ${esc(f.severity)}${f.agent_adjustment ? ': ' + evText(f.agent_adjustment) : ''}</dd>` : ''}
@@ -1440,8 +1545,8 @@ function renderFindings() {
   const col = ov.score == null ? 'var(--text-3)' : ov.score >= 80 ? 'var(--ok)' : ov.score >= 60 ? 'var(--warn)' : 'var(--bad)';
   $('findings').className = '';
   $('findings').innerHTML = `${noticesHtml(d)}
-    <div class="scorewrap"><div class="scorebar" style="margin-bottom:0"><div class="ring" style="--p:${ov.score ?? 0};--c:${col}"><div><span><b>${ov.score ?? '&ndash;'}</b><br><small>/100</small></span></div></div>
-      <div><small class="muted">OVERALL RESILIENCE</small><div style="font-size:16px;font-weight:600">${a.findings.length} weakness${a.findings.length === 1 ? '' : 'es'} &middot; ${a.strengths.length} strength${a.strengths.length === 1 ? '' : 's'} &middot; ${a.results_used.length} experiments</div>
+    <div class="scorewrap"><div class="scorebar" style="margin-bottom:0"><div class="ring" style="--p:${ov.score ?? 0};--c:${col}"${ov.provisional ? ` title="${esc(ov.provisional_note)}"` : ''}><div><span><b>${ov.score ?? '&ndash;'}</b><br><small>/100${ov.provisional ? '<br>provisional' : ''}</small></span></div></div>
+      <div><small class="muted">OVERALL RESILIENCE</small>${ov.provisional ? ` <span class="pill warn" title="Fewer than 3 runs have quality ok">${esc(ov.provisional_note)}</span>` : ''}<div style="font-size:16px;font-weight:600">${a.findings.length} weakness${a.findings.length === 1 ? '' : 'es'} &middot; ${a.strengths.length} strength${a.strengths.length === 1 ? '' : 's'} &middot; ${a.results_used.length} experiments</div>
         <div class="muted">${esc(ov.explain)}</div>
         <div class="muted">${a.source === 'analysis_agent' ? `AI-checked by ${esc(a.model || 'the analysis agent')}, ${esc(a.tool_calls)} tool calls` : 'Deterministic rules only'}${d.generated_at ? ' &middot; ' + esc(d.generated_at.replace('T', ' ').replace('+00:00', ' UTC')) : ''}</div></div></div>
       ${serviceTableHtml(a.scores)}</div>
@@ -1783,6 +1888,7 @@ async function poll() {
 }
 
 $('refreshReady').onclick = () => withBusy($('refreshReady'), 'Refreshing…', () => Promise.all([loadReadiness(), loadGoals()]));
+$('hideExcluded').onchange = () => { historyAll = false; renderHistory(); };
 $('refreshHistory').onclick = () => withBusy($('refreshHistory'), 'Refreshing…', loadHistory);
 $('bannerClose').onclick = () => banner('');
 $('focus').onchange = () => { chartSig = ''; renderCharts(status); };
@@ -1805,13 +1911,15 @@ async function loadGoals() {
 }
 $('approve').onclick = async () => { await act('/api/approve', 'Approve', undefined, $('approve')); await poll(); };
 $('reject').onclick = async () => { await act('/api/reject', 'Reject', undefined, $('reject')); await poll(); };
-$('stop').onclick = async () => {
-  $('stop').disabled = true; $('stop').textContent = 'Stopping…';
+async function requestStop() {                                          // the one STOP handler: the Activity dock's STOP buttons call it, nothing else does
+  if (stopPending) return;
+  stopPending = true; renderWorkflow();                                  // "Stop requested" until the request is through
   await act('/api/stop', 'Stop'); await poll();
-  setTimeout(() => { $('stop').disabled = false; $('stop').textContent = 'STOP EXPERIMENT'; }, 1500);   // a second press skips the recovery wait
-};
+  setTimeout(() => { stopPending = false; renderWorkflow(); }, 1500);   // then it re-arms: a second press skips the recovery wait
+}
 
 $('liveCmpMount').innerHTML = cmpHtml('live');
+dock = ChaosUI.createDock($('ccDock'), { onStop: requestStop });
 loadCompMeta();
 loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); loadSessions(); loadFindings();
 /* Reloading the page (F5 / Ctrl+F5) starts from a clean screen: an unapproved plan, the last result card and the previous agent
