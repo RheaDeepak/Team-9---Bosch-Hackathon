@@ -287,14 +287,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 .svc-table td:nth-child(2) { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .scorewrap { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s3); }
 
-/* ================= Emergency stop ================= */
-#stop { position:fixed; right:var(--s5); bottom:calc(var(--s5) + env(safe-area-inset-bottom)); z-index:40; display:none; align-items:center; gap:var(--s2);
-  background:var(--bad-solid); border:2px solid #ff8a87; color:#fff; font-size:13px; font-weight:800; letter-spacing:.03em; padding:8px 16px; border-radius:var(--r-sm);
-  box-shadow:0 6px 20px rgba(207,52,52,.45); transition:background-color var(--ease), transform .08s ease, box-shadow var(--ease); }
-#stop::before { content:""; width:10px; height:10px; border-radius:2px; background:#fff; flex:none; }
-#stop:hover:not(:disabled) { background:var(--bad-hover); box-shadow:0 12px 40px rgba(224,69,69,.6); } #stop:active:not(:disabled) { transform:translateY(1px); }
-#stop:focus-visible { outline:3px solid #fff; outline-offset:3px; border-radius:var(--r-md); }
-#stop.show { display:inline-flex; }
+.stop-note { font-size:var(--fs-small); color:var(--text-2); }
 
 /* ================= Responsive ================= */
 @media (max-width:1000px) {
@@ -324,7 +317,6 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
   .decision .btns { margin-left:0; width:100%; } .decision .btns .btn { flex:1; }
   .scorebar { padding:var(--s4); }
   th, td { padding:8px 10px; }
-  #stop { left:var(--s3); right:var(--s3); bottom:calc(var(--s3) + env(safe-area-inset-bottom)); justify-content:center; padding:12px 16px; min-height:44px; }
 }
 @media (prefers-reduced-motion:reduce) {
   html { scroll-behavior:auto; }
@@ -333,8 +325,6 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 .human-gate { display:flex; gap:var(--s2); align-items:flex-start; width:100%; margin:0; padding:8px 12px; border-radius:var(--r-sm); background:var(--warn-soft); color:var(--text); font-size:var(--fs-small); border:1px solid rgba(251,191,36,.3); }
 .human-gate .cc-svg { color:var(--warn); margin-top:2px; }
 .cmp-ic { display:inline-grid; vertical-align:-2px; margin-right:6px; } .cmp-ic.ok { color:var(--ok); } .cmp-ic.bad { color:var(--bad); }
-.wf-note { margin:var(--s3) 0 0; font-size:var(--fs-small); color:var(--text-3); }
-main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { order:-9; }
 </style>
 </head>
 <body>
@@ -346,7 +336,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
       <div><h1>Chaos Copilot</h1><p class="cc-label">Resilience operations</p></div>
     </div>
     <nav class="steps-nav" aria-label="Steps">
-      <a href="#readiness" data-for="readiness">Readiness</a><a href="#workflowSec" data-for="workflowSec">Workflow</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a><a href="#agentSec" data-for="agentSec">Agent</a>
+      <a href="#readiness" data-for="readiness">Readiness</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a><a href="#agentSec" data-for="agentSec">Agent</a>
       <a href="#live" data-for="live">Live</a><a href="#grafanaSec" data-for="grafanaSec">Grafana</a><a href="#resultPanel" data-for="resultPanel">Result</a><a href="#historySec" data-for="historySec">History</a><a href="#findingsSec" data-for="findingsSec">Findings</a>
     </nav>
     <div class="top-status">
@@ -356,7 +346,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
     </div>
   </div>
 </header>
-<button id="stop" type="button" aria-label="Emergency stop: abort the experiment and roll the fault back">STOP EXPERIMENT</button>
+<aside id="ccDock" aria-label="Activity dashboard"></aside>
 <div id="srStatus" class="sr" role="status" aria-live="polite"></div>
 <main id="main" tabindex="-1" data-mode="idle">
   <div id="banner" role="alert"><span id="bannerText"></span><button id="bannerClose" class="banner-x" type="button" aria-label="Dismiss message">&times;</button></div>
@@ -372,23 +362,9 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
     </div>
   </section>
 
-  <section id="workflowSec" class="card">
-    <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>02</b>Workflow</span><h2>Agent &amp; Workflow Activity</h2></div>
-      <div class="card-actions"><span id="wfElapsed" class="cc-chip outline hide"></span></div>
-    </header>
-    <div class="card-body">
-      <div class="cc-steps-meta"><span class="cc-label">Experiment lifecycle</span><span id="wfHeadline" class="muted" role="status"></span></div>
-      <div id="wfSteps"></div>
-      <p class="wf-note">Deterministic policy, not the LLM, decides whether an experiment may run, and a human approves it before anything is injected.</p>
-      <h3 class="sub" style="margin-top:var(--s4)">Components <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(what each does now, and how far it is built)</span></h3>
-      <div id="wfAgents"><p class="muted">Loading components…</p></div>
-    </div>
-  </section>
-
   <section id="graphSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>03</b>Understand</span><h2>Dependency graph</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>02</b>Understand</span><h2>Dependency graph</h2></div>
     </header>
     <div class="card-body">
       <div class="toolbar">
@@ -417,7 +393,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="planSec" class="card primary">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>04</b>Decide</span><h2>Experiment plan</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>03</b>Decide</span><h2>Experiment plan</h2></div>
       <div class="card-actions">
         <label class="field"><span class="sr">Learning goal (optional)</span><select id="goalSel"><option value="">No preference: let the AI explore</option></select></label>
         <button id="propose" class="btn btn-primary" type="button">Propose experiment</button>
@@ -437,7 +413,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="agentSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>05</b>Explain</span><h2>Planning agent</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>04</b>Explain</span><h2>Planning agent</h2></div>
       <div class="card-actions">
         <label class="field"><span class="sr">Replay a saved agent session</span><select id="sessionSel"><option value="">Live / latest session</option></select></label>
         <button id="refreshRanking" class="btn btn-sm" type="button">Refresh ranking</button>
@@ -461,8 +437,8 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="live" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>06</b>Observe</span><h2 id="liveTitle" tabindex="-1"><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
-      <div class="card-actions"><span id="faultPill" class="pill warn"></span></div>
+      <div class="card-title"><span class="eyebrow"><b>05</b>Observe</span><h2 id="liveTitle" tabindex="-1"><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
+      <div class="card-actions"><span id="stopNote" class="stop-note hide">Use STOP in the Activity panel.</span><span id="faultPill" class="pill warn"></span></div>
     </header>
     <div class="card-body">
       <div class="run-top">
@@ -480,7 +456,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="grafanaSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>07</b>Correlate</span><h2>Grafana: Spanmetrics <span id="gRange" class="pill info"></span></h2></div>
+      <div class="card-title"><span class="eyebrow"><b>06</b>Correlate</span><h2>Grafana: Spanmetrics <span id="gRange" class="pill info"></span></h2></div>
       <div class="card-actions">
         <label class="field">Service <select id="gService"></select></label>
         <a id="gLink" class="btn btn-sm" href="#" target="_blank" rel="noopener">Open full dashboard in Grafana<span class="sr"> (opens in a new tab)</span></a>
@@ -499,7 +475,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="resultPanel" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>08</b>Learn</span><h2 id="resultTitle" tabindex="-1">Result</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>07</b>Learn</span><h2 id="resultTitle" tabindex="-1">Result</h2></div>
       <div class="card-actions"><span id="resultNote" class="muted"></span></div>
     </header>
     <div class="card-body"><div id="result"></div></div>
@@ -507,7 +483,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="historySec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>09</b>Review</span><h2>History</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>08</b>Review</span><h2>History</h2></div>
       <div class="card-actions"><label class="chk" title="Excluded runs feed no finding or score"><input type="checkbox" id="hideExcluded" checked> Hide excluded runs</label>
         <button id="refreshHistory" class="btn btn-sm" type="button">Refresh</button></div>
     </header>
@@ -516,7 +492,7 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
 
   <section id="findingsSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>10</b>Improve</span><h2>Findings <span id="findingsPill" class="pill">loading</span></h2></div>
+      <div class="card-title"><span class="eyebrow"><b>09</b>Improve</span><h2>Findings <span id="findingsPill" class="pill">loading</span></h2></div>
       <div class="card-actions">
         <label class="chk"><input type="checkbox" id="autoAnalyse"> Auto-analyse after each experiment</label>
         <a class="btn btn-sm" href="/api/report" target="_blank" rel="noopener">Open full report<span class="sr"> (opens in a new tab)</span></a>
@@ -570,7 +546,7 @@ function phaseMessage(s) {
   const p = s.plan, r = s.result;
   switch (s.phase) {
     case 'proposed': return p ? `Plan proposed: ${p.fault.replace('_', ' ')} on ${p.target}. Safety gate ${s.validation && s.validation.valid ? 'passed' : 'blocked'}. Review it, then approve or reject.` : '';
-    case 'monitoring': return 'Fault active. The red emergency stop button is near the top of the page.';
+    case 'monitoring': return 'Fault active. Use STOP in the Activity panel to abort.';
     case 'rolling_back': return 'Rolling back the fault.';
     case 'recovering': return 'Rollback finished. Waiting for the system to recover.';
     case 'done': return r ? `Experiment finished, ${r.guard.aborted ? 'aborted' : 'completed'}. Resilience ${r.score ? r.score.resilience_score : 'unknown'} out of 100. Verdict: ${r.verdict.verdict}.` : 'Experiment finished.';
@@ -606,23 +582,24 @@ async function loadReadiness(quiet = false) {
   renderPlan();
 }
 
-/* ---------- 3. workflow: lifecycle stepper + Agent & Workflow Activity ---------- */
+/* ---------- 3. workflow models: the lifecycle and the six components, shown by the Activity dock ---------- */
 /* wf:pure begin (no DOM; unit-tested by tests/test_ui_workflow.js, which supplies ChaosUI). Maps app.py's real phases and
    fields onto the shared models; it never invents a state, a timestamp or an event. */
 const LIFECYCLE = [
   { id: 'proposed', label: 'Proposed' }, { id: 'validated', label: 'Validated' }, { id: 'approved', label: 'Approved', checkpoint: true },
   { id: 'injecting', label: 'Injecting' }, { id: 'monitoring', label: 'Observing' }, { id: 'rolling_back', label: 'Rolling back' },
   { id: 'recovering', label: 'Recovering' }, { id: 'analyzing', label: 'Analyzing' }, { id: 'done', label: 'Completed' }];
+const STAGE = { proposing: 'Drafting', starting: 'Starting', injecting: 'Injecting', monitoring: 'Monitoring', rolling_back: 'Rolling back', recovering: 'Recovering', analyzing: 'Analyzing' };
 const PHASE_HEADLINE = { proposing: 'Drafting a proposal', starting: 'Approved; preparing to inject', injecting: 'Injecting the fault', monitoring: 'Fault active; the guard is watching',
                          rolling_back: 'Rolling the fault back', recovering: 'Fault removed; waiting for recovery', analyzing: 'Scoring the run' };
 function lifecycleModel(s) {
   const U = ChaosUI, v = s && s.validation, r = s && s.result;
-  if (!s || s.phase === 'idle') return { steps: U.buildSteps(LIFECYCLE, null, null), headline: 'No experiment in progress', outcome: null };
+  if (!s || s.phase === 'idle') return { steps: U.buildSteps(LIFECYCLE, null, null), headline: 'No experiment in progress', outcome: null, stage: 'Idle' };
   if (s.phase === 'proposed') return v && !v.valid
-    ? { steps: U.buildSteps(LIFECYCLE, 'validated', 'failed'), headline: 'Blocked by the safety policy: nothing can run', outcome: 'failed' }
-    : { steps: U.buildSteps(LIFECYCLE, 'approved', null), headline: 'Waiting for human approval; nothing has been injected', outcome: null };
-  if (s.phase === 'refused') return { steps: U.buildSteps(LIFECYCLE, 'injecting', 'failed'), headline: `Not injected: ${s.refused || 'refused'}`, outcome: 'failed' };
-  if (s.phase === 'error') return { steps: U.buildSteps(LIFECYCLE, s.fault_started_ts ? 'monitoring' : 'injecting', 'failed'), headline: `Failed: ${s.refused || 'unexpected error'}`, outcome: 'failed' };
+    ? { steps: U.buildSteps(LIFECYCLE, 'validated', 'failed'), headline: 'Blocked by the safety policy: nothing can run', outcome: 'failed', stage: 'Blocked by policy' }
+    : { steps: U.buildSteps(LIFECYCLE, 'approved', null), headline: 'Waiting for human approval; nothing has been injected', outcome: null, stage: 'Awaiting approval' };
+  if (s.phase === 'refused') return { steps: U.buildSteps(LIFECYCLE, 'injecting', 'failed'), headline: `Not injected: ${s.refused || 'refused'}`, outcome: 'failed', stage: 'Not injected' };
+  if (s.phase === 'error') return { steps: U.buildSteps(LIFECYCLE, s.fault_started_ts ? 'monitoring' : 'injecting', 'failed'), headline: `Failed: ${s.refused || 'unexpected error'}`, outcome: 'failed', stage: 'Failed' };
   if (s.phase === 'done') {
     const g = (r && r.guard) || {}, rbBad = !!r && r.rollback_verified === false, recBad = !!r && !(r.recovery && r.recovery.recovered);
     const steps = LIFECYCLE.map(st => ({ ...st, state: 'done' })), set = (id, patch) => Object.assign(steps.find(t => t.id === id), patch);
@@ -632,10 +609,10 @@ function lifecycleModel(s) {
     if (g.aborted) { set('monitoring', { note: stopped ? 'stopped' : 'guard abort' }); set('done', { label: 'Aborted', state: 'aborted', note: stopped ? 'stopped by operator' : 'auto-abort' }); }
     else if (rbBad || recBad) set('done', { label: 'Needs attention', state: 'failed' });
     const outcome = g.aborted ? 'aborted' : rbBad || recBad ? 'failed' : 'completed';
-    return { steps, outcome, headline: g.aborted ? `Aborted and rolled back: ${g.reason}` : outcome === 'failed' ? 'Finished, but rollback or recovery was not verified' : 'Completed: rolled back and recovered' };
+    return { steps, outcome, stage: g.aborted ? 'Aborted' : outcome === 'failed' ? 'Needs attention' : 'Completed', headline: g.aborted ? `Aborted and rolled back: ${g.reason}` : outcome === 'failed' ? 'Finished, but rollback or recovery was not verified' : 'Completed: rolled back and recovered' };
   }
   const at = s.phase === 'proposing' ? 'proposed' : s.phase;
-  return { steps: U.buildSteps(LIFECYCLE, at, null), headline: PHASE_HEADLINE[s.phase] || '', outcome: null };
+  return { steps: U.buildSteps(LIFECYCLE, at, null), headline: PHASE_HEADLINE[s.phase] || '', outcome: null, stage: STAGE[s.phase] || '' };
 }
 const AGENT_ORDER = ['topology', 'planner', 'policy', 'executor', 'guard', 'analysis'];
 const FALLBACK_NAMES = { topology: 'Topology Discovery', planner: 'Experiment Planner', policy: 'Safety Policy Engine', executor: 'Experiment Executor', guard: 'Telemetry Guard', analysis: 'Analysis & Scoring' };
@@ -687,27 +664,32 @@ function agentModel(ctx) {
   return AGENT_ORDER.map(id => { const m = byId[id] || {};
     return { id, name: m.name || FALLBACK_NAMES[id], summary: m.summary || '', module: m.module, maturity: m.implementation || 'unknown', notes: m.notes || [], runtime: rt[id], latest: latest[id] || '' }; });
 }
+// The compact dashboard's model: stage + elapsed, active fault, the six rows (icon, name, runtime chip, latest line), the 3 newest events.
+function dockModel(s, life, rows) {
+  const plan = s.plan, ph = s.phase || 'idle', over = ['done', 'refused', 'error'].includes(ph);
+  const fault = plan ? [plan.fault, plan.target, plan.fault === 'network_delay' ? `${plan.magnitude} ms` : plan.fault === 'traffic_spike' ? `${plan.magnitude} users` : null].filter(Boolean).join(' \u00b7 ') : '';
+  return { active: ph !== 'idle', running: !!s.running, stage: life.stage, headline: life.headline, steps: life.steps, fault,
+    faultLabel: s.running ? 'Active fault' : over ? 'Last fault' : 'Proposed fault',
+    elapsed: (s.running || ph === 'done') && s.elapsed_s > 0 ? ChaosUI.mmss(s.elapsed_s) : '',
+    rows: rows.map(r => ({ id: r.id, name: r.name, runtime: r.runtime, latest: r.latest, summary: r.summary, module: r.module, maturity: r.maturity, notes: r.notes })),
+    events: (s.events || []).slice(-3).reverse().map(e => ({ time: e.ts, text: e.msg })) };
+}
 /* wf:pure end */
 
-let compMeta = null, graphState = { state: 'loading' }, lastWf = '', lastConn = '';
+let compMeta = null, graphState = { state: 'loading' }, lastConn = '', dock = null, stopPending = false;
 async function loadCompMeta() { try { compMeta = (await api('component-meta.json')).components || []; } catch (e) { compMeta = []; } renderWorkflow(); }
 function setConn(state) {
   if (state === lastConn) return; lastConn = state;
   const el = $('connChip'), [kind, label, ic] = state === 'ok' ? ['ok', 'API connected', 'check'] : ['bad', 'API unreachable', 'plug'];
   el.className = 'cc-chip ' + kind; el.innerHTML = ChaosUI.icon(ic) + label;
 }
-function renderWorkflow() {
-  const s = status || { phase: 'idle' }, el = $('wfElapsed');
-  const timing = s.running || s.phase === 'done';                       // the backend's own timer; shown only when it means something
-  el.classList.toggle('hide', !(timing && s.elapsed_s > 0)); el.textContent = `${s.running ? 'Elapsed' : 'Ran'} ${ChaosUI.mmss(s.elapsed_s)}`;
+function renderWorkflow() {                                               // feeds the Activity dock, the one place the lifecycle and components are shown
+  const s = status || { phase: 'idle' };
   const life = lifecycleModel(s);
   const fresh = typeof agentStats !== 'undefined' && agentStats.run && agentStats.run !== (mainFeed.ignoreRun || '');
   const rows = agentModel({ status: s, meta: compMeta || [], graph: graphState, goal: $('goalSel').value,
     agent: fresh ? { llm: agentStats.llm, tools: agentStats.tools, cap: AGENT_TOOL_CAP } : null });
-  const sig = JSON.stringify([life, rows, compMeta === null]);
-  if (sig === lastWf) return; lastWf = sig;
-  $('wfSteps').innerHTML = ChaosUI.stepperHtml(life); $('wfHeadline').textContent = life.headline;
-  $('wfAgents').innerHTML = ChaosUI.agentsHtml(rows);
+  if (dock) dock.render(dockModel(s, life, rows), { visible: !!s.running, pending: stopPending, disabled: false });   // the dock's STOP is the only STOP
 }
 
 /* ---------- 2. graph ---------- */
@@ -1236,9 +1218,9 @@ function renderEvents(s) {
 }
 function renderLive(s) {
   const show = !['idle', 'proposing', 'proposed'].includes(s.phase); $('live').classList.toggle('hide', !show);
-  $('stop').classList.toggle('show', !!s.running);
+  $('stopNote').classList.toggle('hide', !s.running);
   $('live').classList.toggle('is-live', !!s.running);
-  if (!s.running) { $('stop').disabled = false; $('stop').textContent = 'STOP EXPERIMENT'; }
+  if (!s.running) stopPending = false;
   if (!show) return;
   $('elapsed').textContent = Math.round(s.elapsed_s) + 's';
   $('fault').textContent = s.plan ? `${s.plan.fault} on ${s.plan.target} (${magnitudeText(s.plan)})` : '-';
@@ -1815,13 +1797,15 @@ async function loadGoals() {
 }
 $('approve').onclick = async () => { await act('/api/approve', 'Approve', undefined, $('approve')); await poll(); };
 $('reject').onclick = async () => { await act('/api/reject', 'Reject', undefined, $('reject')); await poll(); };
-$('stop').onclick = async () => {
-  $('stop').disabled = true; $('stop').textContent = 'Stopping…';
+async function requestStop() {                                          // the one STOP handler: the Activity dock's STOP buttons call it, nothing else does
+  if (stopPending) return;
+  stopPending = true; renderWorkflow();                                  // "Stop requested" until the request is through
   await act('/api/stop', 'Stop'); await poll();
-  setTimeout(() => { $('stop').disabled = false; $('stop').textContent = 'STOP EXPERIMENT'; }, 1500);   // a second press skips the recovery wait
-};
+  setTimeout(() => { stopPending = false; renderWorkflow(); }, 1500);   // then it re-arms: a second press skips the recovery wait
+}
 
 $('liveCmpMount').innerHTML = cmpHtml('live');
+dock = ChaosUI.createDock($('ccDock'), { onStop: requestStop });
 loadCompMeta();
 loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); loadSessions(); loadFindings();
 /* Reloading the page (F5 / Ctrl+F5) starts from a clean screen: an unapproved plan, the last result card and the previous agent

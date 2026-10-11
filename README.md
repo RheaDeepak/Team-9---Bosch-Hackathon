@@ -305,6 +305,17 @@ under `results/` and listed in the History panel.
 - **Result:** a resilience score out of 100 (deterministic: error rise, latency rise, shop-probe availability,
   recovery time), a claim-by-claim verdict, amplification ratios, and a recommended next move.
 
+**Activity dock.** A compact floating panel (fixed top right; a slim bar at the bottom under 900 px) is the one place that
+shows the experiment lifecycle (the current step next to the dots) and the six components: stage and elapsed time, the active
+fault, STOP, and the three newest events. Click a component row to expand it: description, file name, *implementation status*
+(from `static/component-meta.json`: edit it when a component's maturity changes) and the full latest result. Runtime status comes
+from the live state and events only, never invented. Its design tokens and renderers live in `static/chaos-ui.css` and
+`static/chaos-ui.js`.
+
+STOP lives only in the dock (the big button when the panel is open, a small one in the collapsed pill and in the narrow bottom bar)
+and has one handler, so there is a single STOP code path and one "Stop requested" state; the live section just points at it.
+Collapse the panel with the chevron; the choice is remembered for the browser session.
+
 **Tests:** `python -m unittest discover -s tests` (no containers are touched; the LLM and Docker are stubbed).
 
 **Safety.** STOP, a threshold breach and Ctrl+C all take the same rollback path. On startup `app.py` (and

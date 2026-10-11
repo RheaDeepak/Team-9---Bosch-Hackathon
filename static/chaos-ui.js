@@ -5,7 +5,7 @@
    Agent row model:  { id, name, summary, module?, maturity: 'implemented'|'in_development'|'planned',
                        runtime: 'idle'|'loading'|'running'|'waiting'|'completed'|'blocked'|'failed'|'unavailable',
                        latest?: string, notes?: [{ text, status }] }
-   Stepper model:    { steps: [{ id, label, state: 'done'|'current'|'pending'|'failed'|'aborted', checkpoint?: bool, note?: string }] } */
+   Lifecycle steps:  [{ id, label, state: 'done'|'current'|'pending'|'failed'|'aborted', checkpoint?: bool, note?: string }] (shown by the dock) */
 (function (root) {
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const P = {                                                  // 24x24 stroke icons (inline SVG, no icon font)
@@ -32,24 +32,7 @@
   const maturityChip = m => { const [k, l, i] = MATURITY[m] || MATURITY.unknown; return chip(k, l, i); };
   const runtimeChip = r => { const [k, l, i] = RUNTIME[r] || RUNTIME.idle; return chip(k, l, i); };
 
-  function agentRowHtml(a) {
-    const rt = RUNTIME[a.runtime] ? a.runtime : 'idle';
-    const notes = (a.notes || []).map(n => `<li>${chip(n.status === 'planned' ? 'dashed' : n.status === 'in_development' ? 'warn' : 'outline', n.text, n.status === 'planned' ? 'list' : n.status === 'in_development' ? 'wrench' : 'check')}</li>`).join('');
-    return `<li class="cc-agent ${rt}" data-agent="${esc(a.id)}"><span class="cc-agent-ic">${icon(a.id)}</span>
-      <div><h4>${esc(a.name)}${a.module ? ` <code>${esc(a.module)}</code>` : ''}</h4><div class="cc-agent-sum">${esc(a.summary)}</div></div>
-      <div class="cc-agent-state">${runtimeChip(rt)}${maturityChip(a.maturity)}</div>
-      <div class="cc-agent-latest">${esc(a.latest || '')}</div>${notes ? `<ul class="cc-agent-notes" aria-label="Capabilities of ${esc(a.name)} still being built">${notes}</ul>` : ''}</li>`;
-  }
-  const agentsHtml = rows => `<ul class="cc-agents" aria-label="Agents and workflow components">${rows.map(agentRowHtml).join('')}</ul>`;
-
   const STEP_WORD = { done: 'completed', current: 'in progress', pending: 'not reached', failed: 'failed', aborted: 'aborted' };
-  function stepHtml(s, i) {
-    const inner = s.state === 'done' ? icon('check') : s.state === 'failed' ? icon('x') : s.state === 'aborted' ? icon('stop') : s.checkpoint ? icon('user') : String(i + 1);
-    return `<li class="cc-step ${s.state}${s.checkpoint ? ' checkpoint' : ''}"${s.state === 'current' ? ' aria-current="step"' : ''}>
-      <span class="cc-dot" aria-hidden="true">${inner}</span><span>${esc(s.label)}${s.checkpoint ? ' <span class="cc-step-note">human checkpoint</span>' : ''}<span class="sr"> (${STEP_WORD[s.state] || s.state})</span>${s.note ? `<span class="cc-step-note" style="display:block">${esc(s.note)}</span>` : ''}</span></li>`;
-  }
-  const stepperHtml = model => `<ol class="cc-steps" aria-label="Experiment lifecycle">${model.steps.map(stepHtml).join('')}</ol>`;
-
   /* Generic stepper builder: `order` is the backend's own ordered phases; `at` is the current phase id (or null);
      `outcome` is 'completed' | 'aborted' | 'failed' | null. Phases before `at` are done, `at` is current, later ones are pending.
      A failed/aborted outcome marks the phase where it ended (`at`) and keeps everything later pending: never green. */
@@ -65,6 +48,95 @@
   }
   const mmss = sec => sec == null || !isFinite(sec) ? '' : `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 
-  const api = { esc, icon, chip, maturityChip, runtimeChip, agentRowHtml, agentsHtml, stepperHtml, buildSteps, mmss, MATURITY, RUNTIME };
+
+  /* ---- Activity dock: the one place that shows the lifecycle and the six components. A compact floating dashboard (fixed top right;
+     a slim bar at the bottom on narrow screens). Pure part first (dockOpen, dockParts: unit-tested), then the small DOM controller.
+     Dock model: { active, running, stage, headline, elapsed, steps, faultLabel, fault, events: [{ time, text }] (newest first),
+                   rows: [{ id, name, runtime, latest, summary, module, maturity, notes }] }.
+     STOP is only ever shown here and never has logic of its own: onStop() is the page's single STOP handler. */
+  const DOCK_ROWS_LATEST = 90;
+  const DOCK_CAPTION = 'Deterministic policy, not the LLM, decides whether an experiment may run, and a human approves it before anything is injected.';
+  // open state: an explicit choice for this session wins; otherwise open while an experiment is active, but never auto-open on narrow screens
+  const dockOpen = (pref, active, narrow) => pref === 'open' ? true : pref === 'closed' ? false : narrow ? false : !!active;
+  const clip = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
+  const noteChip = n => chip(n.status === 'planned' ? 'dashed' : n.status === 'in_development' ? 'warn' : 'outline', n.text, n.status === 'planned' ? 'list' : n.status === 'in_development' ? 'wrench' : 'check');
+  function dockParts(m) {
+    const stage = `${esc(m.stage || 'Idle')}${m.elapsed ? ` · <span class="cc-num">${esc(m.elapsed)}</span>` : ''}`;
+    const steps = m.steps || [], at = steps.findIndex(x => x.state === 'current' || x.state === 'failed' || x.state === 'aborted');
+    const cur = at >= 0 ? at : steps.length && steps.every(x => x.state === 'done') ? steps.length - 1 : -1;      // -1: nothing has started
+    const dots = steps.map((x, k) => `<li class="cc-mdot ${x.state}" title="${k + 1} · ${esc(x.label)} (${STEP_WORD[x.state] || x.state})"><span class="sr">${esc(x.label)}: ${STEP_WORD[x.state] || x.state}</span></li>`).join('');
+    const rows = (m.rows || []).map(r => {
+      const notes = (r.notes || []).map(n => `<li>${noteChip(n)}</li>`).join('');
+      return `<li class="cc-drow ${esc(r.runtime)}" data-agent="${esc(r.id)}"><div class="cc-drow-top" role="button" tabindex="0" aria-expanded="false"><span class="cc-agent-ic">${icon(r.id)}</span><span class="cc-drow-name">${esc(r.name)}</span>${runtimeChip(r.runtime)}</div>${r.latest
+        ? `<div class="cc-drow-latest" title="${esc(r.latest)}" data-full="${esc(r.latest)}" data-short="${esc(clip(r.latest, DOCK_ROWS_LATEST))}">${esc(r.latest)}</div>` : ''}`
+        + `<div class="cc-drow-detail"><p>${esc(r.summary || 'No description available.')}</p><div class="cc-drow-meta">${r.module ? `<code>${esc(r.module)}</code>` : ''}${maturityChip(r.maturity)}</div>`
+        + `${notes ? `<ul class="cc-drow-notes" aria-label="Capabilities of ${esc(r.name)} still being built">${notes}</ul>` : ''}</div></li>`;
+    }).join('');
+    const events = (m.events || []).slice(0, 3).map(e => `<li><span class="cc-ev-time cc-num">${esc(e.time)}</span><span class="cc-ev-text" title="${esc(e.text)}">${esc(clip(e.text, 120))}</span></li>`).join('');
+    return {
+      stage, dots, rows, events, headline: m.headline || '',
+      stepText: steps.length && cur >= 0 ? `${cur + 1} · ${esc(steps[cur].label)}` : 'Not started',
+      dotsLabel: steps.length ? `Lifecycle: ${cur >= 0 ? steps[cur].label : 'not started'}, step ${cur >= 0 ? cur + 1 : 0} of ${steps.length}` : 'Lifecycle',
+      fault: m.fault ? `<span class="cc-label">${esc(m.faultLabel || 'Fault')}</span><b>${esc(m.fault)}</b>` : '<span class="cc-label">Fault</span><span class="muted">none</span>',
+    };
+  }
+  const DOCK_SKELETON = `<div class="cc-dock-head">
+      <button type="button" class="cc-dock-toggle" aria-expanded="false" aria-controls="ccDockBody"><svg class="cc-svg cc-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        <span class="cc-dock-title">Activity</span><span class="cc-dock-mini" data-part="mini"></span></button>
+      <button type="button" class="cc-dock-stop-mini" hidden>STOP</button></div>
+    <div class="cc-dock-body" id="ccDockBody">
+      <p class="cc-dock-caption">${DOCK_CAPTION}</p>
+      <div class="cc-dock-stage" data-part="stage"></div>
+      <div class="cc-dock-steps"><ol class="cc-mdots" data-part="dots" role="img"></ol><span class="cc-dock-step" data-part="stepText"></span></div>
+      <div class="cc-dock-fault" data-part="fault"></div>
+      <ul class="cc-drows" data-part="rows" aria-label="Components: select one for details"></ul>
+      <button type="button" class="cc-dock-stop" hidden>STOP EXPERIMENT</button>
+      <ol class="cc-devents" data-part="events" aria-label="Most recent events, newest first"></ol></div>`;
+  function createDock(el, { onStop, storage, narrowQuery = '(max-width: 899px)' } = {}) {
+    const store = storage || (() => { try { return window.sessionStorage; } catch (e) { return null; } })();
+    const mq = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(narrowQuery) : { matches: false };
+    const key = () => mq.matches ? 'cc-dock-narrow' : 'cc-dock';
+    const read = () => { try { return store && store.getItem(key()); } catch (e) { return null; } };
+    const write = v => { try { store && store.setItem(key(), v); } catch (e) { /* the choice just is not remembered */ } };
+    el.classList.add('cc-dock'); el.innerHTML = DOCK_SKELETON;
+    const q = s => el.querySelector(s), cache = {}, openRows = new Set();
+    const toggle = q('.cc-dock-toggle'), stopBtn = q('.cc-dock-stop'), miniStop = q('.cc-dock-stop-mini');
+    let model = null;
+    const isOpen = () => dockOpen(read(), model && model.active, mq.matches);
+    function apply() {
+      const open = isOpen();
+      el.classList.toggle('open', open); el.classList.toggle('active', !!(model && model.active)); el.classList.toggle('running', !!(model && model.running));
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-label', open ? 'Collapse the activity panel' : 'Expand the activity panel');
+      if (typeof document !== 'undefined') { document.body.classList.toggle('cc-dock-open', open); document.body.classList.toggle('cc-dock-pill', !open); }
+    }
+    const setPart = (name, html) => { if (cache[name] !== html) { cache[name] = html; q(`[data-part="${name}"]`).innerHTML = html; } };
+    function paintRow(li) {                       // expanded: the full latest result plus description, file and implementation status
+      const open = openRows.has(li.dataset.agent), lat = li.querySelector('.cc-drow-latest');
+      li.classList.toggle('open', open); li.querySelector('.cc-drow-top').setAttribute('aria-expanded', String(open));
+      if (lat) { lat.classList.toggle('open', open); lat.textContent = open ? lat.dataset.full : lat.dataset.short; }
+    }
+    const flip = li => { const id = li.dataset.agent; openRows.has(id) ? openRows.delete(id) : openRows.add(id); paintRow(li); };   // in place: keyboard focus stays on the row
+    toggle.addEventListener('click', () => { write(isOpen() ? 'closed' : 'open'); apply(); });
+    [stopBtn, miniStop].forEach(b => b.addEventListener('click', () => { if (onStop) onStop(); }));
+    el.addEventListener('click', e => { const t = e.target.closest && e.target.closest('.cc-drow-top, .cc-drow-latest'); if (t) flip(t.closest('.cc-drow')); });
+    el.addEventListener('keydown', e => { const t = e.target.closest && e.target.closest('.cc-drow-top'); if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); flip(t.closest('.cc-drow')); } });
+    if (mq.addEventListener) mq.addEventListener('change', apply);
+    return { render(m, stop = {}) {
+      model = m;
+      const parts = dockParts(m);
+      setPart('mini', parts.stage); setPart('stage', parts.stage); setPart('dots', parts.dots); setPart('stepText', parts.stepText); setPart('fault', parts.fault); setPart('events', parts.events || '');
+      q('[data-part="stage"]').title = parts.headline; q('[data-part="dots"]').setAttribute('aria-label', parts.dotsLabel);
+      if (cache.rows !== parts.rows) { cache.rows = parts.rows; q('[data-part="rows"]').innerHTML = parts.rows; }
+      el.querySelectorAll('.cc-drow').forEach(paintRow);
+      for (const b of [stopBtn, miniStop]) {
+        b.hidden = !stop.visible; b.disabled = !!stop.disabled || !!stop.pending; b.classList.toggle('pending', !!stop.pending); b.setAttribute('aria-busy', String(!!stop.pending));
+        b.textContent = stop.pending ? (b === miniStop ? 'Stopping…' : 'Stop requested: rolling back…') : (b === miniStop ? 'STOP' : 'STOP EXPERIMENT');
+      }
+      apply();
+    }, apply };
+  }
+
+  const api = { esc, icon, chip, maturityChip, runtimeChip, buildSteps, mmss, dockOpen, dockParts, createDock, DOCK_CAPTION, MATURITY, RUNTIME };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.ChaosUI = api;
 })(typeof window !== 'undefined' ? window : globalThis);
