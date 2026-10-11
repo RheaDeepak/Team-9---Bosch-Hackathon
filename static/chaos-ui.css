@@ -38,50 +38,77 @@
 .cc-spin { animation:cc-spin 1s linear infinite; transform-origin:center; }
 @keyframes cc-spin { to { transform:rotate(360deg); } }
 
-/* ---- Agent & Workflow Activity: compact rows, not cards ---- */
-.cc-agents { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--s2); }
-.cc-agent { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:var(--s1) var(--s3); align-items:start; padding:10px var(--s3);
-  background:var(--surface-2); border:1px solid var(--line); border-left:3px solid var(--line-2); border-radius:var(--r-md); }
-.cc-agent.running { border-left-color:var(--accent); background:linear-gradient(90deg,var(--accent-soft),var(--surface-2) 60%); }
-.cc-agent.waiting { border-left-color:var(--warn); }
-.cc-agent.completed { border-left-color:var(--ok); }
-.cc-agent.failed, .cc-agent.blocked { border-left-color:var(--bad); }
+/* ---- component icon tile (used by the dock rows) ---- */
 .cc-agent-ic { width:32px; height:32px; display:grid; place-items:center; border-radius:var(--r-sm); background:var(--surface-3); color:var(--text-2); }
-.cc-agent.running .cc-agent-ic { color:var(--accent); } .cc-agent.completed .cc-agent-ic { color:var(--ok); }
-.cc-agent.failed .cc-agent-ic, .cc-agent.blocked .cc-agent-ic { color:var(--bad); } .cc-agent.waiting .cc-agent-ic { color:var(--warn); }
 .cc-agent-ic .cc-svg { width:18px; height:18px; }
-.cc-agent h4 { margin:0; font-size:var(--fs-body); font-weight:650; color:var(--text); display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; }
-.cc-agent h4 code { font:var(--fs-small) var(--mono); color:var(--text-3); font-weight:400; }
-.cc-agent-sum { font-size:var(--fs-small); color:var(--text-3); margin-top:1px; }
-.cc-agent-state { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
-.cc-agent-latest { grid-column:2 / -1; font-size:var(--fs-small); color:var(--text-2); overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
-.cc-agent-latest:empty { display:none; }
-.cc-agent-notes { grid-column:2 / -1; margin:2px 0 0; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:4px 6px; }
-@media (max-width:640px) {
-  .cc-agent { grid-template-columns:32px minmax(0,1fr); }
-  .cc-agent-state { grid-column:2; flex-direction:row; flex-wrap:wrap; align-items:center; }
-}
-
-/* ---- experiment lifecycle stepper: horizontal on wide screens, vertical on narrow ones ---- */
-.cc-steps { list-style:none; margin:0; padding:0; display:flex; align-items:flex-start; }
-.cc-step { flex:1 1 0; min-width:0; position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; color:var(--text-3); font-size:12px; }
-.cc-step::before { content:""; position:absolute; top:13px; left:calc(-50% + 14px); right:calc(50% + 14px); height:2px; background:var(--line-2); }
-.cc-step:first-child::before { display:none; }
-.cc-step.done::before, .cc-step.current::before, .cc-step.checkpoint-done::before { background:var(--ok); }
-.cc-step.failed::before { background:var(--bad); } .cc-step.aborted::before { background:var(--warn); }
-.cc-dot { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; background:var(--surface-3); color:var(--text-3); border:2px solid var(--line-2); position:relative; z-index:1; font-size:12px; font-weight:700; }
-.cc-dot .cc-svg { width:14px; height:14px; stroke-width:2.6; }
-.cc-step.done .cc-dot { background:var(--ok-soft); color:var(--ok); border-color:var(--ok); }
-.cc-step.current .cc-dot { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); box-shadow:0 0 0 4px rgba(56,189,248,.14); }
-.cc-step.failed .cc-dot { background:var(--bad-soft); color:var(--bad); border-color:var(--bad); }
-.cc-step.aborted .cc-dot { background:var(--warn-soft); color:var(--warn); border-color:var(--warn); }
-.cc-step.done, .cc-step.current { color:var(--text); } .cc-step.failed { color:var(--bad); } .cc-step.aborted { color:var(--warn); }
-.cc-step.checkpoint .cc-dot { border-radius:8px; }                       /* the human approval step is square: a gate, not just a stage */
-.cc-step .cc-step-note { font-size:11px; color:var(--text-3); font-variant-numeric:tabular-nums; }
-.cc-steps-meta { display:flex; flex-wrap:wrap; gap:var(--s3); align-items:center; justify-content:space-between; margin:0 0 var(--s3); }
-@media (max-width:860px) {
-  .cc-steps { flex-direction:column; gap:0; }
-  .cc-step { flex-direction:row; align-items:center; gap:var(--s3); text-align:left; padding:6px 0; width:100%; }
-  .cc-step::before { top:-50%; bottom:auto; left:13px; right:auto; width:2px; height:100%; }
-}
+.cc-drow.running .cc-agent-ic { color:var(--accent); } .cc-drow.completed .cc-agent-ic { color:var(--ok); }
+.cc-drow.failed .cc-agent-ic, .cc-drow.blocked .cc-agent-ic { color:var(--bad); } .cc-drow.waiting .cc-agent-ic { color:var(--warn); }
 @media (prefers-reduced-motion:reduce) { .cc-spin { animation:none; } }
+
+/* ---- Activity dock: compact floating dashboard, top right (a slim bar at the bottom below 900px) ---- */
+.cc-dock { position:fixed; z-index:45; top:calc(var(--topbar-h,64px) + 12px); right:16px; width:320px; max-height:70vh; display:flex; flex-direction:column;
+  background:var(--surface); border:1px solid var(--line-2); border-radius:var(--r-lg); box-shadow:0 18px 50px rgba(0,0,0,.6); color:var(--text); font-size:13px; line-height:1.4; }
+.cc-dock-head { display:flex; align-items:center; gap:var(--s2); padding:6px 8px; }
+.cc-dock-toggle { flex:1; min-width:0; display:flex; align-items:center; gap:8px; min-height:34px; padding:4px 6px; background:none; border:0; border-radius:var(--r-sm); color:inherit; font:inherit; font-weight:650; text-align:left; cursor:pointer; }
+.cc-dock-toggle:hover { background:var(--surface-2); }
+.cc-dock-toggle:focus-visible, .cc-dock-stop:focus-visible, .cc-dock-stop-mini:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.cc-chev { width:16px; height:16px; transition:transform var(--ease); } .cc-dock:not(.open) .cc-chev { transform:rotate(-90deg); }
+.cc-dock-title { letter-spacing:.02em; }
+.cc-dock-mini { display:none; margin-left:auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-weight:650; }
+.cc-dock:not(.open).active .cc-dock-mini { display:block; }
+.cc-dock:not(.open) { width:auto; max-width:min(380px, calc(100vw - 32px)); border-radius:999px; }
+.cc-dock-stop-mini { display:none; flex:none; min-height:34px; padding:4px 14px; border-radius:999px; border:2px solid #FF8A87; background:var(--bad-solid); color:#fff; font:inherit; font-weight:800; letter-spacing:.04em; cursor:pointer; }
+.cc-dock.running:not(.open) .cc-dock-stop-mini:not([hidden]) { display:inline-flex; align-items:center; }      /* collapsed pill: STOP stays in it */
+.cc-dock-body { display:none; flex-direction:column; gap:8px; flex:1 1 auto; min-height:0; overflow:hidden; padding:2px 12px 12px; }
+.cc-dock-body > * { min-width:0; flex:none; }
+.cc-dock.open .cc-dock-body { display:flex; }
+.cc-dock-stage { font-size:17px; font-weight:700; line-height:1.25; }
+.cc-dock-caption { margin:0; padding:2px 0 0; font-size:12px; line-height:1.4; color:var(--text-2); }
+.cc-dock-steps { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cc-dock-step { font-size:13px; font-weight:650; color:var(--text); font-variant-numeric:tabular-nums; }
+.cc-mdots { display:flex; gap:6px; list-style:none; margin:0; padding:0; }
+.cc-mdot { width:13px; height:13px; border-radius:50%; background:var(--surface-3); border:2px solid var(--line-2); }
+.cc-mdot.done { background:var(--ok); border-color:var(--ok); }
+.cc-mdot.current { background:var(--accent); border-color:var(--accent); box-shadow:0 0 0 3px rgba(56,189,248,.3); }
+.cc-mdot.failed { background:var(--bad); border-color:var(--bad); border-radius:3px; transform:rotate(45deg); }
+.cc-mdot.aborted { background:var(--warn); border-color:var(--warn); border-radius:3px; }
+.cc-dock-fault { display:flex; flex-direction:column; gap:1px; overflow-wrap:anywhere; } .cc-dock-fault b { font-variant-numeric:tabular-nums; }
+.cc-drows { list-style:none; margin:0; padding:2px; display:grid; grid-template-columns:minmax(0,1fr); gap:5px; align-content:start; flex:1 1 auto; min-height:96px; overflow-y:auto; overflow-x:hidden; }   /* only the component list scrolls: stage, STOP and events stay in view */
+.cc-drow { min-width:0; padding:4px 8px; background:var(--surface-2); border:1px solid var(--line); border-left:3px solid var(--line-2); border-radius:var(--r-sm); }
+.cc-drow.running { border-left-color:var(--accent); } .cc-drow.waiting { border-left-color:var(--warn); } .cc-drow.completed { border-left-color:var(--ok); } .cc-drow.failed, .cc-drow.blocked { border-left-color:var(--bad); }
+.cc-drow-top { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:8px; align-items:center; cursor:pointer; border-radius:4px; }
+.cc-drow-top:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.cc-drow .cc-agent-ic { width:24px; height:24px; } .cc-drow .cc-agent-ic .cc-svg { width:14px; height:14px; }
+.cc-drow-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.cc-drow-latest { display:block; min-width:0; max-width:100%; margin-top:1px; padding:1px 2px; border-radius:4px; color:var(--text-2); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+.cc-drow-latest.open { white-space:normal; overflow-wrap:anywhere; color:var(--text); }
+.cc-drow-detail { display:none; margin-top:6px; padding-top:6px; border-top:1px solid var(--line); font-size:12px; color:var(--text-2); }
+.cc-drow.open .cc-drow-detail { display:block; }
+.cc-drow-detail p { margin:0 0 6px; overflow-wrap:anywhere; }
+.cc-drow-meta { display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; }
+.cc-drow-meta code { font:12px var(--mono); color:var(--text); overflow-wrap:anywhere; }
+.cc-drow-notes { list-style:none; margin:6px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:4px 6px; }
+.cc-drow.open { background:var(--surface-3); }
+.cc-dock-stop { width:100%; min-height:48px; border-radius:var(--r-md); border:2px solid #FF8A87; background:var(--bad-solid); color:#fff; font:inherit; font-size:16px; font-weight:800; letter-spacing:.04em; box-shadow:0 6px 20px rgba(201,48,48,.45); cursor:pointer; }
+.cc-dock-stop:hover:not(:disabled), .cc-dock-stop-mini:hover:not(:disabled) { background:var(--bad-hover); }
+.cc-dock-stop[hidden], .cc-dock-stop-mini[hidden] { display:none !important; }
+.cc-dock-stop:disabled, .cc-dock-stop-mini:disabled { cursor:not-allowed; }
+.cc-dock-stop.pending, .cc-dock-stop-mini.pending { background:var(--warn-soft); color:var(--warn); border-color:var(--warn); box-shadow:none; }
+.cc-devents { list-style:none; margin:0; padding:8px 0 0; border-top:1px solid var(--line); display:grid; gap:4px; font-size:12px; color:var(--text-2); }
+.cc-devents li { display:grid; grid-template-columns:58px minmax(0,1fr); gap:6px; }
+.cc-ev-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .cc-devents:empty { display:none; } .cc-ev-time { color:var(--text-3); }
+@media (min-width:900px) {
+  body.cc-dock-open main, body.cc-dock-open .footer { margin-right:352px; }
+  body.cc-dock-pill main { margin-top:52px; }                      /* the collapsed pill gets its own strip instead of covering the first row */
+}   /* leave the dock's column free: charts, STOP and approval stay uncovered */
+@media (max-width:899px) {
+  body { padding-bottom:64px; }
+  .cc-dock { top:auto; left:0; right:0; bottom:0; width:auto; max-width:none; max-height:70vh; border-radius:var(--r-lg) var(--r-lg) 0 0; padding-bottom:env(safe-area-inset-bottom); }
+  .cc-dock:not(.open) { max-width:none; border-radius:var(--r-lg) var(--r-lg) 0 0; }
+  .cc-dock:not(.open) .cc-dock-mini { display:block; }
+  .cc-dock:not(.open) .cc-chev { transform:rotate(180deg); }
+  .cc-dock-stop, .cc-dock-stop-mini, .cc-dock-toggle { min-height:44px; }
+  .cc-dock.running .cc-dock-stop-mini:not([hidden]) { display:inline-flex; align-items:center; }   /* the bar always carries STOP, expanded or not */
+  .cc-dock-stop { display:none !important; }
+}
+@media (prefers-reduced-motion:reduce) { .cc-chev { transition:none; } }

@@ -248,6 +248,8 @@ def check_answer(decision, top, data, seen_locations=frozenset()):
             raise ValueError(f"finding {finding.id!r} raises severity by more than one level")
         if new != old and not adjustment:
             raise ValueError(f"finding {finding.id!r} changes severity without agent_adjustment")
+        if weakness.get("capped_low_evidence") and finding.severity in ("Critical", "High"):
+            raise ValueError(f"finding {finding.id!r} rests only on low-evidence runs, so it cannot be {finding.severity}")
         cited = [data["evidence"][evidence_id] for evidence_id in finding.evidence_ids]
         unsupported_numbers = not rules.numbers_supported(finding.root_cause, cited)
         location = (finding.fix_location or "").strip()
@@ -287,7 +289,8 @@ def deterministic_summary(data):
     parts = [f"{counts[severity]} {severity}" for severity in rules.SEVERITY_ORDER if counts[severity]]
     head = f"{len(weaknesses)} weaknesses ({', '.join(parts)})" if weaknesses else "No weaknesses found"
     top = f"; the most severe: {weaknesses[0]['title']} ({weaknesses[0]['severity']})" if weaknesses else ""
-    score = (f" Overall resilience {overall['score']}/100 over {overall['tested']} tested services."
+    score = (f" Overall resilience {overall['score']}/100 over {overall['tested']} tested services"
+             + (f" ({overall['provisional_note']})" if overall.get("provisional") else "") + "."
              if overall["score"] is not None else " No service has a resilience score yet.")
     return f"{head}{top}. {len(data['strengths'])} strengths.{score}"
 
@@ -302,7 +305,9 @@ def build_output(data, source, note, agent=None, model=None, run_id=None, tool_c
     cited |= {evidence_id for strength in data["strengths"] for evidence_id in strength["evidence_ids"]}
     return {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "source": source,
             "note": note, "model": model, "run_id": run_id, "tool_calls": tool_calls,
-            "results_used": data["results_used"], "skipped": data["skipped"], "findings": findings,
+            "results_used": data["results_used"], "skipped": data["skipped"],
+            "excluded": data.get("excluded", []), "quality_counts": data.get("quality_counts", {}),
+            "findings": findings,
             "strengths": data["strengths"], "strength_notes": agent.get("strength_notes", []),
             "summary": agent.get("summary") or deterministic_summary(data), "scores": data["scores"],
             "experiments": data["experiments"],
@@ -470,6 +475,7 @@ def run_analysis(api_key=None, model_client=None, data=None, results=None, graph
     if results is None:
         results, skipped = rules.load_results()
         data = data or rules.analyse(results, skipped)
+    results = [r for r in results if r.get("quality") != "excluded"]   # the agent's tools never see excluded runs
     data = data or rules.analyse(results)
     graph = graph if graph is not None else load_graph()[0]
     top = pick_top(data["weaknesses"])

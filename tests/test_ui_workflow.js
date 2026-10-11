@@ -1,10 +1,10 @@
-// Lifecycle stepper + Agent & Workflow Activity models (the wf:pure block of static/index.html) and the shared renderers.
+// Lifecycle and component models (the wf:pure block of static/index.html) and the shared Activity dock renderer.
 // Run: node tests/test_ui_workflow.js   (also run by tests/test_ui_comparison.py)
 const fs = require('fs'), path = require('path'), assert = require('assert');
 const ChaosUI = require(path.join(__dirname, '..', 'static', 'chaos-ui.js'));
 const html = fs.readFileSync(path.join(__dirname, '..', 'static', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const block = html.match(/\/\* wf:pure begin[\s\S]*?\*\/\n([\s\S]*?)\/\* wf:pure end \*\//)[1];
-const { lifecycleModel, agentModel } = new Function('ChaosUI', block + '; return { lifecycleModel, agentModel };')(ChaosUI);
+const { lifecycleModel, agentModel, dockModel } = new Function('ChaosUI', block + '; return { lifecycleModel, agentModel, dockModel };')(ChaosUI);
 
 const META = ['topology', 'planner', 'policy', 'executor', 'guard', 'analysis'].map(id => ({ id, name: id.toUpperCase(), summary: 's', module: id + '.py', implementation: 'implemented', notes: [] }));
 const plan = { fault: 'network_delay', target: 'quote', magnitude: 200, duration_s: 60 };
@@ -105,16 +105,41 @@ const tests = {
     assert.strictEqual(agentModel({ status: base(), meta: [], graph })[0].maturity, 'unknown'); // no metadata: say so, do not guess
     assert.strictEqual(agentModel({ status: base(), meta: [], graph })[0].name, 'Topology Discovery');
   },
-  'renderers: both chips are shown, text is escaped, the current step is announced, states are words as well as colours'() {
-    const row = { id: 'executor', name: '<b>x</b>', summary: 's', maturity: 'in_development', runtime: 'waiting', latest: '<img src=x>', notes: [{ text: 'Packet-loss fault', status: 'planned' }] };
-    const h = ChaosUI.agentRowHtml(row);
-    assert.ok(h.includes('Waiting for approval') && h.includes('In development') && h.includes('Packet-loss fault'));
-    assert.ok(!h.includes('<b>x</b>') && !h.includes('<img'));
-    const steps = ChaosUI.stepperHtml(lifecycleModel(base({ phase: 'proposed', plan, validation: okVal })));
-    assert.match(steps, /aria-current="step"/);
-    assert.match(steps, /Proposed<span class="sr"> \(completed\)/);
-    assert.match(steps, /human checkpoint/);
-    assert.match(ChaosUI.stepperHtml({ steps: ChaosUI.buildSteps([{ id: 'a', label: 'A' }], 'a', 'failed') }), /\(failed\)/);
+  'dock lifecycle: the current step name sits next to the dots, and every dot names its step on hover'() {
+    const text = st => ChaosUI.dockParts(dockModel(st, lifecycleModel(st), model(st)));
+    assert.strictEqual(text(base({ phase: 'monitoring', running: true, plan, validation: okVal })).stepText, '5 · Observing');
+    assert.strictEqual(text(base({ phase: 'proposed', plan, validation: okVal })).stepText, '3 · Approved');       // the human checkpoint is the current step
+    assert.strictEqual(text(base({ phase: 'done', plan, result: result() })).stepText, '9 · Completed');
+    assert.strictEqual(text(base({ phase: 'done', plan, result: result({ guard: { aborted: true, reason: 'x' } }) })).stepText, '9 · Aborted');
+    assert.strictEqual(text(base()).stepText, 'Not started');
+    const dots = text(base({ phase: 'monitoring', running: true, plan, validation: okVal })).dots;
+    assert.match(dots, /title="1 · Proposed \(completed\)"/);
+    assert.match(dots, /title="5 · Observing \(in progress\)"/);
+    assert.match(dots, /title="9 · Completed \(not reached\)"/);
+    assert.match(dots, /<span class="sr">Observing: in progress<\/span>/);
+  },
+  'dock caption: the policy-decides, human-approves line is shown at the top of the panel'() {
+    assert.strictEqual(ChaosUI.DOCK_CAPTION, 'Deterministic policy, not the LLM, decides whether an experiment may run, and a human approves it before anything is injected.');
+  },
+  'dock rows expand to description, file name, implementation status, planned capabilities and the full latest result'() {
+    const meta = META.map(m => m.id === 'executor' ? { ...m, summary: 'Injects the approved fault.', implementation: 'planned', notes: [{ text: 'Packet-loss fault', status: 'planned' }] } : m);
+    const s = base({ phase: 'monitoring', running: true, plan, validation: okVal, samples: [{ breaches: {} }] });
+    const rows = agentModel({ status: s, meta, graph, goal: '', agent: null });
+    const html = ChaosUI.dockParts(dockModel(s, lifecycleModel(s), rows)).rows;
+    const executor = html.split('<li class="cc-drow').find(x => x.includes('data-agent="executor"'));
+    assert.match(executor, /<p>Injects the approved fault\.<\/p>/);
+    assert.match(executor, /<code>executor\.py<\/code>/);
+    assert.ok(executor.includes('Planned') && executor.includes('Packet-loss fault'));
+    assert.match(executor, /data-full="Fault active: network delay on quote"/);          // the full latest result is kept for the expanded view
+    const topology = html.split('<li class="cc-drow').find(x => x.includes('data-agent="topology"'));
+    assert.ok(topology.includes('Implemented'));
+    assert.match(topology, /class="cc-drow-top" role="button" tabindex="0" aria-expanded="false"/);          // the whole row head is a keyboard-operable button
+  },
+  'dock renderer: text is escaped everywhere, including the expanded details'() {
+    const row = { id: 'executor', name: '<b>x</b>', runtime: 'waiting', latest: '<img src=x>', summary: '<script>1</script>', module: '<i>m.py</i>', maturity: 'in_development', notes: [{ text: '<u>n</u>', status: 'planned' }] };
+    const h = ChaosUI.dockParts({ stage: 'S', steps: [], rows: [row], events: [] }).rows;
+    assert.ok(!/<b>x|<img|<script|<i>m|<u>n/.test(h));
+    assert.ok(h.includes('Waiting for approval') && h.includes('In development'));
   },
   'mmss formats real seconds and stays empty for no timer'() {
     assert.deepStrictEqual([ChaosUI.mmss(75), ChaosUI.mmss(5), ChaosUI.mmss(null)], ['1:15', '0:05', '']);

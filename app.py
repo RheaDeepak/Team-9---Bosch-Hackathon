@@ -56,10 +56,28 @@ WORKER = None
 def _blank():
     return {"phase": "idle", "running": False, "plan": None, "source": None, "note": None, "validation": None,
             "approved_at": None, "fault_started_ts": None, "ended_ts": None, "rollback_at_s": None,
-            "watch": {}, "normal": None, "samples": [], "probes": [], "events": [], "result": None, "refused": None}
+            "watch": {}, "normal": None, "samples": [], "probes": [], "events": [], "result": None, "refused": None,
+            "guard_preview": None}
 
 
 STATE = {**_blank(), "startup_note": None}
+
+
+def _guard_preview(plan, validation):
+    """What the guard will watch and when it aborts, for the plan card. Read-only: the same services and baseline
+    thresholds execute() uses; None if the baseline is missing (execute() would refuse anyway)."""
+    try:
+        baseline = metrics.load_baseline()
+        if baseline is None:
+            return None
+        services = guard.watched_services(plan, baseline, validation.get("blast_radius") or [])
+        thr = {s: exp.FORCE_THRESHOLDS for s in services} if exp.FORCE_ABORT_TEST else baseline["thresholds"]["services"]
+        return {"services": services, "abort": {s: {m: thr[s].get(m) for m in guard.METRICS} for s in services},
+                "breaches_in_a_row": guard.CONSECUTIVE_BREACHES,
+                "max_duration_s": min(int(plan.get("duration_s") or 0), guard.MAX_DURATION_S),
+                "recovery_timeout_s": guard.RECOVERY_TIMEOUT_S, "rollback": inject.ROLLBACK_ACTIONS.get(plan.get("fault"))}
+    except Exception:  # a preview must never break proposing
+        return None
 
 
 def _log(msg):
@@ -304,8 +322,10 @@ def api_propose(body: dict = Body(default=None)):
         with LOCK:
             STATE.update(_blank())
         raise HTTPException(500, f"planning failed: {type(e).__name__}: {e}")
+    preview = _guard_preview(p["plan"], p["validation"])
     with LOCK:
-        STATE.update(phase="proposed", plan=p["plan"], source=p["source"], note=p["note"], validation=p["validation"])
+        STATE.update(phase="proposed", plan=p["plan"], source=p["source"], note=p["note"], validation=p["validation"],
+                     guard_preview=preview)
     _log(f"proposed: {p['plan'].get('fault')} on {p['plan'].get('target')} ({p['source']})")
     return p
 
@@ -451,22 +471,23 @@ def api_status():
         return s
 
 
-def _load_result(path):
-    return analysis.normalise_result(json.loads(path.read_text(encoding="utf-8")), path.stem)
+def _load_result(path, excluded=None):
+    return analysis.normalise_result(json.loads(path.read_text(encoding="utf-8")), path.stem, excluded)
 
 
 @app.get("/api/results")
 def api_results():
-    rows = []
-    for f in sorted(exp.RESULTS_DIR.glob("*.json"), reverse=True):
+    rows, excluded = [], analysis.load_excluded()
+    for f in reversed(analysis.result_files(exp.RESULTS_DIR)):   # EXCLUDED.json is not a run
         try:
-            d = _load_result(f)
+            d = _load_result(f, excluded)
             rows.append({"id": d["id"], "started_at": d["started_at"], "target": d["plan"]["target"],
                          "fault": d["plan"]["fault"], "magnitude": d["plan"]["magnitude"],
                          "parameters": d["plan"].get("parameters"),
                          "aborted": d["guard"]["aborted"], "reason": d["guard"]["reason"],
                          "verdict": d["verdict"]["verdict"], "recovered": d["recovery"]["recovered"],
-                         "rollback_verified": d["rollback_verified"]})
+                         "rollback_verified": d["rollback_verified"],
+                         "quality": d["quality"], "quality_reason": d["quality_reason"]})
         except (OSError, ValueError, KeyError):
             continue
     return rows
