@@ -55,6 +55,15 @@ class ComponentMetaTest(unittest.TestCase):
 
 
 class HonestPagesTest(unittest.TestCase):
+    def test_planning_view_is_one_candidate_centric_plan_section(self):
+        html = text(ROOT / "static" / "index.html")
+        self.assertIn('id="planSec"', html)
+        self.assertNotIn('id="agentSec"', html)
+        self.assertNotIn('id="rankFault"', html)
+        self.assertIn('class="candidate-card', html)
+        self.assertIn('Rejected by policy', html)
+        self.assertEqual(html.count('data-for="planSec">Plan</a>'), 1)
+
     def test_no_placeholder_numbers_or_fake_session_in_the_canonical_ui(self):
         html = text(ROOT / "static" / "index.html")
         for fake in ("CC-042", "99.8%", "0.4%", "184 ms", "42.1 rps"):

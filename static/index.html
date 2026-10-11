@@ -63,13 +63,21 @@ main[data-mode="review"] #resultPanel { order:-8; } main[data-mode="review"] #li
 .card.is-live { border-color:#6b2a2d; box-shadow:0 0 0 1px rgba(255,118,115,.22), 0 16px 48px -16px rgba(207,52,52,.4); }
 .sub { font-size:11.5px; font-weight:650; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin:0 0 var(--s2); }
 .block { margin-top:var(--s5); }
-.agent-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:var(--s5); align-items:start; }
-.agent-col { min-width:0; } .agent-col > .sub { display:flex; justify-content:space-between; gap:var(--s2); }
-#rankPanel th[scope=row] { white-space:normal; min-width:200px; text-align:left; font-weight:inherit; } #rankPanel td { white-space:nowrap; vertical-align:top; }
-.pbar { display:block; height:6px; min-width:64px; border-radius:3px; background:var(--surface-3); margin-top:5px; } .pbar i { display:block; height:100%; border-radius:3px; background:var(--accent-solid); }
-tr.chosen-row > * { background:var(--ok-soft); }
-tr.unavailable-row > * { opacity:.55; }                  /* listed for completeness; it cannot run right now */
-.rank-node { background:none; border:0; padding:0; font:inherit; font-weight:650; color:var(--accent); cursor:pointer; text-align:left; } .rank-node:hover { text-decoration:underline; }
+.plan-note { margin:0 0 var(--s4); font-size:12.5px; color:var(--text-3); }
+.candidate-list { display:grid; gap:var(--s3); }
+.candidate-card { padding:var(--s4); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); transition:border-color var(--ease), box-shadow var(--ease); }
+.candidate-card:hover, .candidate-card:focus-within { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent-soft); }
+.candidate-card.top-pick { border-color:var(--accent-solid); background:linear-gradient(110deg,var(--accent-soft),var(--surface-2) 46%); }
+.candidate-head { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
+.candidate-rank { font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; }
+.candidate-title { background:none; border:0; padding:0; color:var(--text); font:600 15px/1.35 var(--font); text-align:left; cursor:pointer; }
+.candidate-title:hover { color:var(--accent); }
+.score { margin:var(--s3) 0; display:flex; height:9px; overflow:hidden; border-radius:99px; background:var(--surface-3); }
+.score i { display:block; min-width:3px; } .score .impact { background:#38bdf8; } .score .info { background:#2fbf9b; } .score .penalty { background:#f0524f; } .score .fit { background:#a78bfa; }
+.score-legend { display:flex; flex-wrap:wrap; gap:4px 10px; color:var(--text-3); font-size:11.5px; } .score-legend span::before { content:''; display:inline-block; width:7px; height:7px; margin-right:4px; border-radius:50%; background:var(--c); }
+.candidate-move { margin:var(--s2) 0; color:var(--accent); font-size:12.5px; }.candidate-reason { margin:var(--s2) 0; color:var(--text-2); }.candidate-hypothesis { margin:var(--s2) 0; font-size:12.5px; color:var(--text-3); }.candidate-chips { margin-top:var(--s2); }.candidate-chips .chip { margin:0 4px 4px 0; }
+.collapsed-candidate { display:flex; gap:var(--s2); align-items:center; padding:8px 0; color:var(--text-2); }.collapsed-candidate b { color:var(--text); }.collapsed-candidate span:last-child { margin-left:auto; font-variant-numeric:tabular-nums; }
+.rejected { margin-top:var(--s4); }.rejected summary { cursor:pointer; color:var(--text-3); }.rejected ul { margin:var(--s2) 0 0; padding-left:20px; color:var(--text-3); font-size:12.5px; }
 .factors { list-style:none; margin:6px 0 0; padding:0; font-size:12.5px; color:var(--text-2); } .factors li { display:flex; gap:8px; justify-content:space-between; }
 .factors .pos { color:var(--ok); } .factors .neg { color:var(--bad); } .factors b { font-variant-numeric:tabular-nums; font-weight:600; }
 .why-box { margin-top:var(--s3); } .why-box p { color:var(--text-2); overflow-wrap:anywhere; margin:0 0 var(--s2); }
@@ -87,7 +95,6 @@ tr.unavailable-row > * { opacity:.55; }                  /* listed for completen
 .mtag { flex:none; font-size:10.5px; font-weight:650; letter-spacing:.05em; text-transform:uppercase; padding:0 6px; border-radius:4px; background:var(--surface-3); color:var(--accent); }
 .mtag.analysis { color:var(--warn); }
 .calls { font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; }
-@media (max-width:980px) { .agent-grid { grid-template-columns:minmax(0,1fr); } }
 .panel { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3) var(--s4); min-width:0; }
 .panel > .sub { margin-bottom:var(--s3); }
 
@@ -278,7 +285,6 @@ details > summary.muted { cursor:pointer; display:flex; align-items:center; }
 
 /* ================= Accessibility and touch ================= */
 .field select { min-width:0; max-width:100%; } .toolbar .field { min-width:0; }
-.zoom { display:inline-flex; gap:4px; }
 .btn-icon { min-width:34px; padding:4px 0; font-size:17px; line-height:1; }
 a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-tap-highlight-color:rgba(107,151,255,.22); }
 @media (pointer:coarse) {                                  /* touch screens: comfortable targets */
@@ -363,7 +369,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
       <div><h1>Chaos Copilot</h1><p class="cc-label">Resilience operations</p></div>
     </div>
     <nav class="steps-nav" aria-label="Steps">
-      <a href="#readiness" data-for="readiness">Readiness</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a><a href="#agentSec" data-for="agentSec">Agent</a>
+      <a href="#readiness" data-for="readiness">Readiness</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a>
       <a href="#live" data-for="live">Live</a><a href="#grafanaSec" data-for="grafanaSec">Grafana</a><a href="#resultPanel" data-for="resultPanel">Result</a><a href="#historySec" data-for="historySec">History</a><a href="#findingsSec" data-for="findingsSec">Findings</a>
     </nav>
     <div class="top-status">
@@ -399,9 +405,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
         <label class="field">Journey <select id="journeySel"><option value="">none</option></select></label>
         <label class="chk"><input type="checkbox" id="checkoutPath"> Checkout path</label>
         <label class="chk" title="Colour services by their resilience score from the findings"><input type="checkbox" id="showFindings"> Show findings</label>
-        <span class="zoom" role="group" aria-label="Graph zoom"><button id="zoomOut" class="btn btn-sm btn-icon" type="button" aria-label="Zoom out">&minus;</button><button id="zoomIn" class="btn btn-sm btn-icon" type="button" aria-label="Zoom in">+</button></span>
-        <button id="fitGraph" class="btn btn-sm" type="button">Fit</button>
-        <span class="hint">Click a service to inspect it · hover an edge for details · scroll to zoom · drag to pan</span>
+        <span class="hint">Click a service to inspect it · hover an edge for details</span>
       </div>
       <div class="gwrap">
         <div class="stage"><div id="cy" role="img" aria-label="Service dependency graph. To explore it with the keyboard, use the Inspect service menu above."><p class="muted" style="padding:16px">Loading graph…</p></div><span class="stage-note" id="graphInfo"></span></div>
@@ -420,15 +424,18 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="planSec" class="card primary">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>03</b>Decide</span><h2>Experiment plan</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>03</b>Decide</span><h2>Plan</h2></div>
       <div class="card-actions">
         <label class="field"><span class="sr">Learning goal (optional)</span><select id="goalSel"><option value="">No preference: let the AI explore</option></select></label>
         <button id="propose" class="btn btn-primary" type="button">Propose experiment</button>
+        <label class="field"><span class="sr">Replay a saved planning session</span><select id="sessionSel"><option value="">Live / latest session</option></select></label>
+        <button id="refreshRanking" class="btn btn-sm" type="button">Refresh</button>
       </div>
     </header>
     <div class="card-body">
       <div id="retestNote" class="notice info hide" role="status"></div>
-      <div id="plan"><p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p></div>
+      <p id="planNote" class="plan-note">Ranker candidates include every fault allowed by policy. Propose an experiment to add the planning agent’s checks and reasoning.</p>
+      <div id="rankPanel" class="muted">Loading candidates…</div>
       <div id="decision" class="decision hide">
         <p class="human-gate"><svg class="cc-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/></svg><span><b>Human approval required.</b> Nothing is injected until you approve. The safety policy has already decided whether approval is possible.</span></p>
         <label class="chk"><input type="checkbox" id="reviewed" disabled aria-describedby="approveHint"> I reviewed the hypothesis and blast radius</label>
@@ -438,33 +445,9 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
     </div>
   </section>
 
-  <section id="agentSec" class="card">
-    <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>04</b>Explain</span><h2>Planning agent</h2></div>
-      <div class="card-actions">
-        <label class="field"><span class="sr">Replay a saved agent session</span><select id="sessionSel"><option value="">Live / latest session</option></select></label>
-        <button id="refreshRanking" class="btn btn-sm" type="button">Refresh ranking</button>
-      </div>
-    </header>
-    <div class="card-body agent-grid">
-      <div class="agent-col">
-        <h3 class="sub">Candidate ranking <span id="rankMeta" class="muted"></span></h3>
-        <label class="field" style="margin-bottom:8px"><span class="sr">Show candidates with this fault</span><select id="rankFault"><option value="">All faults</option><option value="container_stop">Container stop only</option><option value="network_delay">Network delay only</option></select></label>
-        <div id="rankPanel" class="muted">Loading…</div>
-      </div>
-      <div class="agent-col">
-        <h3 class="sub">Agent activity <span><span id="feedCalls" class="calls muted"></span> <span id="feedRun" class="muted"></span></span></h3>
-        <div class="feedbar"><div class="seg" role="group" aria-label="Show the activity of">
-          <button type="button" data-feed-mode="planning" aria-pressed="true">Planning</button><button type="button" data-feed-mode="analysis" aria-pressed="false">Analysis</button><button type="button" data-feed-mode="all" aria-pressed="false">All</button></div></div>
-        <p id="feedEmpty" class="muted">No planning activity yet. Propose an experiment and every step shows up here as it happens.</p>
-        <ol id="feed" class="feed" aria-label="Agent activity, one entry per step; open an entry for details"></ol>
-      </div>
-    </div>
-  </section>
-
   <section id="live" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>05</b>Observe</span><h2 id="liveTitle" tabindex="-1"><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>04</b>Observe</span><h2 id="liveTitle" tabindex="-1"><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
       <div class="card-actions"><span id="stopNote" class="stop-note hide">Use STOP in the Activity panel.</span><span id="faultPill" class="pill warn"></span></div>
     </header>
     <div class="card-body">
@@ -483,7 +466,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="grafanaSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>06</b>Correlate</span><h2>Grafana: Spanmetrics <span id="gRange" class="pill info"></span></h2></div>
+      <div class="card-title"><span class="eyebrow"><b>05</b>Correlate</span><h2>Grafana: Spanmetrics <span id="gRange" class="pill info"></span></h2></div>
       <div class="card-actions">
         <label class="field">Service <select id="gService"></select></label>
         <a id="gLink" class="btn btn-sm" href="#" target="_blank" rel="noopener">Open full dashboard in Grafana<span class="sr"> (opens in a new tab)</span></a>
@@ -502,7 +485,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="resultPanel" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>07</b>Learn</span><h2 id="resultTitle" tabindex="-1">Result</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>06</b>Learn</span><h2 id="resultTitle" tabindex="-1">Result</h2></div>
       <div class="card-actions"><span id="resultNote" class="muted"></span></div>
     </header>
     <div class="card-body"><div id="result"></div></div>
@@ -510,7 +493,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="historySec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>08</b>Review</span><h2>History</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>07</b>Review</span><h2>History</h2></div>
       <div class="card-actions"><label class="chk" title="Excluded runs feed no finding or score"><input type="checkbox" id="hideExcluded" checked> Hide excluded runs</label>
         <button id="refreshHistory" class="btn btn-sm" type="button">Refresh</button></div>
     </header>
@@ -519,10 +502,11 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="findingsSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>09</b>Improve</span><h2>Findings <span id="findingsPill" class="pill">loading</span></h2></div>
+      <div class="card-title"><span class="eyebrow"><b>08</b>Improve</span><h2>Findings <span id="findingsPill" class="pill">loading</span></h2></div>
       <div class="card-actions">
         <label class="chk"><input type="checkbox" id="autoAnalyse"> Auto-analyse after each experiment</label>
         <a class="btn btn-sm" href="/api/report" target="_blank" rel="noopener">Open full report<span class="sr"> (opens in a new tab)</span></a>
+        <a id="downloadPdf" class="btn btn-sm" href="/api/report.pdf" download="chaos-copilot-findings-report.pdf">Download PDF</a>
         <button id="downloadReport" class="btn btn-sm" type="button">Download report</button>
         <button id="copySummary" class="btn btn-sm" type="button">Copy summary</button>
         <button id="runAnalysis" class="btn btn-sm btn-primary" type="button" aria-describedby="analysisHint">Run analysis</button>
@@ -716,7 +700,19 @@ function renderWorkflow() {                                               // fee
   const fresh = typeof agentStats !== 'undefined' && agentStats.run && agentStats.run !== (mainFeed.ignoreRun || '');
   const rows = agentModel({ status: s, meta: compMeta || [], graph: graphState, goal: $('goalSel').value,
     agent: fresh ? { llm: agentStats.llm, tools: agentStats.tools, cap: AGENT_TOOL_CAP } : null });
+  if (status) autoOpenDock(s);
   if (dock) dock.render(dockModel(s, life, rows), { visible: !!s.running, pending: stopPending, disabled: false });   // the dock's STOP is the only STOP
+}
+/* The dock's open/closed choice lives in memory only: a page load starts expanded on wide screens (collapsed on phones,
+   where the bottom sheet would cover the page), and a new run (planning agent, experiment, analysis) expands it again
+   even if the user collapsed it. The toggle's choice holds until the next such trigger. */
+const dockPref = { v: { 'cc-dock': 'open' }, getItem(k) { return this.v[k] ?? null; }, setItem(k, x) { this.v[k] = x; } };
+let dockSeen = null;                                     // the last status's triggers; null until the first status
+function expandDock() { dockPref.v['cc-dock'] = dockPref.v['cc-dock-narrow'] = 'open'; if (dock) dock.apply(); }
+function autoOpenDock(s) {
+  const now = { proposing: s.phase === 'proposing', running: !!s.running, analysis: !!(s.analysis && s.analysis.running) };
+  if (dockSeen && Object.keys(now).some(k => now[k] && !dockSeen[k])) expandDock();
+  dockSeen = now;
 }
 
 /* ---------- 2. graph ---------- */
@@ -832,7 +828,8 @@ async function loadGraph() {
   const elements = graph.nodes.map(n => ({ data: { id: n, label: nodeLabel(n), fan: graph.fan_in[n] || 0 }, position: pos[n], classes: nodeClasses(n) }))
     .concat(graph.edges.map(e => ({ data: { id: e.parent + '>' + e.child, source: e.parent, target: e.child, color: EDGE_COLOR[edgeKind(e)],
       w: 1.3 + 2.2 * Math.log10(1 + (e.call_count || 0)) / Math.log10(1 + maxCalls), tip: edgeTip(e) }, classes: [e.source === 'config' ? 'config' : '', (info[e.child] || {}).role === 'control plane' ? 'ctl' : ''].join(' ') })));
-  cy = cytoscape({ container: $('cy'), elements, layout: { name: 'preset', padding: 30 }, wheelSensitivity: 0.3, minZoom: 0.3, maxZoom: 2.5,
+  cy = cytoscape({ container: $('cy'), elements, layout: { name: 'preset', padding: 30 }, minZoom: 0.05, maxZoom: 2.5,
+    userZoomingEnabled: false, userPanningEnabled: false, autoungrabify: true, boxSelectionEnabled: false,   // a static picture: click to inspect only
     style: [
       { selector: 'node', style: { shape: 'round-rectangle', 'background-color': tok('--surface-3'), label: 'data(label)', color: tok('--text'), 'font-weight': 600,
           'font-size': `mapData(fan, 0, ${maxFan}, 11, 13)`, 'text-valign': 'center', 'text-halign': 'center', width: 'label', padding: '10px',
@@ -867,10 +864,7 @@ async function loadGraph() {
   $('nodeSel').innerHTML = '<option value="">none</option>' + graph.nodes.slice().sort().map(n => `<option value="${esc(n)}">${esc(n)}${(info[n] || {}).protected ? ' (protected)' : ''}</option>`).join('');
   $('journeySel').innerHTML = '<option value="">none</option>' + Object.entries(graph.flows || {}).map(([k, f]) => `<option value="${esc(k)}">${esc(k)} (${f.traces} traces)</option>`).join('');
   $('graphInfo').textContent = `${graph.nodes.length} services, ${graph.edges.length} dependencies`;
-  if (width < 640) {                                 // phones: start readable (zoomed in at the left), pan to explore
-    const bb = cy.nodes().boundingBox(), z = 0.6;
-    cy.zoom(z); cy.pan({ x: 24 - bb.x1 * z, y: (cy.height() - bb.h * z) / 2 - bb.y1 * z });
-  }
+  fitGraph();                                         // every service visible, on phones too
   highlight(); applyFocus(); applyOverlay();
 }
 
@@ -955,64 +949,6 @@ function magnitudeText(p) {
 }
 const SOURCE_LABEL = { llm: 'Planned by LLM', rank_agent: 'Planned by agent', ranker_fallback: 'Ranker #1 (LLM not used)', 'deterministic-capability': 'Tested capability', fallback: 'FALLBACK PLAN' };
 const fix2 = x => x == null ? '&ndash;' : Number(x).toFixed(2);
-/* plan:pure begin (no DOM): the plan card's text, built only from the plan, its validation and the guard preview */
-const planDuration = p => p.fault === 'traffic_spike' ? ((p.parameters || {}).duration_seconds ?? p.duration_s) : p.duration_s;
-function planQuestion(p, v) {                                 // what the run answers, from who depends on the target
-  const near = (v && v.blast_radius) || [], stop = p.fault === 'container_stop';
-  if (p.fault === 'traffic_spike') return 'does the storefront keep up?';
-  if (p.target !== 'checkout' && near.includes('checkout')) return stop ? 'does checkout fail gracefully?' : 'does checkout slow down or fail?';
-  if (p.target === 'frontend' || near.includes('frontend')) return stop ? 'does the storefront degrade gracefully?' : 'does the storefront slow down?';
-  if (near.length) return `do the ${near.length} service${near.length === 1 ? '' : 's'} that depend on it cope?`;
-  return 'does it recover cleanly?';
-}
-function planSummary(p, v) {
-  const x = p.parameters || {};
-  const what = p.fault === 'container_stop' ? `Stop ${p.target}`
-    : p.fault === 'network_delay' ? `Add ${p.magnitude} ms delay to ${p.target}`
-    : p.fault === 'traffic_spike' ? `Raise traffic on ${p.target} from ${x.baseline_users} to ${x.peak_users} users`
-    : `${FAULT_LABELS[p.fault] || p.fault} on ${p.target}`;
-  return `${what} for ${planDuration(p)} s: ${planQuestion(p, v)}`;
-}
-const PRED_METRIC = { p95_ms: 'p95', p99_ms: 'p99', error_rate: 'errors' };
-const PRED_ARROW = { up: ['↑', 'up', 'rises'], down: ['↓', 'down', 'falls'] };
-function predictionRows(r) {                                  // [{svc, metric, arrow, cls, said, factor}]
-  return ((r && r.predictions) || []).map(x => {
-    const [arrow, cls, said] = PRED_ARROW[x.direction] || ['→', 'flat', 'stays the same'];
-    const f = Number(x.min_factor);
-    return { svc: x.svc, metric: PRED_METRIC[x.metric] || x.metric, arrow, cls, said,
-             factor: isFinite(f) && f > 1 && x.direction !== 'flat' ? `≥${Math.round(f * 10) / 10}×` : '' };
-  });
-}
-function chosenCandidate(r) { return r && (r.top_k || []).find(c => c.candidate_id === r.chosen) || null; }
-function whyFacts(r) {                                         // 2-3 short facts: the ranker's reasons, then the agent's evidence
-  const c = chosenCandidate(r);
-  if (!c) return [];
-  const why = String(c.why || '').split('|')[0].split(';').map(t => t.trim()).filter(Boolean);
-  const ev = (c.evidence || []).filter(e => e && e.finding).map(e => {
-    const f = String(e.finding).trim();
-    return `${f.length > 110 ? f.slice(0, 108) + '…' : f} (${String(e.tool || 'agent').replaceAll('_', ' ')})`;
-  });
-  const out = [...why.slice(0, 2), ...ev.slice(0, 1)];
-  for (const t of [...why.slice(2), ...ev.slice(1)]) if (out.length < 3) out.push(t);
-  return out.slice(0, 3);
-}
-const fmtNum = x => { const n = Number(x); return String(n >= 100 ? Math.round(n) : Math.round(n * 10) / 10); };
-function rangeText(vals, unit) {
-  const v = vals.filter(x => x != null && isFinite(x)).map(Number);
-  if (!v.length) return '';
-  const lo = Math.min(...v), hi = Math.max(...v);
-  return fmtNum(lo) === fmtNum(hi) ? `${fmtNum(lo)}${unit}` : `${fmtNum(lo)}–${fmtNum(hi)}${unit}`;
-}
-function abortText(g) {                                        // from /api/status guard_preview; '' when it is not there
-  if (!g || !(g.services || []).length) return '';
-  const lim = Object.values(g.abort || {});
-  const err = rangeText(lim.map(x => x.error_rate), '%'), p95 = rangeText(lim.map(x => x.p95_ms), ' ms');
-  const parts = [err && `error rate above ${err}`, p95 && `p95 above ${p95}`].filter(Boolean);
-  if (!parts.length) return '';
-  const each = lim.length > 1 ? ' (each service’s baseline limit)' : ' (baseline limit)';
-  return `${parts.join(' or ')}${each} for ${g.breaches_in_a_row} samples in a row; stops anyway at ${g.max_duration_s} s`;
-}
-/* plan:pure end */
 const agentStats = { run: '', llm: 0, tools: 0, last: null, seen: new Set() };       // what the planning agent has done so far, from its events
 function noteAgentEvents(evs) {                                    // called by the feed for every batch of events
   for (const e of evs) {
@@ -1033,7 +969,7 @@ function agentRunningHtml() {                                      // while POST
     : 'LLM call in progress: waiting for the model';
   return `<p class="plan-empty"><span class="spin"></span><b>The planning agent is running and making LLM calls.</b> It asks the model which of the top candidates to investigate,
     runs read-only tool calls (at most ${AGENT_TOOL_CAP}) on what the model asks for, then asks it to choose.
-    <span class="muted">Now: ${esc(now)}. LLM calls so far: ${fresh ? a.llm : 0}, tool calls: ${fresh ? a.tools : 0} of ${AGENT_TOOL_CAP}. Every step is in the Planning agent card below.</span></p>`;
+    <span class="muted">Now: ${esc(now)}. LLM calls so far: ${fresh ? a.llm : 0}, tool calls: ${fresh ? a.tools : 0} of ${AGENT_TOOL_CAP}.</span></p>`;
 }
 const AGENT_TOOL_CAP = 8;
 function renderPlan() {
@@ -1053,92 +989,10 @@ function renderPlan() {
   $('approveHint').textContent = !canDecide ? '' : !v.valid ? 'Blocked by the safety gate.' : !(readiness && readiness.ready) ? 'Readiness checks are failing.'
     : !trafficReady ? 'Traffic spike is unavailable because the Locust executor or rollback path is not ready.'
     : !$('reviewed').checked ? 'Tick the box to confirm you reviewed the plan.' : '';
-  if (!p) {
-    $('plan').innerHTML = proposing ? ($('goalSel').value
-      ? '<p class="plan-empty"><span class="spin"></span><b>Making an LLM call.</b> The planner asks the model for one experiment that fits your goal (up to a minute).</p>'
-      : agentRunningHtml())
-      : '<p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p>';
-    return;
-  }
-  const faultName = FAULT_LABELS[p.fault] || p.fault;
-  const g = s.guard_preview || null;
-  const key = JSON.stringify([p, v, s.source, s.note, g]);
-  if (key === lastPlanHtml) return;                       // the poll runs every second: do not rebuild (and deselect) unchanged text
-  lastPlanHtml = key;
-  const r = p.ranking, c = chosenCandidate(r), preds = predictionRows(r), facts = whyFacts(r);
-  const checks = v.checks || [], failed = checks.filter(k => !k.passed), blast = v.blast_radius || [];
-  const more = (id, label) => `<button type="button" class="pc-more" data-pt="${id}" aria-expanded="${!!planOpen[id]}" aria-controls="pt-${id}">${planOpen[id] ? 'Show less' : label}</button>`;
-  const long = t => String(t || '').length > 110;
-  const x = p.parameters || {};
-  const faultLine = p.fault === 'traffic_spike'
-    ? `${faultName}: ${x.baseline_users} → ${x.peak_users} users at ${x.spawn_rate_per_second}/s${x.journey_profile ? ', ' + String(x.journey_profile).replaceAll('-', ' ') : ''}, ${planDuration(p)} s`
-    : `${faultName}${p.fault === 'network_delay' ? ` +${p.magnitude} ms` : ''}, ${p.duration_s} s`;
-  const watched = g && (g.services || []).length ? g.services : [p.target, ...blast];
-  const abort = abortText(g);
-  const passIf = `${preds.length ? 'the predictions hold' : 'the hypothesis holds'} and the system recovers${g ? ` within ${g.recovery_timeout_s} s` : ''}`;
-  const reasonFull = [p.reasoning, c && c.reason && c.reason !== p.reasoning ? c.reason : ''].filter(Boolean);
-  const evidence = (c && c.evidence) || [];
-  const gateOpen = planOpen.gate ?? !v.valid;              // a blocked plan opens its failures by default
-  const checkLi = k => `<li><span class="ic ${k.passed ? 'ok' : 'no'}" aria-hidden="true">${k.passed ? '&#10003;' : '&#10007;'}</span><span>${esc(k.name)}<span class="sr">: ${k.passed ? 'passed' : 'failed'}</span> <small class="muted">${esc(k.detail)}</small></span></li>`;
-  const blastChips = `<div>${blast.length ? blast.map(n => `<span class="chip blast">${esc(n)}</span>`).join('') : '<span class="muted">none</span>'}</div>`;
-  const gateSummary = v.valid
-    ? `${ChaosUI.chip('ok', 'Safety gate passed', 'check')}<span>${checks.length}/${checks.length} checks &middot; blast radius: ${blast.length} service${blast.length === 1 ? '' : 's'}</span>`
-    : `${ChaosUI.icon('x')}<span>Blocked by the safety gate &middot; ${failed.length || (v.reasons || []).length} check${(failed.length || (v.reasons || []).length) === 1 ? '' : 's'} failed</span>`;
-  const gateBody = v.valid
-    ? `<ul class="gate">${checks.map(checkLi).join('')}</ul><h4 class="pc-sub">Blast radius: everything that depends on ${esc(p.target)}</h4>${blastChips}`
-    : `${failed.length ? `<ul class="gate">${failed.map(checkLi).join('')}</ul>` : ''}
-       ${!checks.length && (v.reasons || []).length ? `<ul class="reasons">${v.reasons.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
-       ${checks.length ? `<details data-pt="gateAll"${planOpen.gateAll ? ' open' : ''}><summary>Show all ${checks.length} checks and the blast radius</summary>
-         <ul class="gate">${checks.map(checkLi).join('')}</ul><h4 class="pc-sub">Blast radius</h4>${blastChips}</details>` : ''}`;
-  $('plan').innerHTML = `
-    <p class="plan-sum">${esc(planSummary(p, v))}</p>
-    <div class="plan-pills"><span class="pill ${p.fault === 'container_stop' ? 'bad' : 'warn'}">${esc(faultName)}</span>
-      <span class="pill ${['llm', 'rank_agent'].includes(s.source) ? 'info' : 'warn'}">${esc(SOURCE_LABEL[s.source] || 'FALLBACK PLAN')}</span>
-      ${r && (r.top_k || []).length ? `<span class="pill">1 of ${r.top_k.length} candidates</span>` : ''}</div>
-    <div class="pc-cards">
-      <section class="pc-card" aria-labelledby="pc-h-expect"><h3 id="pc-h-expect">${ChaosUI.icon('analysis')}We expect</h3>
-        <p class="pc-text${long(p.hypothesis) && !planOpen.hyp ? ' clamp' : ''}" id="pt-hyp">${esc(p.hypothesis)}</p>
-        ${long(p.hypothesis) ? more('hyp', 'Show full') : ''}
-        ${preds.length ? `<h4 class="pc-sub">Predictions</h4><ul class="pc-preds" aria-label="Predicted changes">${preds.map(q => `<li>
-          <span class="svc">${esc(q.svc)}</span><span class="met">${esc(q.metric)}</span><span class="arr ${q.cls}" aria-hidden="true">${q.arrow}</span><span class="fac">${esc(q.factor)}</span>
-          <span class="sr">${esc(q.metric)} ${q.said}${q.factor ? ' by at least ' + esc(q.factor.replace('≥', '').replace('×', ' times')) : ''}</span></li>`).join('')}</ul>` : ''}
-      </section>
-      <section class="pc-card" aria-labelledby="pc-h-why"><h3 id="pc-h-why">${ChaosUI.icon('planner')}Why this one</h3>
-        ${facts.length ? `<ul class="pc-facts">${facts.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`
-          : `<p class="pc-text${long(p.reasoning) && !planOpen.why ? ' clamp' : ''}" id="pt-why">${esc(p.reasoning)}</p>`}
-        ${facts.length && (reasonFull.length || evidence.length) ? `${more('why', 'Show full')}
-          <div class="pc-full" id="pt-why"${planOpen.why ? '' : ' hidden'}>${reasonFull.map(t => `<p>${esc(t)}</p>`).join('')}
-            ${evidence.length ? `<h4 class="pc-sub">Evidence</h4><ul>${evidence.map(e => `<li><code>${esc(e.tool)}</code> ${esc(e.finding)}</li>`).join('')}</ul>` : ''}</div>`
-          : !facts.length && long(p.reasoning) ? more('why', 'Show full') : ''}
-      </section>
-      <section class="pc-card" aria-labelledby="pc-h-how"><h3 id="pc-h-how">${ChaosUI.icon('guard')}How we'll test it</h3>
-        <dl class="pc-test">
-          <dt>Fault</dt><dd>${esc(faultLine)}</dd>
-          <dt>Watching</dt><dd>${watched.map(n => `<span class="chip ${n === p.target ? 'target' : 'blast'}">${esc(n)}</span>`).join('')}</dd>
-          ${abort ? `<dt>Abort if</dt><dd>${esc(abort)}</dd>` : ''}
-          ${g && g.rollback ? `<dt>Rollback</dt><dd>${esc(g.rollback)}</dd>` : ''}
-          <dt>Pass if</dt><dd>${esc(passIf)}</dd>
-        </dl>
-      </section>
-    </div>
-    ${s.note || (r && (r.top_k || []).length) ? `<p class="pc-note">${esc(s.note || '')}${r && (r.top_k || []).length ? `<a href="#agentSec">Full ranking and the agent's steps</a>` : ''}</p>` : ''}
-    <details class="gate-strip ${v.valid ? 'passed' : 'blocked'}" data-pt="gate"${gateOpen ? ' open' : ''}>
-      <summary>${gateSummary}<span class="more">details</span></summary>
-      <div class="gate-body">${gateBody}</div>
-    </details>`;
-  announce(`Plan for ${p.target}: ${v.valid ? 'Safety gate passed' : 'Blocked by the safety gate'}`);
+  $('planNote').innerHTML = proposing ? agentRunningHtml() : p
+    ? `${esc(SOURCE_LABEL[s.source] || 'Plan')} · ${esc(s.note || 'Agent reasoning and checks are shown on the candidate cards.')}`
+    : 'Ranker candidates include every fault allowed by policy. Propose an experiment to add the planning agent’s checks and reasoning.';
 }
-$('plan').addEventListener('click', e => {                   // "Show full" toggles: flip in place, remember across re-renders
-  const b = e.target.closest('button[data-pt]');
-  if (!b) return;
-  const id = b.dataset.pt, open = planOpen[id] = !planOpen[id], target = $('pt-' + id);
-  b.setAttribute('aria-expanded', String(open)); b.textContent = open ? 'Show less' : 'Show full';
-  if (target) target.classList.contains('pc-full') ? (target.hidden = !open) : target.classList.toggle('clamp', !open);
-});
-$('plan').addEventListener('toggle', e => {                  // <details> in the card: remember what the user opened or closed
-  const d = e.target;
-  if (d.matches && d.matches('details[data-pt]')) planOpen[d.dataset.pt] = d.open;
-}, true);
 
 /* ---------- 4. live ---------- */
 /* cmp:pure begin (no DOM, no Chart.js: unit-tested from tests/test_ui_comparison.js) */
@@ -1774,6 +1628,12 @@ function renderRanking() {
       ${(chosen.evidence || []).length ? `<ul>${chosen.evidence.map(e => `<li><code>${esc(e.tool)}</code> ${esc(e.finding)}</li>`).join('')}</ul>` : ''}</div>`
       : '<p class="muted" style="margin-top:8px">Nothing chosen yet: this is the ranker\'s view before the agent investigates.</p>'}`;
 }
+const planTitle = r => r.fault === 'network_delay' ? `Add ${r.magnitude} ms delay to ${r.target} for 60 s` : r.fault === 'container_stop' ? `Stop ${r.target} for 60 s` : `Increase traffic to ${r.target} for 60 s`;
+function unifiedScore(r) { const parts = { impact: 0, info: 0, penalty: 0, fit: 0 }, why = { impact: [], info: [], penalty: [], fit: [] }; for (const f of r.factors || []) { const k = f.kind === 'penalty' ? 'penalty' : /coverage|novelty|severity|escalation/.test(f.name || '') ? 'fit' : f.kind === 'info' ? 'info' : 'impact'; parts[k] += Math.abs(Number(f.contribution) || 0); why[k].push(f.label); } const total = Object.values(parts).reduce((a, b) => a + b, 0) || 1; return `<div class="score" aria-label="Total score ${fix2(r.priority)}">${Object.entries(parts).map(([k, v]) => `<i class="${k}" style="width:${100 * v / total}%" title="${esc(k)}: ${fix2(v)}. ${esc(why[k].join('; ') || 'No contributing factors')}"></i>`).join('')}</div>`; }
+const SCORE_LEGEND = `<div class="score-legend" aria-label="Score legend"><span style="--c:#38bdf8">impact potential</span><span style="--c:#2fbf9b">informativeness</span><span style="--c:#f0524f">risk penalty</span><span style="--c:#a78bfa">fault fit</span></div>`;
+function unifiedCandidate(r, agentRanks) { const ar = agentRanks.get(r.id), move = ar && ar !== r.rank ? `<p class="candidate-move">${ar < r.rank ? '↑ moved up' : '↓ moved down'} from #${r.rank} — ${esc(r.reason)}</p>` : '', checks = (r.checked || []).map(x => `<span class="chip">${esc(x)}</span>`).join(''), blast = (r.blast_radius || []).map(x => `<span class="chip blast">${esc(x)}</span>`).join('') || '<span class="muted">none</span>', hypothesis = r.id === rankData.chosen && status && status.plan ? status.plan.hypothesis : `This will reveal how ${r.target} and its callers handle ${r.fault.replace('_', ' ')}.`; return `<article class="candidate-card${r.rank === 1 ? ' top-pick' : ''}" data-node="${esc(r.target)}" tabindex="0"><div class="candidate-head"><span class="candidate-rank">#${r.rank}</span>${r.rank === 1 ? '<span class="pill ok">Top pick</span>' : ''}<button class="candidate-title" type="button" data-node="${esc(r.target)}">${esc(planTitle(r))}</button><span class="pill">score ${fix2(r.priority)}</span></div>${unifiedScore(r)}${move}<p class="candidate-reason">${esc(r.reason || r.why)}</p><p class="candidate-hypothesis"><b>Hypothesis:</b> ${esc(hypothesis)}</p><div class="candidate-chips"><b class="sub">Checked</b> ${checks || '<span class="muted">No agent checks recorded.</span>'}</div><div class="candidate-chips"><b class="sub">Expected blast radius</b> ${blast}</div></article>`; }
+function renderUnifiedRanking() { const d = rankData; if (!d) return; const rows = d.candidates, adjusted = rows.filter(r => r.adjusted_priority != null).sort((a, b) => b.adjusted_priority - a.adjusted_priority), ranks = new Map(adjusted.map((r, i) => [r.id, i + 1])), open = rows.slice(0, 5), rest = rows.slice(5); $('rankPanel').classList.remove('muted'); $('rankPanel').innerHTML = `${SCORE_LEGEND}<div class="candidate-list">${open.map(r => unifiedCandidate(r, ranks)).join('')}</div>${rest.length ? `<details class="block"><summary>Show all candidates (${rest.length} more)</summary><div class="candidate-list">${rest.map(r => `<div class="collapsed-candidate" data-node="${esc(r.target)}"><b>#${r.rank}</b><span>${esc(planTitle(r))}</span><span>${fix2(r.priority)}</span></div>`).join('')}</div></details>` : ''}${(d.rejected || []).length ? `<details class="rejected"><summary>Rejected by policy (${d.rejected.length})</summary><ul>${d.rejected.map(r => `<li>${esc(planTitle(r))} — ${esc(r.reason)}</li>`).join('')}</ul></details>` : ''}`; }
+function renderRanking() { renderUnifiedRanking(); }
 async function loadRanking() {
   try { rankData = await api('/api/ranking'); renderRanking(); }
   catch (e) { $('rankPanel').textContent = 'Ranking unavailable: ' + e.message; }
@@ -1820,7 +1680,7 @@ function makeFeed(o) {
   };
   return f;
 }
-const mainFeed = makeFeed({ list: 'feed', empty: 'feedEmpty', runLabel: 'feedRun', calls: 'feedCalls', mode: 'planning' });
+const mainFeed = { mode: 'planning', run: '', viewRun: '', ignoreRun: '', reset() {}, async poll() {} };
 const aFeed = makeFeed({ list: 'afeed', empty: 'afeedEmpty', runLabel: 'afeedRun', calls: 'afeedCalls', mode: 'analysis', follow: true, emptyOnlyWithRun: true });
 function setFeedMode(mode) {
   mainFeed.mode = mode; mainFeed.viewRun = ''; mainFeed.ignoreRun = ''; mainFeed.reset();
@@ -1839,10 +1699,9 @@ async function loadSessions() {
     $('sessionSel').value = [...$('sessionSel').options].some(o => o.value === cur) ? cur : '';
   } catch (e) { /* optional */ }
 }
-$('rankFault').onchange = renderRanking;
 $('sessionSel').onchange = () => { mainFeed.viewRun = $('sessionSel').value; mainFeed.ignoreRun = ''; mainFeed.reset(); mainFeed.poll(); };
 $('refreshRanking').onclick = () => withBusy($('refreshRanking'), 'Refreshing…', async () => { await loadRanking(); await loadSessions(); });
-$('rankPanel').onclick = e => { const b = e.target.closest('[data-node]'); if (b) { selectNode(b.dataset.node); $('graphSec').scrollIntoView({ block: 'start' }); } };
+$('rankPanel').onmouseover = $('rankPanel').onclick = e => { const b = e.target.closest('[data-node]'); if (b) { selectNode(b.dataset.node); } };
 
 /* ---------- polling ---------- */
 let lastMode = 'idle', modeReady = false;
@@ -1893,16 +1752,16 @@ $('refreshHistory').onclick = () => withBusy($('refreshHistory'), 'Refreshing…
 $('bannerClose').onclick = () => banner('');
 $('focus').onchange = () => { chartSig = ''; renderCharts(status); };
 $('gService').onchange = () => { gSel = $('gService').value; updateGrafana(); };
-$('propose').onclick = async () => { $('propose').disabled = true; $('sessionSel').value = ''; mainFeed.viewRun = '';
-  if (mainFeed.mode === 'planning') { mainFeed.ignoreRun = mainFeed.run; mainFeed.reset(); $('feedEmpty').classList.remove('hide'); }
+$('propose').onclick = async () => { $('propose').disabled = true; $('sessionSel').value = ''; expandDock(); mainFeed.viewRun = '';
+  if (mainFeed.mode === 'planning') { mainFeed.ignoreRun = mainFeed.run; mainFeed.reset(); }
   chartSig = ''; viewedResult = null; renderResult(null);
   await act('/api/propose', 'Propose', { goal: $('goalSel').value || null }, $('propose')); await poll(); };
 $('reviewed').onchange = renderPlan;
 $('journeySel').onchange = () => { if ($('journeySel').value) { $('checkoutPath').checked = false; } applyFocus(); };
 $('checkoutPath').onchange = () => { if ($('checkoutPath').checked) $('journeySel').value = ''; applyFocus(); };
-$('fitGraph').onclick = () => { if (cy) cy.fit(undefined, 30); };
-const zoomBy = f => { if (cy) cy.zoom({ level: Math.max(cy.minZoom(), Math.min(cy.maxZoom(), cy.zoom() * f)), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }); };
-$('zoomIn').onclick = () => zoomBy(1.25); $('zoomOut').onclick = () => zoomBy(0.8);
+function fitGraph() { if (cy) { cy.resize(); cy.fit(undefined, 30); } }
+let fitTimer = null;
+window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitGraph, 150); });
 $('nodeSel').onchange = () => selectNode($('nodeSel').value || null);
 $('nodeDetail').onclick = ev => { const c = ev.target.closest('[data-node]'); if (c) selectNode(c.dataset.node); };
 async function loadGoals() {
@@ -1919,7 +1778,7 @@ async function requestStop() {                                          // the o
 }
 
 $('liveCmpMount').innerHTML = cmpHtml('live');
-dock = ChaosUI.createDock($('ccDock'), { onStop: requestStop });
+dock = ChaosUI.createDock($('ccDock'), { onStop: requestStop, storage: dockPref });
 loadCompMeta();
 loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); loadSessions(); loadFindings();
 /* Reloading the page (F5 / Ctrl+F5) starts from a clean screen: an unapproved plan, the last result card and the previous agent
