@@ -45,6 +45,7 @@ class PlanningState(TypedDict, total=False):
 
 
 def top_k(ranking, k):
+    ranking = [candidate for candidate in ranking if not candidate.get("unavailable")]
     seen, selected = set(), []
     for candidate in ranking:
         if candidate["target"] not in seen:

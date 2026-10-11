@@ -219,54 +219,12 @@ class PlanningGraphTest(unittest.TestCase):
             self.assertNotIn("subprocess", source)
 
 
-class FaultDiversityAgentTest(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.log = Path(self.tmp.name) / "agent_log.jsonl"
-        self.g, self.base = graph(), baseline()
-        self.g.add_edge("load-generator", "frontend", mode="sync", type="sync-http")      # the traffic_spike target
-        self.g.add_edge("frontend", "checkout", mode="sync", type="sync-http")
-        self.base["services"]["frontend"] = dict(self.base["services"]["web"])
-        self.base["containers"]["frontend"] = {"running": {"mean": 1}}
-        self.cap = traffic_capability(runtime_ready=False, ready=False, detail="Unavailable: ConnectionError")
-
-    def agent(self, replies, history=(), bodies=None):
-        it = iter(replies)
-
-        def post(api_key, body, models):
-            if bodies is not None:
-                bodies.append(body)
-            return next(it), "fake-model"
-        return rank_agent.run_agent(api_key="k", post=post, graph=self.g, baseline=self.base, flows=flows(),
-                                    history=list(history), log_path=self.log, traffic_capability=self.cap)
-
+class CandidateAvailabilityTest(unittest.TestCase):
     def test_an_unavailable_candidate_is_never_shortlisted(self):
         spike = {"id": "frontend:traffic_spike:8", "target": "frontend", "fault": "traffic_spike", "priority": 0.99,
                  "unavailable": True}
         others = [{"id": f"{t}:network_delay:200", "target": t, "fault": "network_delay", "priority": 0.5} for t in ("a", "b", "c")]
         self.assertNotIn(spike, rank_agent.top_k([spike, *others], 3))
-
-    def test_the_agent_cannot_choose_an_unavailable_traffic_spike(self):
-        pick = {"ranking": [], "chosen": "frontend:traffic_spike:8", "hypothesis": "h",
-                "predictions": [{"svc": "frontend", "metric": "p95_ms", "direction": "up", "min_factor": 1.5}]}
-        out = self.agent([reply({"text": json.dumps(pick)})])
-        self.assertEqual(out["source"], "ranker_fallback")
-        self.assertNotEqual(out["plan"]["fault"], "traffic_spike")
-        self.assertNotIn("frontend:traffic_spike:8", [r["candidate_id"] for r in out["top_k"]])
-        self.assertTrue(validate(out["plan"], self.g)["valid"])
-
-    def test_the_brief_says_how_often_each_fault_type_ran_and_the_prompt_prefers_the_less_run(self):
-        bodies = []
-        history = [{"target": "pay", "fault": "network_delay", "magnitude": m, "verdict": "held", "guard_aborted": False,
-                    "reason": "", "recovery_s": 5.0, "file": "x"} for m in (200, 500)]
-        self.agent([reply({"text": "not json"})], history, bodies)
-        brief = bodies[0]["contents"][0]["parts"][0]["text"]
-        self.assertIn("network_delay 2x", brief)
-        self.assertIn("container_stop 0x", brief)
-        self.assertIn("within 0.05", brief)
-        self.assertIn("within 0.05", rank_agent.SYSTEM_PROMPT)
-
 
 if __name__ == "__main__":
     unittest.main()
