@@ -13,6 +13,7 @@ import networkx as nx
 
 import grafana
 import planner
+import guard
 import ranker
 import run_experiment as exp
 from discovery import compute_stats, load_flows, load_graph
@@ -23,7 +24,7 @@ from policy import PROTECTED, blast_radius
 RESULTS_DIR = exp.RESULTS_DIR
 REPORTS_DIR = Path("reports")
 DETERMINISTIC_JSON = REPORTS_DIR / "deterministic.json"
-FORMAT_VERSION = 2   # bump when the analysis output changes shape, so stale caches are recomputed
+FORMAT_VERSION = 3   # bump when the analysis output changes shape, so stale caches are recomputed
 JAEGER_UI = "http://localhost:8080/jaeger/ui"
 USER_FACING = {"frontend", "frontend-proxy", "checkout"}  # where users feel errors and latency directly
 
@@ -59,9 +60,22 @@ SEVERITY_WEIGHTS = {
 SEVERITY_BANDS = ((70, "Critical"), (50, "High"), (30, "Medium"), (0, "Low"))   # lower bound -> label
 SEVERITY_ORDER = ("Critical", "High", "Medium", "Low")
 # Resilience: subtracted from a service's average experiment score per open weakness of this severity.
-WEAKNESS_PENALTY = {"Critical": 15, "High": 8}
+# Resilience: subtracted from a service's average run score per open weakness. Medium findings (often held at
+# Medium only because their evidence is thin) still count, scaled by the finding's confidence; Low findings do not.
+WEAKNESS_PENALTY = {"Critical": 15, "High": 8, "Medium": 5}
+PENALTY_SCALED_BY_CONFIDENCE = ("Medium",)
+MIN_RELIABLE_RUNS = 3   # fewer "ok" runs than this: the overall score is shown as provisional
 WEAKNESS_PENALTY_CAP = 30   # related weaknesses often share one root cause; do not stack without limit
 USER_STOPS = ("stopped by user", "interrupted by user")   # guard reasons of runs a person ended early
+
+# ---- data quality: every result is "ok", "low_evidence" or "excluded" (files are never deleted) -------------------
+EXCLUDED_JSON = RESULTS_DIR / "EXCLUDED.json"   # {"<result id>": "reason"}, tracked in git
+RESULT_FILE = re.compile(r"^\d{8}T\d{6}Z$")      # result file stems; anything else in results/ is not a run
+EXCLUDED_SOURCES = {"manual-test": "staged by a test harness (planner bypassed), not a planned experiment"}
+MIN_TIMELINE_SAMPLES = 4      # fewer guard samples than this: the peak rests on too little data
+RESTART_BEFORE_RUN = "restarts: restarted"   # recovery blocked by a restart the old guard compared with the baseline
+LOW_EVIDENCE_CONFIDENCE = 0.5  # a low-evidence run counts this much towards a finding's confidence
+LOW_EVIDENCE_MAX_SCORE = 49.9  # findings backed only by low-evidence runs stay below High (50)
 TITLES = {"latency_amplification": "{caller} pays the delay on {target} several times over",
           "silent_degradation": "{caller} slows down silently when {target} degrades",
           "hard_dependency": "{caller} fails when {target} is down",
@@ -72,38 +86,90 @@ TITLES = {"latency_amplification": "{caller} pays the delay on {target} several 
 
 # ---- loading ----------------------------------------------------------------------------
 
-def normalise_result(d, rid):
-    """Bring older result shapes up to date (the same normalisation the UI's /api/results uses)."""
+def load_excluded(path=None):
+    """{result id: reason} from results/EXCLUDED.json; {} when it is missing or unreadable."""
+    try:
+        data = json.loads(Path(path or EXCLUDED_JSON).read_text(encoding="utf-8"))
+        return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def result_files(results_dir=RESULTS_DIR):
+    """The result files in results/ (EXCLUDED.json and other non-run files are skipped)."""
+    return [p for p in sorted(Path(results_dir).glob("*.json")) if RESULT_FILE.match(p.stem)]
+
+
+def _restart_before_run(d):
+    """True for older results whose recovery was blocked by a restart that predates the run: their guard compared
+    restarts with the baseline, not with the counts taken at experiment start (results now record restart_limits)."""
+    return "restart_limits" not in d and RESTART_BEFORE_RUN in str(d["recovery"].get("note") or "")
+
+
+def availability_of(d):
+    """Probe availability during the fault: recomputed from the timeline's probes, else what the run recorded."""
+    timeline = d["guard"].get("timeline") or []
+    if any("probes" in t for t in timeline):
+        return guard.probe_availability(timeline)
+    return (d.get("score") or {}).get("availability_pct")
+
+
+def assess_quality(d, excluded=None):
+    """(quality, reason): "excluded" runs never feed findings, strengths or scores; "low_evidence" runs may support a
+    finding but lower its confidence and never carry a Critical/High finding alone."""
+    excluded = load_excluded() if excluded is None else excluded
+    if d["id"] in excluded:
+        return "excluded", excluded[d["id"]]
+    if d.get("forced_abort_test"):
+        return "excluded", "forced abort test (fake thresholds)"
+    if not d.get("rollback_verified"):
+        return "excluded", "rollback not verified"
+    if d.get("plan_source") in EXCLUDED_SOURCES:
+        return "excluded", EXCLUDED_SOURCES[d["plan_source"]]
+    reasons = []
+    samples = len(d["guard"].get("timeline") or [])
+    if samples < MIN_TIMELINE_SAMPLES:
+        reasons.append(f"only {samples} guard sample{'' if samples == 1 else 's'} (need {MIN_TIMELINE_SAMPLES})")
+    if d["score"].get("availability_pct") is None:
+        reasons.append("availability not measured")
+    if not exp.recovery_measured(d["recovery"], _restart_before_run(d)):
+        reasons.append("recovery not measured (" + (str(d["recovery"].get("note") or "") or "restart from before the run") + ")")
+    return ("low_evidence", "; ".join(reasons)) if reasons else ("ok", "")
+
+
+def normalise_result(d, rid, excluded=None):
+    """Bring older result shapes up to date (the same normalisation the UI's /api/results uses), re-score them the
+    honest way (unmeasured components are left out, not counted as no damage) and flag their data quality.
+    The files themselves are never changed."""
     d["id"] = rid
     d.setdefault("container_resources", [])
     d["amplification"] = exp.amplification(d["plan"], d["impact"])  # recomputed: older results have an older shape
     d["recovery"].setdefault("metrics_confirmed", None)
     d["recovery"].setdefault("recovered", False)
-    if not d.get("score"):  # older results: score what was recorded (no probe data then)
-        d["score"] = exp.score_experiment(d["impact"], d["recovery"], None, d["guard"]["elapsed_s"])
+    recorded = d.get("score") or {}
+    d["score"] = exp.score_experiment(d["impact"], d["recovery"], availability_of(d),
+                                      d["guard"]["elapsed_s"] if d["guard"].get("timeline") else None,
+                                      restart_before_run=_restart_before_run(d))
+    if recorded.get("resilience_score") is not None and recorded["resilience_score"] != d["score"]["resilience_score"]:
+        d["score"]["recorded_resilience_score"] = recorded["resilience_score"]   # what the file says, for reference
     d["verdict"].setdefault("recommendation", planner.remediation_for(d["plan"]))
     if not d.get("grafana_window_ms"):  # older results: derive the window from what was recorded
         start = datetime.fromisoformat(d["started_at"]).timestamp()
         d["grafana_window_ms"] = grafana.window_ms(start, start + d["guard"]["elapsed_s"] + (d["recovery"]["seconds"] or 60))
+    d["quality"], d["quality_reason"] = assess_quality(d, excluded)
     return d
 
 
-def load_results(results_dir=RESULTS_DIR):
-    """(usable results oldest first, [{id, reason}] skipped). Forced kill-switch tests and runs whose
-    rollback was not verified are skipped: their numbers do not describe the system."""
+def load_results(results_dir=RESULTS_DIR, excluded=None):
+    """(every readable result oldest first, each with quality / quality_reason; [{id, reason}] unreadable files).
+    Nothing is dropped here: analyse() keeps excluded runs out of findings and scores but still lists them."""
+    excluded = load_excluded(Path(results_dir) / EXCLUDED_JSON.name) if excluded is None else excluded
     results, skipped = [], []
-    for p in sorted(Path(results_dir).glob("*.json")):
+    for p in result_files(results_dir):
         try:
-            d = normalise_result(json.loads(p.read_text(encoding="utf-8")), p.stem)
+            results.append(normalise_result(json.loads(p.read_text(encoding="utf-8")), p.stem, excluded))
         except (OSError, ValueError, KeyError, TypeError) as e:
             skipped.append({"id": p.stem, "reason": f"unreadable: {type(e).__name__}"})
-            continue
-        if d.get("forced_abort_test"):
-            skipped.append({"id": p.stem, "reason": "forced abort test"})
-        elif not d.get("rollback_verified"):
-            skipped.append({"id": p.stem, "reason": "rollback not verified"})
-        else:
-            results.append(d)
     return results, skipped
 
 
@@ -344,11 +410,16 @@ def group(cands, by_id, g, crit, weights=SEVERITY_WEIGHTS):
                 "criticality": crit.get(target, 0.0),
                 "spread": max(_clamp(sum(_impacted(row) for row in r["impact"] if row["service"] != target) / br) for r in runs),
                 "recovery": max(_recovery_cost(r) for r in runs)}
-        run_conf = [weights["run_confidence"].get(r["score"]["confidence"].split()[0], 0.4) for r in runs]
+        run_conf = [weights["run_confidence"].get(r["score"]["confidence"].split()[0], 0.4)
+                    * (LOW_EVIDENCE_CONFIDENCE if r.get("quality") == "low_evidence" else 1.0) for r in runs]
         confidence = round(min(1.0, sum(run_conf) / len(run_conf) * (0.6 + 0.2 * len(runs))), 2)
         base = sum(weights["components"][k] * v for k, v in comp.items())
         score = round(100 * weights["pattern"].get(pattern, 1.0) * base
                       * (weights["conf_floor"] + (1 - weights["conf_floor"]) * confidence), 1)
+        low = sorted({r["id"] for r in runs if r.get("quality") == "low_evidence"})
+        capped = bool(low) and len(low) == len({r["id"] for r in runs}) and score > LOW_EVIDENCE_MAX_SCORE
+        if capped:   # low-evidence runs alone never carry a Critical/High finding
+            score = LOW_EVIDENCE_MAX_SCORE
         first = cs[0]
         out.append({
             "id": f"{pattern}:{target}:{caller or '-'}", "pattern": pattern, "service": target, "caller": caller,
@@ -356,9 +427,11 @@ def group(cands, by_id, g, crit, weights=SEVERITY_WEIGHTS):
             "runs": sorted({c["result_id"] for c in cs}),
             "faults": sorted({f"{c['fault']}" + (f" {c['magnitude']}ms" if c["fault"] == "network_delay" else "") for c in cs}),
             "evidence_ids": [e for c in cs for e in c["evidence_ids"]],
-            "detail": first["why"] if len(cs) == 1 else f"{first['why']} Seen in {len(cs)} runs.",
+            "detail": (first["why"] if len(cs) == 1 else f"{first['why']} Seen in {len(cs)} runs.")
+                      + (" Severity held below High: every supporting run is low evidence." if capped else ""),
             "per_run": [{"result_id": c["result_id"], "why": c["why"]} for c in cs],
             "components": {k: round(v, 3) for k, v in comp.items()}, "confidence": confidence,
+            "low_evidence_runs": low, "capped_low_evidence": capped,
             "severity_score": score, "severity": severity_label(score),
             "fix": planner.remediation_for({"target": target, "fault": first["fault"]}),
             "fix_location": None, "verify_by": verify_by(pattern, first, target, caller)})
@@ -401,7 +474,7 @@ def measures_resilience(r):
 
 
 def resilience_scores(results, weaknesses, services, crit):
-    """Per service: mean experiment resilience score minus open Critical/High weakness penalties.
+    """Per service: mean experiment resilience score minus open-weakness penalties (Medium scaled by confidence).
     Overall: criticality-weighted mean over tested services. Untested services are "not tested"."""
     per = {}
     for s in sorted(services):
@@ -417,13 +490,17 @@ def resilience_scores(results, weaknesses, services, crit):
             continue
         scores = [r["score"]["resilience_score"] for r in runs]
         open_w = [w for w in weaknesses if w["service"] == s and w["severity"] in WEAKNESS_PENALTY]
-        penalty = min(WEAKNESS_PENALTY_CAP, sum(WEAKNESS_PENALTY[w["severity"]] for w in open_w))
+        penalty = round(min(WEAKNESS_PENALTY_CAP, sum(
+            WEAKNESS_PENALTY[w["severity"]] * (w["confidence"] if w["severity"] in PENALTY_SCALED_BY_CONFIDENCE else 1.0)
+            for w in open_w)), 1)
         mean = sum(scores) / len(scores)
         score = max(0, round(mean - penalty))
         per[s] = {"score": score, "status": "tested", "runs": len(runs), "mean_run_score": round(mean, 1),
                   "penalty": penalty, "open_weaknesses": [w["id"] for w in open_w], "criticality": crit.get(s, 0.0),
                   "explain": f"mean of {len(runs)} run scores ({round(mean, 1)}) minus {penalty} for "
-                             f"{len(open_w)} open Critical/High weaknesses (cap {WEAKNESS_PENALTY_CAP}) = {score}"}
+                             f"{len(open_w)} open weaknesses (Critical {WEAKNESS_PENALTY['Critical']}, High "
+                             f"{WEAKNESS_PENALTY['High']}, Medium {WEAKNESS_PENALTY['Medium']} x confidence; cap "
+                             f"{WEAKNESS_PENALTY_CAP}) = {score}"}
     tested = {s: v for s, v in per.items() if v["score"] is not None}
     if tested:
         weights = {s: 1 + v["criticality"] for s, v in tested.items()}
@@ -432,7 +509,11 @@ def resilience_scores(results, weaknesses, services, crit):
                    f"{len(per) - len(tested)} services not tested yet and not included")
     else:
         overall, explain = None, "no service has been tested yet"
-    return {"overall": {"score": overall, "tested": len(tested), "services": len(per), "explain": explain},
+    reliable = sum(r.get("quality", "ok") == "ok" for r in results)
+    provisional = overall is not None and reliable < MIN_RELIABLE_RUNS
+    return {"overall": {"score": overall, "tested": len(tested), "services": len(per), "explain": explain,
+                        "reliable_runs": reliable, "provisional": provisional,
+                        "provisional_note": f"provisional: based on {reliable} reliable runs" if provisional else None},
             "services": per}
 
 
@@ -442,6 +523,9 @@ def analyse(results=None, skipped=(), g=None, stats=None, baseline=None, flows=N
     """Full deterministic analysis. Arguments default to the files on disk."""
     if results is None:
         results, skipped = load_results()
+    everything = list(results)
+    excluded_runs = [r for r in everything if r.get("quality") == "excluded"]
+    results = [r for r in everything if r.get("quality") != "excluded"]   # excluded runs feed no finding or score
     if g is None:
         g, stats = load_graph()
     stats = stats or compute_stats(g)
@@ -457,14 +541,20 @@ def analyse(results=None, skipped=(), g=None, stats=None, baseline=None, flows=N
     services |= {r["plan"]["target"] for r in results}
     return {
         "version": FORMAT_VERSION, "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "results_used": [r["id"] for r in results], "skipped": list(skipped),
+        "results_used": [r["id"] for r in results],
+        "skipped": list(skipped) + [{"id": r["id"], "reason": "excluded: " + r["quality_reason"]} for r in excluded_runs],
+        "excluded": [{"id": r["id"], "target": r["plan"]["target"], "fault": r["plan"]["fault"], "reason": r["quality_reason"]}
+                     for r in excluded_runs],
+        "quality_counts": {q: sum(r.get("quality", "ok") == q for r in everything) for q in ("ok", "low_evidence", "excluded")},
+        "excluded_map": load_excluded(),
         "experiments": [{"id": r["id"], "target": r["plan"]["target"], "fault": r["plan"]["fault"],
                          "magnitude": r["plan"]["magnitude"],
                          "outcome": ("aborted: " if r["guard"]["aborted"] else "completed: ") + r["guard"]["reason"],
                          "recovered": r["recovery"].get("recovered"), "recovery_s": r["recovery"].get("seconds"),
                          "score": r["score"]["resilience_score"], "verdict": r["verdict"]["verdict"],
+                         "quality": r.get("quality", "ok"), "quality_reason": r.get("quality_reason", ""),
                          "grafana_url": grafana_url(r["grafana_window_ms"]),
-                         "jaeger_url": jaeger_url(r["plan"]["target"], r["grafana_window_ms"])} for r in results],
+                         "jaeger_url": jaeger_url(r["plan"]["target"], r["grafana_window_ms"])} for r in everything],
         "weaknesses": weaknesses, "strengths": strengths, "evidence": evidence,
         "scores": resilience_scores(results, weaknesses, services, crit),
         "thresholds": {k: v for k, v in globals().items() if k.isupper() and isinstance(v, (int, float)) and not isinstance(v, bool)},
@@ -491,7 +581,8 @@ def current(path=DETERMINISTIC_JSON, results_dir=RESULTS_DIR):
     try:
         a = json.loads(path.read_text(encoding="utf-8"))
         seen = set(a["results_used"]) | {s["id"] for s in a["skipped"]}
-        if a.get("version") == FORMAT_VERSION and seen == {p.stem for p in Path(results_dir).glob("*.json")}:
+        if (a.get("version") == FORMAT_VERSION and seen == {p.stem for p in result_files(results_dir)}
+                and a.get("excluded_map") == load_excluded(Path(results_dir) / EXCLUDED_JSON.name)):
             return a
     except (OSError, ValueError, KeyError):
         pass

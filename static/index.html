@@ -508,7 +508,8 @@ main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { orde
   <section id="historySec" class="card">
     <header class="card-head">
       <div class="card-title"><span class="eyebrow"><b>09</b>Review</span><h2>History</h2></div>
-      <div class="card-actions"><button id="refreshHistory" class="btn btn-sm" type="button">Refresh</button></div>
+      <div class="card-actions"><label class="chk" title="Excluded runs feed no finding or score"><input type="checkbox" id="hideExcluded" checked> Hide excluded runs</label>
+        <button id="refreshHistory" class="btn btn-sm" type="button">Refresh</button></div>
     </header>
     <div class="card-body"><div id="history" class="muted">Loading…</div></div>
   </section>
@@ -1320,17 +1321,25 @@ async function loadHistory() {
   catch (e) { $('history').className = ''; $('history').innerHTML = `<p class="pos">Could not load history: ${esc(e.message)}</p>`; return; }
   renderHistory();
 }
+const QUALITY_PILL = { ok: ['ok', 'ok'], low_evidence: ['warn', 'low evidence'], excluded: ['', 'excluded'] };
+function qualityPill(r) {
+  const [cls, label] = QUALITY_PILL[r.quality] || ['', r.quality || 'unknown'];
+  return `<span class="pill ${cls}" title="${esc(r.quality_reason || 'enough evidence')}">${esc(label)}</span><span class="sr">: ${esc(r.quality_reason || 'enough evidence')}</span>`;
+}
 function renderHistory() {
-  const rows = historyAll ? historyRows : historyRows.slice(0, 8);
+  const hidden = $('hideExcluded').checked ? historyRows.filter(r => r.quality === 'excluded').length : 0;
+  const shown = $('hideExcluded').checked ? historyRows.filter(r => r.quality !== 'excluded') : historyRows;
+  const rows = historyAll ? shown : shown.slice(0, 8);
   $('history').className = '';
   $('history').innerHTML = !historyRows.length ? '<p class="muted">No saved results yet.</p>' :
-    `<div class="table-wrap${historyAll ? ' scroll' : ''}"><table><tr><th>Started (UTC)</th><th>Experiment</th><th>Outcome</th><th>Verdict</th><th>Recovered</th><th>Rollback</th></tr>${rows.map(r =>
+    `<div class="table-wrap${historyAll ? ' scroll' : ''}"><table><tr><th>Started (UTC)</th><th>Experiment</th><th>Outcome</th><th>Verdict</th><th>Recovered</th><th>Rollback</th><th>Data</th></tr>${rows.map(r =>
       `<tr class="click" data-id="${esc(r.id)}"><td><button type="button" class="rowbtn" aria-label="Open the ${esc(r.fault.replace('_', ' '))} on ${esc(r.target)} result from ${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))} UTC">${esc(r.started_at.replace('T', ' ').replace('+00:00', ''))}</button></td>
        <td>${esc(r.fault)} on <b>${esc(r.target)}</b>${r.fault === 'network_delay' ? ` ${esc(r.magnitude)}&nbsp;ms` : r.fault === 'traffic_spike' ? ` ${esc((r.parameters || {}).baseline_users)}→${esc((r.parameters || {}).peak_users)} users` : ''}</td>
        <td><span class="pill ${r.aborted ? 'warn' : 'ok'}">${r.aborted ? 'aborted' : 'completed'}</span></td>
        <td><span class="pill ${verdictClass(r.verdict)}">${esc(r.verdict)}</span></td>
-       <td>${r.recovered ? 'yes' : 'no'}</td><td>${r.rollback_verified ? 'verified' : '<b class="pos">FAILED</b>'}</td></tr>`).join('')}</table></div>`
-    + (historyRows.length > 8 ? `<button id="historyMore" class="btn btn-sm history-more" type="button">${historyAll ? 'Show latest 8' : `Show all ${historyRows.length}`}</button>` : '');
+       <td>${r.recovered ? 'yes' : 'no'}</td><td>${r.rollback_verified ? 'verified' : '<b class="pos">FAILED</b>'}</td><td>${qualityPill(r)}</td></tr>`).join('')}</table></div>`
+    + (hidden ? `<p class="note">${hidden} excluded run${hidden === 1 ? '' : 's'} hidden (they feed no finding or score). Untick &ldquo;Hide excluded runs&rdquo; to see them.</p>` : '')
+    + (shown.length > 8 ? `<button id="historyMore" class="btn btn-sm history-more" type="button">${historyAll ? 'Show latest 8' : `Show all ${shown.length}`}</button>` : '');
   document.querySelectorAll('#history tr.click').forEach(tr => { tr.onclick = () => openResult(tr.dataset.id); });      // mouse: the whole row
   document.querySelectorAll('#history .rowbtn').forEach(b => { b.onclick = ev => { ev.stopPropagation(); openResult(b.closest('tr').dataset.id); }; });   // keyboard: the button
   if ($('historyMore')) $('historyMore').onclick = () => { historyAll = !historyAll; renderHistory(); };
@@ -1419,7 +1428,7 @@ function findingHtml(f, a, ex) {
   return `<details class="finding" data-id="${esc(f.id)}"${findingsOpen.has(f.id) ? ' open' : ''}>
     <summary><span class="pill ${SEV_PILL[f.severity]}">${esc(f.severity)}</span><b>${esc(f.title)}</b>
       ${adj ? `<span class="pill info" title="${esc(f.agent_adjustment || '')}">AI adjusted: ${esc(f.deterministic_severity)} &rarr; ${esc(f.severity)}</span>` : ''}
-      <span class="muted">${esc(f.edge || f.service)} &middot; score ${esc(f.severity_score)} &middot; ${f.runs.length} run${f.runs.length === 1 ? '' : 's'} &middot; ${f.source === 'agent' ? 'AI-checked' : 'rules'}</span></summary>
+      <span class="muted">${esc(f.edge || f.service)} &middot; score ${esc(f.severity_score)} &middot; ${(n => `based on ${n} run${n === 1 ? '' : 's'}`)(f.runs.length)}${(m => m ? ` (${m} low evidence)` : '')(f.runs.filter(r => ex[r] && ex[r].quality === 'low_evidence').length)} &middot; ${f.source === 'agent' ? 'AI-checked' : 'rules'}</span></summary>
     <div class="fbody">
       <dl class="kv"><dt>Root cause</dt><dd>${evText(f.root_cause)}${f.root_cause_replaced ? ' <span class="muted">(the agent quoted numbers that are not in the evidence, so the rule\'s own text is shown)</span>' : ''}</dd>
         ${adj ? `<dt>AI adjusted</dt><dd>${esc(f.deterministic_severity)} &rarr; ${esc(f.severity)}${f.agent_adjustment ? ': ' + evText(f.agent_adjustment) : ''}</dd>` : ''}
@@ -1440,8 +1449,8 @@ function renderFindings() {
   const col = ov.score == null ? 'var(--text-3)' : ov.score >= 80 ? 'var(--ok)' : ov.score >= 60 ? 'var(--warn)' : 'var(--bad)';
   $('findings').className = '';
   $('findings').innerHTML = `${noticesHtml(d)}
-    <div class="scorewrap"><div class="scorebar" style="margin-bottom:0"><div class="ring" style="--p:${ov.score ?? 0};--c:${col}"><div><span><b>${ov.score ?? '&ndash;'}</b><br><small>/100</small></span></div></div>
-      <div><small class="muted">OVERALL RESILIENCE</small><div style="font-size:16px;font-weight:600">${a.findings.length} weakness${a.findings.length === 1 ? '' : 'es'} &middot; ${a.strengths.length} strength${a.strengths.length === 1 ? '' : 's'} &middot; ${a.results_used.length} experiments</div>
+    <div class="scorewrap"><div class="scorebar" style="margin-bottom:0"><div class="ring" style="--p:${ov.score ?? 0};--c:${col}"${ov.provisional ? ` title="${esc(ov.provisional_note)}"` : ''}><div><span><b>${ov.score ?? '&ndash;'}</b><br><small>/100${ov.provisional ? '<br>provisional' : ''}</small></span></div></div>
+      <div><small class="muted">OVERALL RESILIENCE</small>${ov.provisional ? ` <span class="pill warn" title="Fewer than 3 runs have quality ok">${esc(ov.provisional_note)}</span>` : ''}<div style="font-size:16px;font-weight:600">${a.findings.length} weakness${a.findings.length === 1 ? '' : 'es'} &middot; ${a.strengths.length} strength${a.strengths.length === 1 ? '' : 's'} &middot; ${a.results_used.length} experiments</div>
         <div class="muted">${esc(ov.explain)}</div>
         <div class="muted">${a.source === 'analysis_agent' ? `AI-checked by ${esc(a.model || 'the analysis agent')}, ${esc(a.tool_calls)} tool calls` : 'Deterministic rules only'}${d.generated_at ? ' &middot; ' + esc(d.generated_at.replace('T', ' ').replace('+00:00', ' UTC')) : ''}</div></div></div>
       ${serviceTableHtml(a.scores)}</div>
@@ -1783,6 +1792,7 @@ async function poll() {
 }
 
 $('refreshReady').onclick = () => withBusy($('refreshReady'), 'Refreshing…', () => Promise.all([loadReadiness(), loadGoals()]));
+$('hideExcluded').onchange = () => { historyAll = false; renderHistory(); };
 $('refreshHistory').onclick = () => withBusy($('refreshHistory'), 'Refreshing…', loadHistory);
 $('bannerClose').onclick = () => banner('');
 $('focus').onchange = () => { chartSig = ''; renderCharts(status); };

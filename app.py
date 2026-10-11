@@ -444,22 +444,23 @@ def api_status():
         return s
 
 
-def _load_result(path):
-    return analysis.normalise_result(json.loads(path.read_text(encoding="utf-8")), path.stem)
+def _load_result(path, excluded=None):
+    return analysis.normalise_result(json.loads(path.read_text(encoding="utf-8")), path.stem, excluded)
 
 
 @app.get("/api/results")
 def api_results():
-    rows = []
-    for f in sorted(exp.RESULTS_DIR.glob("*.json"), reverse=True):
+    rows, excluded = [], analysis.load_excluded()
+    for f in reversed(analysis.result_files(exp.RESULTS_DIR)):   # EXCLUDED.json is not a run
         try:
-            d = _load_result(f)
+            d = _load_result(f, excluded)
             rows.append({"id": d["id"], "started_at": d["started_at"], "target": d["plan"]["target"],
                          "fault": d["plan"]["fault"], "magnitude": d["plan"]["magnitude"],
                          "parameters": d["plan"].get("parameters"),
                          "aborted": d["guard"]["aborted"], "reason": d["guard"]["reason"],
                          "verdict": d["verdict"]["verdict"], "recovered": d["recovery"]["recovered"],
-                         "rollback_verified": d["rollback_verified"]})
+                         "rollback_verified": d["rollback_verified"],
+                         "quality": d["quality"], "quality_reason": d["quality_reason"]})
         except (OSError, ValueError, KeyError):
             continue
     return rows

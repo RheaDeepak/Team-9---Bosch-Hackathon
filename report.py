@@ -13,6 +13,8 @@ import run_experiment as exp
 
 MD_PATH = analysis.REPORTS_DIR / "findings_report.md"
 HTML_PATH = analysis.REPORTS_DIR / "findings_report.html"
+QUALITY_LABEL = {"ok": "ok", "low_evidence": "low evidence", "excluded": "excluded"}
+QUALITY_CLASS = {"ok": "ok", "low_evidence": "Medium", "excluded": "Low"}
 SOURCES = {"analysis_agent": "AI analysis agent (validated against stored evidence)",
            "analysis_fallback": "deterministic rules only (AI analysis not used)"}
 
@@ -53,8 +55,10 @@ def method_lines(data):
         f"Weakness severity (0-100) = 100 x pattern weight x ({comp}) x ({sw['conf_floor']:g} + {1 - sw['conf_floor']:g} x confidence); "
         "Critical >= 70, High >= 50, Medium >= 30, else Low. Confidence grows with the number of runs that show the same weakness "
         "and falls with missing data.",
-        f"Service resilience = mean of its experiment scores minus {analysis.WEAKNESS_PENALTY['Critical']} per open Critical and "
-        f"{analysis.WEAKNESS_PENALTY['High']} per open High weakness (at most {analysis.WEAKNESS_PENALTY_CAP}); overall = mean over "
+        f"Service resilience = mean of its experiment scores minus {analysis.WEAKNESS_PENALTY['Critical']} per open Critical, "
+        f"{analysis.WEAKNESS_PENALTY['High']} per open High and {analysis.WEAKNESS_PENALTY['Medium']} x confidence per open Medium "
+        f"weakness (at most {analysis.WEAKNESS_PENALTY_CAP}); the overall score is provisional with fewer than "
+        f"{analysis.MIN_RELIABLE_RUNS} reliable (quality ok) runs; overall = mean over "
         "tested services weighted by 1 + criticality. Untested services are shown as not tested, never as 100.",
         "Deterministic: evidence index, weakness rules (thresholds in analysis.py), severity and all scores. "
         "AI (when available): root-cause explanation, source/config/trace investigation, specific fix and verification. "
@@ -76,7 +80,8 @@ def render_md(data):
            f"({len(data['skipped'])} skipped). Analysis: {SOURCES.get(data['source'], data['source'])}"
            + (f" - {data['note']}" if data.get("note") else "") + ".", "",
            f"**Overall resilience: {ov['score'] if ov['score'] is not None else 'not tested'}"
-           f"{'/100' if ov['score'] is not None else ''}** ({ov['explain']})", "",
+           f"{'/100' if ov['score'] is not None else ''}**"
+           + (f" **({ov['provisional_note']})**" if ov.get("provisional") else "") + f" ({ov['explain']})", "",
            f"> {data['summary']}", "", "## Resilience by service", "",
            "| Service | Score | How it is computed |", "|---|---:|---|"]
     for s, v in sorted(data["scores"]["services"].items(), key=lambda kv: (kv[1]["score"] is None, kv[1]["score"] or 0, kv[0])):
@@ -104,11 +109,18 @@ def render_md(data):
     out += ["## Strengths: what held up", ""]
     out += [f"- **{s['title']}** ({len(s['runs'])} run(s)): {s['detail']}" for s in data["strengths"]] or ["- None observed yet."]
     out += [f"- {n}" for n in data.get("strength_notes", [])]
-    out += ["", "## Experiments run", "", "| Result | Target | Fault | Magnitude | Outcome | Recovery | Score |",
-            "|---|---|---|---:|---|---|---:|"]
+    qc = data.get("quality_counts") or {}
+    out += ["", "## Experiments", "", f"{qc.get('ok', 0)} ok, {qc.get('low_evidence', 0)} low evidence, "
+            f"{qc.get('excluded', 0)} excluded. Low-evidence runs count less towards a finding's confidence and never carry "
+            "a Critical/High finding alone; excluded runs feed no finding or score.", "",
+            "| Result | Target | Fault | Magnitude | Outcome | Recovery | Score | Quality |", "|---|---|---|---:|---|---|---:|---|"]
     for e in data["experiments"]:
         rec = f"{e['recovery_s']} s" if e["recovered"] else "not recovered"
-        out.append(f"| {e['id']} | {e['target']} | {e['fault']} | {e['magnitude']} | {_md_cell(e['outcome'][:90])} | {rec} | {e['score']} |")
+        quality = QUALITY_LABEL.get(e.get("quality", "ok"), e.get("quality")) + (f": {e['quality_reason']}" if e.get("quality_reason") else "")
+        out.append(f"| {e['id']} | {e['target']} | {e['fault']} | {e['magnitude']} | {_md_cell(e['outcome'][:90])} | {rec} | {e['score']} | {_md_cell(quality)} |")
+    out += ["", "## Excluded runs", ""]
+    out += [f"- `{x['id']}` ({x['fault']} on {x['target']}): {x['reason']}" for x in data.get("excluded", [])] \
+        or ["None: every run feeds the analysis."]
     out += ["", "## Method", ""] + [f"- {line}" for line in method_lines(data)] + [""]
     return "\n".join(out)
 
@@ -145,7 +157,8 @@ def render_html(data):
              f"{' - ' + e(data['note']) if data.get('note') else ''}.</p>",
              f"<div class='card'><div class='overall'>{e(ov['score']) if ov['score'] is not None else 'not tested'}"
              f"<span class='muted' style='font-size:16px'>{'/100' if ov['score'] is not None else ''} overall resilience</span></div>"
-             f"<div class='muted'>{e(ov['explain'])}</div></div>",
+             + (f"<div><span class='pill Medium'>{e(ov['provisional_note'])}</span></div>" if ov.get("provisional") else "")
+             + f"<div class='muted'>{e(ov['explain'])}</div></div>",
              f"<p class='summary'>{e(data['summary'])}</p>",
              "<h2>Resilience by service</h2><div class='table-wrap'><table><tr><th>Service</th><th>Score</th><th>How it is computed</th></tr>"]
     for s, v in sorted(data["scores"]["services"].items(), key=lambda kv: (kv[1]["score"] is None, kv[1]["score"] or 0, kv[0])):
@@ -173,13 +186,22 @@ def render_html(data):
     parts += [f"<li><b>{e(s['title'])}</b> ({len(s['runs'])} run(s)): {e(s['detail'])}</li>" for s in data["strengths"]] \
         or ["<li class='muted'>None observed yet.</li>"]
     parts += [f"<li>{e(n)}</li>" for n in data.get("strength_notes", [])]
-    parts.append("</ul><h2>Experiments run</h2><div class='table-wrap'><table><tr><th>Result</th><th>Target</th><th>Fault</th>"
-                 "<th>Magnitude</th><th>Outcome</th><th>Recovery</th><th>Score</th></tr>")
+    qc = data.get("quality_counts") or {}
+    parts.append(f"</ul><h2>Experiments</h2><p class='muted'>{qc.get('ok', 0)} ok, {qc.get('low_evidence', 0)} low evidence, "
+                 f"{qc.get('excluded', 0)} excluded. Low-evidence runs count less towards a finding's confidence and never carry a "
+                 "Critical/High finding alone; excluded runs feed no finding or score.</p><div class='table-wrap'><table><tr><th>Result</th><th>Target</th><th>Fault</th>"
+                 "<th>Magnitude</th><th>Outcome</th><th>Recovery</th><th>Score</th><th>Quality</th></tr>")
     for x in data["experiments"]:
+        q = x.get("quality", "ok")
         parts.append(f"<tr><td><a href='{e(x['grafana_url'])}'>{e(x['id'])}</a></td><td>{e(x['target'])}</td><td>{e(x['fault'])}</td>"
                      f"<td>{e(x['magnitude'])}</td><td>{e(x['outcome'][:90])}</td>"
-                     f"<td>{e(str(x['recovery_s']) + ' s') if x['recovered'] else 'not recovered'}</td><td>{e(x['score'])}</td></tr>")
-    parts.append("</table></div><h2>Method</h2><ul>" + "".join(f"<li>{e(l)}</li>" for l in method_lines(data)) + "</ul></main>")
+                     f"<td>{e(str(x['recovery_s']) + ' s') if x['recovered'] else 'not recovered'}</td><td>{e(x['score'])}</td>"
+                     f"<td><span class='pill {QUALITY_CLASS.get(q, '')}'>{e(QUALITY_LABEL.get(q, q))}</span>"
+                     f"{' <span class=muted>' + e(x['quality_reason']) + '</span>' if x.get('quality_reason') else ''}</td></tr>")
+    parts.append("</table></div><h2>Excluded runs</h2><ul>")
+    parts += [f"<li><code>{e(x['id'])}</code> ({e(x['fault'])} on {e(x['target'])}): {e(x['reason'])}</li>" for x in data.get("excluded", [])] \
+        or ["<li class='muted'>None: every run feeds the analysis.</li>"]
+    parts.append("</ul><h2>Method</h2><ul>" + "".join(f"<li>{e(l)}</li>" for l in method_lines(data)) + "</ul></main>")
     return "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" \
            + parts[0] + "</head><body>" + "".join(parts[1:]) + "</body></html>"
 
