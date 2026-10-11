@@ -37,6 +37,32 @@ endpoint contract, safety flow, and judge-facing demo explanation.
 
 ## Set up and run the integrated application
 
+### Reproduce the current Windows laptop layout
+
+The development environment documented here uses these two sibling checkouts:
+
+```text
+%USERPROFILE%\Downloads\
+├── opentelemetry-demo\
+└── chaos-copilot\
+    └── Team-9---Bosch-Hackathon\
+```
+
+Clone them from PowerShell if they are not already present:
+
+```powershell
+Set-Location "$env:USERPROFILE\Downloads"
+git clone https://github.com/open-telemetry/opentelemetry-demo.git
+New-Item -ItemType Directory -Path chaos-copilot -Force | Out-Null
+git clone https://github.com/RheaDeepak/Team-9---Bosch-Hackathon.git `
+  chaos-copilot\Team-9---Bosch-Hackathon
+Set-Location .\chaos-copilot\Team-9---Bosch-Hackathon
+```
+
+This repository may contain local, uncommitted work that is not available from
+the remote repository. Commit or preserve that work before using the clone
+commands to move the environment to another machine.
+
 Use Python 3.11 or newer. Create the environment from this repository's root:
 
 ```powershell
@@ -57,13 +83,30 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` before running discovery or experiments. Set
-`TARGET_REPOSITORY_PATH` to the absolute path of the OpenTelemetry Demo
-checkout, and adjust the Compose, Store, Prometheus, Jaeger, and Locust URLs
-when they differ from the defaults. `LLM_API_KEY` is optional: without it,
-planning and analysis use their deterministic fallbacks. With a Gemini key,
-`LLM_MODEL` is tried first and the comma-separated `LLM_FALLBACK_MODELS` chain
-is used after provider failures.
+Edit `.env` before running discovery or experiments. For the sibling layout
+above, retain `TARGET_REPOSITORY_PATH=../../opentelemetry-demo`. If the target
+checkout is elsewhere, use its absolute path instead. The current local setup
+uses the following non-secret endpoints:
+
+```dotenv
+TARGET_COMPOSE_PROJECT=opentelemetry-demo
+TARGET_REPOSITORY_PATH=../../opentelemetry-demo
+STORE_URL=http://localhost:8080
+PROMETHEUS_URL=http://localhost:9090
+JAEGER_URL=http://localhost:8080/jaeger/ui
+LOCUST_URL=http://host.docker.internal:8080/loadgen/
+```
+
+`LLM_API_KEY` is optional: without it, planning and analysis use their
+deterministic fallbacks. With a Gemini key, `LLM_MODEL` is tried first and the
+comma-separated `LLM_FALLBACK_MODELS` chain is used after provider failures.
+To reproduce LLM-backed behaviour, set `LLM_API_KEY` to your own Gemini key;
+do not copy or commit another machine's `.env` file.
+
+Both the local Python and Docker control-plane modes require the Astronomy Shop
+target to be running first. Use the exact target command in
+[Start the Astronomy Shop exactly as this laptop does](#1-start-the-astronomy-shop-exactly-as-this-laptop-does)
+before starting `app.py`.
 
 The LangGraph checkpoint and activity database is created automatically at
 `state/agent_runs.sqlite3`; its SQLite, WAL, and shared-memory files are local
@@ -91,7 +134,8 @@ deployment with a shared or production Docker daemon.
   installed on your machine.
 - A local checkout of the OpenTelemetry Demo, with this repository either next
   to it or supplied through `OTEL_DEMO_PATH` below.
-- The Astronomy Shop started with its full and observability Compose overlays.
+- The Astronomy Shop started with its full, observability, and extras Compose
+  overlays.
   Prometheus must be available on host port `9090`; the storefront, Jaeger, and
   Grafana are reached through the frontend proxy on host port `8080`.
 
@@ -104,22 +148,26 @@ Downloads/
     └── Team-9---Bosch-Hackathon/
 ```
 
-#### 1. Start the Astronomy Shop
+#### 1. Start the Astronomy Shop exactly as this laptop does
 
 From the `opentelemetry-demo` checkout, start the full demo and its
-observability services. Include the provided Grafana override to allow the
-Chaos Copilot UI to embed the Grafana panels:
+observability and extras services:
 
 ```powershell
-docker compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
-  -f ..\chaos-copilot\Team-9---Bosch-Hackathon\grafana-embed.yaml up -d
+docker-compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
+  -f compose.extras.yaml up -d
 ```
 
 Wait for the storefront at <http://127.0.0.1:8080> and Prometheus at
 <http://127.0.0.1:9090/-/ready>. Keep the load generator running so Jaeger and
-Prometheus have recent traffic. If the demo is already running without the
-Grafana override, recreate Grafana with the same Compose files and
-`--no-deps grafana`.
+Prometheus have recent traffic.
+
+This laptop currently does **not** use `grafana-embed.yaml`, so the optional
+“Grafana embedding enabled” readiness check remains red while the required
+checks are green. To enable embedded Grafana panels instead of reproducing the
+current setup exactly, add
+`-f ..\chaos-copilot\Team-9---Bosch-Hackathon\grafana-embed.yaml` to the command
+above and recreate Grafana with `--no-deps grafana`.
 
 #### 2. Configure Chaos Copilot
 
@@ -137,7 +185,7 @@ TARGET_REPOSITORY_PATH=../../opentelemetry-demo
 STORE_URL=http://localhost:8080
 PROMETHEUS_URL=http://localhost:9090
 JAEGER_URL=http://localhost:8080/jaeger/ui
-LOCUST_URL=http://localhost:8080/loadgen
+LOCUST_URL=http://host.docker.internal:8080/loadgen/
 ```
 
 `LLM_API_KEY` is optional. Without a Gemini key, planning and analysis use their
@@ -149,15 +197,15 @@ reason to change them; they are safety boundaries for experiments.
 From this repository's root, build and start the service:
 
 ```powershell
-docker compose up --build -d
-docker compose logs -f chaos-copilot
+docker-compose up --build -d
+docker-compose logs -f chaos-copilot
 ```
 
 The UI is intentionally bound to localhost only. Confirm the container and the
 application readiness gate:
 
 ```powershell
-docker compose ps
+docker-compose ps
 Invoke-RestMethod http://127.0.0.1:8000/api/readiness
 ```
 
@@ -167,8 +215,8 @@ topology or baseline exists, refresh both from the container after the demo has
 generated traffic:
 
 ```powershell
-docker compose exec chaos-copilot python discovery.py
-docker compose exec chaos-copilot python metrics.py
+docker-compose exec chaos-copilot python discovery.py
+docker-compose exec chaos-copilot python metrics.py
 ```
 
 The baseline collection takes about five minutes. The refreshed
@@ -183,11 +231,11 @@ demo checkout is elsewhere, provide its absolute path before starting:
 
 ```powershell
 $env:OTEL_DEMO_PATH = "C:\path\to\opentelemetry-demo"
-docker compose up --build -d
+docker-compose up --build -d
 ```
 
 For non-default host ports or routes, set a `CHAOS_*` variable in the shell
-before `docker compose up`. These values override the equivalent `.env` setting
+before `docker-compose up`. These values override the equivalent `.env` setting
 inside the container only:
 
 | Service | Override | Default in container |
@@ -202,20 +250,20 @@ For example:
 
 ```powershell
 $env:CHAOS_PROMETHEUS_URL = "http://host.docker.internal:19090"
-docker compose up -d
+docker-compose up -d
 ```
 
 #### Operate and update
 
 ```powershell
 # Follow logs
-docker compose logs -f chaos-copilot
+docker-compose logs -f chaos-copilot
 
 # Apply repository or dependency changes
-docker compose up --build -d
+docker-compose up --build -d
 
 # Stop only the control plane after no experiment is active
-docker compose down
+docker-compose down
 ```
 
 Do not stop or recreate the control-plane container while an experiment is
@@ -359,33 +407,26 @@ The application setup is tested with Python 3.11; Python 3.12 is also supported.
 
 ### 1. Start Astronomy Shop
 
-From the OpenTelemetry Demo repository, start the deployment mode supported by
-your machine. Follow the upstream
-[Docker deployment documentation](https://opentelemetry.io/docs/demo/docker-deployment/)
-and confirm the storefront and Jaeger UI are reachable before continuing.
-
-To use the Grafana panels in the experiment UI, also pass this repository's
-[`grafana-embed.yaml`](grafana-embed.yaml) override. It only lets Grafana be embedded in an
-iframe (`GF_SECURITY_ALLOW_EMBEDDING=true`), so the demo repository is never modified. For
-the default deployment (full demo plus observability):
+From the OpenTelemetry Demo repository, start the same target configuration as
+the Docker guide above. It uses the full, observability, and extras overlays:
 
 ```powershell
-# run from the opentelemetry-demo checkout; adjust the path to this repository
-docker compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
-  -f C:\path\to\Team-9---Bosch-Hackathon\grafana-embed.yaml up -d
+docker-compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
+  -f compose.extras.yaml up -d
 ```
 
-If the demo is already running, recreate only Grafana with the same `-f` files (add any others
-you started with, e.g. `compose.extras.yaml`) plus the override:
+Confirm the storefront and Jaeger UI are reachable before continuing. To enable
+embedded Grafana panels as an optional enhancement, append this repository's
+[`grafana-embed.yaml`](grafana-embed.yaml) override and recreate Grafana:
 
 ```powershell
-docker compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
+docker-compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
+  -f compose.extras.yaml `
   -f C:\path\to\Team-9---Bosch-Hackathon\grafana-embed.yaml up -d --no-deps grafana
 ```
 
-Recreating the container resets Grafana's own database (provisioned dashboards reload from
-files). Without the override the experiment UI still works; the Grafana panels stay blank and
-the readiness panel says so.
+Without the override, the experiment UI still works but embedded Grafana panels
+remain unavailable; this is the state of the current laptop deployment.
 
 If `product-catalog` turns unhealthy and pins its 20 MiB limit (product pages time out), add a `compose.chaos-override.yaml` in the demo checkout that raises its memory to 64M (`GOMEMLIMIT=52MiB`), and pass it with `-f` like the override above.
 
@@ -413,8 +454,10 @@ python -m pip install -r requirements.txt
 
 Copy [`.env.example`](.env.example) to `.env` and configure
 `TARGET_REPOSITORY_PATH`, `TARGET_COMPOSE_PROJECT`, `PROMETHEUS_URL`, and
-`JAEGER_URL`. Prefer an absolute repository path when setting
-`TARGET_REPOSITORY_PATH`; discovery and telemetry use these values directly.
+`JAEGER_URL`. The documented sibling layout uses
+`TARGET_REPOSITORY_PATH=../../opentelemetry-demo`; use an absolute path only
+when the target checkout is elsewhere. Discovery and telemetry use these values
+directly.
 
 ### 4. Generate the topology
 
