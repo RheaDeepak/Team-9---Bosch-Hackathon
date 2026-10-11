@@ -506,6 +506,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
       <div class="card-actions">
         <label class="chk"><input type="checkbox" id="autoAnalyse"> Auto-analyse after each experiment</label>
         <a class="btn btn-sm" href="/api/report" target="_blank" rel="noopener">Open full report<span class="sr"> (opens in a new tab)</span></a>
+        <a id="downloadPdf" class="btn btn-sm" href="/api/report.pdf" download="chaos-copilot-findings-report.pdf">Download PDF</a>
         <button id="downloadReport" class="btn btn-sm" type="button">Download report</button>
         <button id="copySummary" class="btn btn-sm" type="button">Copy summary</button>
         <button id="runAnalysis" class="btn btn-sm btn-primary" type="button" aria-describedby="analysisHint">Run analysis</button>
