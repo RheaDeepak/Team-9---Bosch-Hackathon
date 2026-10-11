@@ -35,19 +35,39 @@ operator UI**. It:
 See [plans/INTEGRATION_REPORT.md](plans/INTEGRATION_REPORT.md) for the component map,
 endpoint contract, safety flow, and judge-facing demo explanation.
 
-## Run the integrated application
+## Set up and run the integrated application
 
-Create the local environment once:
+Use Python 3.11 or newer. Create the environment from this repository's root:
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Update `.env` if the Astronomy Shop checkout or local ports differ, then start
-the API and UI together:
+On macOS or Linux:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+cp .env.example .env
+```
+
+Edit `.env` before running discovery or experiments. Set
+`TARGET_REPOSITORY_PATH` to the absolute path of the OpenTelemetry Demo
+checkout, and adjust the Compose, Store, Prometheus, Jaeger, and Locust URLs
+when they differ from the defaults. `LLM_API_KEY` is optional: without it,
+planning and analysis use their deterministic fallbacks. With a Gemini key,
+`LLM_MODEL` is tried first and the comma-separated `LLM_FALLBACK_MODELS` chain
+is used after provider failures.
+
+The LangGraph checkpoint and activity database is created automatically at
+`state/agent_runs.sqlite3`; its SQLite, WAL, and shared-memory files are local
+runtime state and are ignored by Git. Start the API and UI together:
 
 ```powershell
 python app.py
@@ -144,7 +164,7 @@ default, including `chaos-copilot`, `otel-collector`, `prometheus`, `jaeger`,
 | Observation | Explicit baseline, fault, and recovery windows from Prometheus and Jaeger |
 | Recovery | Automatic rollback, health verification, and a global emergency stop |
 | Reporting | Markdown and JSON reports with evidence, severity, and resilience score |
-| UI | A single-screen operator workflow, initially implemented with Streamlit |
+| UI | A single-screen FastAPI-served static operator workflow |
 
 The initial experiment catalogue targets:
 
@@ -184,7 +204,7 @@ before making experiment decisions.
 - Docker with the Astronomy Shop and its observability stack running; and
 - recent traffic in Jaeger, normally produced by the demo's load generator.
 
-The PRD targets Python 3.12 for the eventual application.
+The application setup is tested with Python 3.11; Python 3.12 is also supported.
 
 ### 1. Start Astronomy Shop
 
@@ -223,16 +243,18 @@ If `product-catalog` turns unhealthy and pins its 20 MiB limit (product pages ti
 PowerShell:
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
 macOS or Linux:
 
 ```bash
-python3 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
@@ -240,8 +262,8 @@ python -m pip install -r requirements.txt
 
 Copy [`.env.example`](.env.example) to `.env` and configure
 `TARGET_REPOSITORY_PATH`, `TARGET_COMPOSE_PROJECT`, `PROMETHEUS_URL`, and
-`JAEGER_URL`. Discovery and telemetry use these values directly; no source-code
-path edits are required.
+`JAEGER_URL`. Prefer an absolute repository path when setting
+`TARGET_REPOSITORY_PATH`; discovery and telemetry use these values directly.
 
 ### 4. Generate the topology
 
@@ -353,7 +375,7 @@ Development follows the PRD's safety-first phases:
    with cleanup verification.
 4. **AI planner** — schema-constrained proposals with deterministic catalogue
    fallback; never executable commands.
-5. **Operator experience** — Streamlit UI, live experiment events, findings,
+5. **Operator experience** — FastAPI-served static UI, live experiment events, findings,
    architecture documentation, and a rehearsed three-minute demo.
 
 Stretch work such as traffic spikes, combined failures, and Kubernetes support
