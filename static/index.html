@@ -278,7 +278,6 @@ details > summary.muted { cursor:pointer; display:flex; align-items:center; }
 
 /* ================= Accessibility and touch ================= */
 .field select { min-width:0; max-width:100%; } .toolbar .field { min-width:0; }
-.zoom { display:inline-flex; gap:4px; }
 .btn-icon { min-width:34px; padding:4px 0; font-size:17px; line-height:1; }
 a, button, select, summary, .chk, tr.click { touch-action:manipulation; -webkit-tap-highlight-color:rgba(107,151,255,.22); }
 @media (pointer:coarse) {                                  /* touch screens: comfortable targets */
@@ -399,9 +398,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
         <label class="field">Journey <select id="journeySel"><option value="">none</option></select></label>
         <label class="chk"><input type="checkbox" id="checkoutPath"> Checkout path</label>
         <label class="chk" title="Colour services by their resilience score from the findings"><input type="checkbox" id="showFindings"> Show findings</label>
-        <span class="zoom" role="group" aria-label="Graph zoom"><button id="zoomOut" class="btn btn-sm btn-icon" type="button" aria-label="Zoom out">&minus;</button><button id="zoomIn" class="btn btn-sm btn-icon" type="button" aria-label="Zoom in">+</button></span>
-        <button id="fitGraph" class="btn btn-sm" type="button">Fit</button>
-        <span class="hint">Click a service to inspect it · hover an edge for details · scroll to zoom · drag to pan</span>
+        <span class="hint">Click a service to inspect it · hover an edge for details</span>
       </div>
       <div class="gwrap">
         <div class="stage"><div id="cy" role="img" aria-label="Service dependency graph. To explore it with the keyboard, use the Inspect service menu above."><p class="muted" style="padding:16px">Loading graph…</p></div><span class="stage-note" id="graphInfo"></span></div>
@@ -716,7 +713,19 @@ function renderWorkflow() {                                               // fee
   const fresh = typeof agentStats !== 'undefined' && agentStats.run && agentStats.run !== (mainFeed.ignoreRun || '');
   const rows = agentModel({ status: s, meta: compMeta || [], graph: graphState, goal: $('goalSel').value,
     agent: fresh ? { llm: agentStats.llm, tools: agentStats.tools, cap: AGENT_TOOL_CAP } : null });
+  if (status) autoOpenDock(s);
   if (dock) dock.render(dockModel(s, life, rows), { visible: !!s.running, pending: stopPending, disabled: false });   // the dock's STOP is the only STOP
+}
+/* The dock's open/closed choice lives in memory only: a page load starts expanded on wide screens (collapsed on phones,
+   where the bottom sheet would cover the page), and a new run (planning agent, experiment, analysis) expands it again
+   even if the user collapsed it. The toggle's choice holds until the next such trigger. */
+const dockPref = { v: { 'cc-dock': 'open' }, getItem(k) { return this.v[k] ?? null; }, setItem(k, x) { this.v[k] = x; } };
+let dockSeen = null;                                     // the last status's triggers; null until the first status
+function expandDock() { dockPref.v['cc-dock'] = dockPref.v['cc-dock-narrow'] = 'open'; if (dock) dock.apply(); }
+function autoOpenDock(s) {
+  const now = { proposing: s.phase === 'proposing', running: !!s.running, analysis: !!(s.analysis && s.analysis.running) };
+  if (dockSeen && Object.keys(now).some(k => now[k] && !dockSeen[k])) expandDock();
+  dockSeen = now;
 }
 
 /* ---------- 2. graph ---------- */
@@ -832,7 +841,8 @@ async function loadGraph() {
   const elements = graph.nodes.map(n => ({ data: { id: n, label: nodeLabel(n), fan: graph.fan_in[n] || 0 }, position: pos[n], classes: nodeClasses(n) }))
     .concat(graph.edges.map(e => ({ data: { id: e.parent + '>' + e.child, source: e.parent, target: e.child, color: EDGE_COLOR[edgeKind(e)],
       w: 1.3 + 2.2 * Math.log10(1 + (e.call_count || 0)) / Math.log10(1 + maxCalls), tip: edgeTip(e) }, classes: [e.source === 'config' ? 'config' : '', (info[e.child] || {}).role === 'control plane' ? 'ctl' : ''].join(' ') })));
-  cy = cytoscape({ container: $('cy'), elements, layout: { name: 'preset', padding: 30 }, wheelSensitivity: 0.3, minZoom: 0.3, maxZoom: 2.5,
+  cy = cytoscape({ container: $('cy'), elements, layout: { name: 'preset', padding: 30 }, minZoom: 0.05, maxZoom: 2.5,
+    userZoomingEnabled: false, userPanningEnabled: false, autoungrabify: true, boxSelectionEnabled: false,   // a static picture: click to inspect only
     style: [
       { selector: 'node', style: { shape: 'round-rectangle', 'background-color': tok('--surface-3'), label: 'data(label)', color: tok('--text'), 'font-weight': 600,
           'font-size': `mapData(fan, 0, ${maxFan}, 11, 13)`, 'text-valign': 'center', 'text-halign': 'center', width: 'label', padding: '10px',
@@ -867,10 +877,7 @@ async function loadGraph() {
   $('nodeSel').innerHTML = '<option value="">none</option>' + graph.nodes.slice().sort().map(n => `<option value="${esc(n)}">${esc(n)}${(info[n] || {}).protected ? ' (protected)' : ''}</option>`).join('');
   $('journeySel').innerHTML = '<option value="">none</option>' + Object.entries(graph.flows || {}).map(([k, f]) => `<option value="${esc(k)}">${esc(k)} (${f.traces} traces)</option>`).join('');
   $('graphInfo').textContent = `${graph.nodes.length} services, ${graph.edges.length} dependencies`;
-  if (width < 640) {                                 // phones: start readable (zoomed in at the left), pan to explore
-    const bb = cy.nodes().boundingBox(), z = 0.6;
-    cy.zoom(z); cy.pan({ x: 24 - bb.x1 * z, y: (cy.height() - bb.h * z) / 2 - bb.y1 * z });
-  }
+  fitGraph();                                         // every service visible, on phones too
   highlight(); applyFocus(); applyOverlay();
 }
 
@@ -1121,7 +1128,7 @@ function renderPlan() {
         </dl>
       </section>
     </div>
-    ${s.note || (r && (r.top_k || []).length) ? `<p class="pc-note">${esc(s.note || '')}${r && (r.top_k || []).length ? `<a href="#agentSec">Full ranking and the agent's steps</a>` : ''}</p>` : ''}
+    ${s.note ? `<p class="pc-note">${esc(s.note)}</p>` : ''}
     <details class="gate-strip ${v.valid ? 'passed' : 'blocked'}" data-pt="gate"${gateOpen ? ' open' : ''}>
       <summary>${gateSummary}<span class="more">details</span></summary>
       <div class="gate-body">${gateBody}</div>
@@ -1893,16 +1900,16 @@ $('refreshHistory').onclick = () => withBusy($('refreshHistory'), 'Refreshing…
 $('bannerClose').onclick = () => banner('');
 $('focus').onchange = () => { chartSig = ''; renderCharts(status); };
 $('gService').onchange = () => { gSel = $('gService').value; updateGrafana(); };
-$('propose').onclick = async () => { $('propose').disabled = true; $('sessionSel').value = ''; mainFeed.viewRun = '';
+$('propose').onclick = async () => { $('propose').disabled = true; $('sessionSel').value = ''; expandDock(); mainFeed.viewRun = '';
   if (mainFeed.mode === 'planning') { mainFeed.ignoreRun = mainFeed.run; mainFeed.reset(); $('feedEmpty').classList.remove('hide'); }
   chartSig = ''; viewedResult = null; renderResult(null);
   await act('/api/propose', 'Propose', { goal: $('goalSel').value || null }, $('propose')); await poll(); };
 $('reviewed').onchange = renderPlan;
 $('journeySel').onchange = () => { if ($('journeySel').value) { $('checkoutPath').checked = false; } applyFocus(); };
 $('checkoutPath').onchange = () => { if ($('checkoutPath').checked) $('journeySel').value = ''; applyFocus(); };
-$('fitGraph').onclick = () => { if (cy) cy.fit(undefined, 30); };
-const zoomBy = f => { if (cy) cy.zoom({ level: Math.max(cy.minZoom(), Math.min(cy.maxZoom(), cy.zoom() * f)), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }); };
-$('zoomIn').onclick = () => zoomBy(1.25); $('zoomOut').onclick = () => zoomBy(0.8);
+function fitGraph() { if (cy) { cy.resize(); cy.fit(undefined, 30); } }
+let fitTimer = null;
+window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitGraph, 150); });
 $('nodeSel').onchange = () => selectNode($('nodeSel').value || null);
 $('nodeDetail').onclick = ev => { const c = ev.target.closest('[data-node]'); if (c) selectNode(c.dataset.node); };
 async function loadGoals() {
@@ -1919,7 +1926,7 @@ async function requestStop() {                                          // the o
 }
 
 $('liveCmpMount').innerHTML = cmpHtml('live');
-dock = ChaosUI.createDock($('ccDock'), { onStop: requestStop });
+dock = ChaosUI.createDock($('ccDock'), { onStop: requestStop, storage: dockPref });
 loadCompMeta();
 loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); loadSessions(); loadFindings();
 /* Reloading the page (F5 / Ctrl+F5) starts from a clean screen: an unapproved plan, the last result card and the previous agent
