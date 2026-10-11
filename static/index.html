@@ -173,15 +173,42 @@ button.chip.link { transition:background-color var(--ease); } button.chip.link:h
 
 /* ================= 3. Plan ================= */
 .plan-empty { padding:var(--s4) 0 var(--s2); color:var(--text-3); }
-.plan-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:var(--s5); }
-.plan-headline { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3); margin-bottom:var(--s3); }
-.plan-target { font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1.15; overflow-wrap:anywhere; }
-.facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:var(--s3); margin:0 0 var(--s4); }
-.fact { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s2) var(--s3); min-width:0; }
-.fact dt { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-3); }
-.fact dd { margin:2px 0 0; font-weight:600; overflow-wrap:anywhere; }
-.prose p { color:var(--text-2); overflow-wrap:anywhere; margin-bottom:var(--s3); } .prose .sub { margin-top:var(--s3); }
-.plan-side { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s4); align-self:start; }
+.plan-sum { margin:0 0 var(--s2); font-size:var(--fs-title); font-weight:700; letter-spacing:-.01em; line-height:1.3; overflow-wrap:anywhere; }
+.plan-pills { display:flex; flex-wrap:wrap; gap:var(--s2); margin-bottom:var(--s4); }
+.pc-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--s3); }
+.pc-card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3) var(--s4) var(--s4); min-width:0; }
+.pc-card h3 { display:flex; align-items:center; gap:var(--s2); margin:0 0 var(--s2); font-size:var(--fs-section); font-weight:650; color:var(--text); }
+.pc-card h3 .cc-svg { width:16px; height:16px; color:var(--accent); }
+.pc-text { margin:0; color:var(--text-2); overflow-wrap:anywhere; }
+.pc-text.clamp { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.pc-more { background:none; border:0; padding:2px 0; margin-top:2px; color:var(--accent); font:inherit; font-size:var(--fs-small); cursor:pointer; }
+.pc-more:hover { text-decoration:underline; }
+.pc-full[hidden] { display:none; }
+.pc-full { margin-top:var(--s2); font-size:var(--fs-small); color:var(--text-2); overflow-wrap:anywhere; }
+.pc-full p { margin:0 0 var(--s2); } .pc-full ul { margin:0; padding-left:18px; }
+.pc-sub { margin:var(--s3) 0 var(--s1); font-size:var(--fs-label); font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); }
+.pc-preds { list-style:none; margin:0; padding:0; }
+.pc-preds li { display:grid; grid-template-columns:minmax(0,1fr) auto 1.5em 3.6em; gap:var(--s2); align-items:baseline; padding:3px 0; border-top:1px solid var(--line); font-size:var(--fs-small); font-variant-numeric:tabular-nums; }
+.pc-preds li:first-child { border-top:0; }
+.pc-preds .svc { overflow-wrap:anywhere; font-weight:600; } .pc-preds .met { color:var(--text-3); }
+.pc-preds .arr { text-align:center; font-weight:700; } .pc-preds .arr.up { color:var(--bad); } .pc-preds .arr.down { color:var(--ok); }
+.pc-preds .fac { text-align:right; color:var(--text-2); }
+.pc-facts { margin:0; padding-left:18px; color:var(--text-2); } .pc-facts li { margin:3px 0; overflow-wrap:anywhere; }
+.pc-test { margin:0; display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px var(--s3); font-size:var(--fs-small); }
+.pc-test dt { color:var(--text-3); font-weight:600; } .pc-test dd { margin:0; color:var(--text-2); overflow-wrap:anywhere; }
+.pc-test .chip { font-size:11.5px; }
+.pc-note { margin:var(--s3) 0 0; font-size:var(--fs-small); color:var(--text-3); overflow-wrap:anywhere; }
+.pc-note a { margin-left:var(--s2); }
+.gate-strip { margin-top:var(--s3); border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface-2); font-size:var(--fs-small); }
+.gate-strip > summary { display:flex; flex-wrap:wrap; align-items:center; gap:6px var(--s2); padding:var(--s2) var(--s3); cursor:pointer; color:var(--text-2); }
+.gate-strip > summary .more { margin-left:auto; color:var(--accent); }
+.gate-strip[open] > summary .more { font-size:0; } .gate-strip[open] > summary .more::after { content:"hide details"; font-size:var(--fs-small); }
+.gate-strip.blocked { border-color:var(--bad); background:var(--bad-soft); }
+.gate-strip.blocked > summary { color:var(--bad); font-weight:600; }
+.gate-body { padding:0 var(--s3) var(--s3); }
+.gate-body .gate { margin:var(--s1) 0 var(--s2); }
+.gate-body details > summary { cursor:pointer; color:var(--accent); font-size:var(--fs-small); }
+@media (max-width:860px) { .pc-cards { grid-template-columns:minmax(0,1fr); } }
 .gate { list-style:none; margin:var(--s3) 0 var(--s4); padding:0; }
 .gate li { display:flex; gap:var(--s2); margin:6px 0; font-size:13px; }
 .gate .ic { font-weight:800; width:16px; flex:none; text-align:center; } .gate .ic.ok { color:var(--ok); } .gate .ic.no { color:var(--bad); }
@@ -313,7 +340,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
   .toolbar .field { flex:1 1 100%; } .toolbar .field select { flex:1; }
   .kv { grid-template-columns:1fr; gap:0; } .kv dd { margin-bottom:var(--s2); }
   .kpis { width:100%; } .kpi { flex:1; min-width:0; }
-  .plan-target { font-size:22px; }
+  .plan-sum { font-size:18px; }
   .decision .btns { margin-left:0; width:100%; } .decision .btns .btn { flex:1; }
   .scorebar { padding:var(--s4); }
   th, td { padding:8px 10px; }
@@ -916,11 +943,7 @@ function highlight() {
 
 /* ---------- 3. plan ---------- */
 let lastPlanKey = '', lastPlanHtml = '';
-const FAULTS = {
-  container_stop: 'Container stop (docker stop, restarted on rollback)',
-  network_delay: 'Network delay (tc netem on the target\'s egress)',
-  traffic_spike: 'Traffic spike (bounded Locust users, original load restored on rollback)'
-};
+let planOpen = {};                                           // plan card toggles the user opened, kept across re-renders
 const FAULT_LABELS = { container_stop: 'Container stop', network_delay: 'Network delay', traffic_spike: 'Traffic spike' };
 function magnitudeText(p) {
   if (p.fault === 'network_delay') return `${p.magnitude} ms added delay`;
@@ -930,31 +953,66 @@ function magnitudeText(p) {
   }
   return 'n/a (container is stopped)';
 }
-function planFacts(p) {
-  const x = p.parameters || {};
-  if (p.fault === 'traffic_spike') return `
-    <div class="fact"><dt>Fault</dt><dd>${esc(FAULTS[p.fault])}</dd></div>
-    <div class="fact"><dt>Original load</dt><dd>${esc(x.baseline_users)} users</dd></div>
-    <div class="fact"><dt>Peak load</dt><dd>${esc(x.peak_users)} users</dd></div>
-    <div class="fact"><dt>Spawn rate</dt><dd>${esc(x.spawn_rate_per_second)} users/s</dd></div>
-    <div class="fact"><dt>Duration</dt><dd>${esc(x.duration_seconds)}&nbsp;s</dd></div>
-    <div class="fact"><dt>Journey</dt><dd>${esc(String(x.journey_profile || '').replaceAll('-', ' '))}</dd></div>`;
-  return `<div class="fact"><dt>Fault</dt><dd>${esc(FAULTS[p.fault] || p.fault)}</dd></div>
-    <div class="fact"><dt>Magnitude</dt><dd>${esc(magnitudeText(p))}</dd></div>
-    <div class="fact"><dt>Duration</dt><dd>${esc(p.duration_s)}&nbsp;s</dd></div>`;
-}
 const SOURCE_LABEL = { llm: 'Planned by LLM', rank_agent: 'Planned by agent', ranker_fallback: 'Ranker #1 (LLM not used)', 'deterministic-capability': 'Tested capability', fallback: 'FALLBACK PLAN' };
 const fix2 = x => x == null ? '&ndash;' : Number(x).toFixed(2);
-function rankingHtml(r) {
-  if (!r || !(r.top_k || []).length) return '';
-  const chosen = r.top_k.find(c => c.candidate_id === r.chosen) || {};
-  const ev = chosen.evidence || [], pr = r.predictions || [];
-  return `<details class="block" open><summary>Why this experiment: ${r.top_k.length} candidates compared${r.capped ? ' (tool cap reached)' : ''}</summary>
-    ${chosen.reason ? `<p>${esc(chosen.reason)}</p>` : ''}
-    ${ev.length ? `<h3 class="sub">Evidence</h3><ul>${ev.map(e => `<li><code>${esc(e.tool)}</code> ${esc(e.finding)}</li>`).join('')}</ul>` : ''}
-    ${pr.length ? `<h3 class="sub">Predictions</h3><ul>${pr.map(x => `<li>${esc(x.svc)} ${esc(x.metric)} ${esc(x.direction)} (&times;${esc(x.min_factor)})</li>`).join('')}</ul>` : ''}
-    <p class="muted"><a href="#agentSec">Full ranking and the agent's steps</a></p></details>`;
+/* plan:pure begin (no DOM): the plan card's text, built only from the plan, its validation and the guard preview */
+const planDuration = p => p.fault === 'traffic_spike' ? ((p.parameters || {}).duration_seconds ?? p.duration_s) : p.duration_s;
+function planQuestion(p, v) {                                 // what the run answers, from who depends on the target
+  const near = (v && v.blast_radius) || [], stop = p.fault === 'container_stop';
+  if (p.fault === 'traffic_spike') return 'does the storefront keep up?';
+  if (p.target !== 'checkout' && near.includes('checkout')) return stop ? 'does checkout fail gracefully?' : 'does checkout slow down or fail?';
+  if (p.target === 'frontend' || near.includes('frontend')) return stop ? 'does the storefront degrade gracefully?' : 'does the storefront slow down?';
+  if (near.length) return `do the ${near.length} service${near.length === 1 ? '' : 's'} that depend on it cope?`;
+  return 'does it recover cleanly?';
 }
+function planSummary(p, v) {
+  const x = p.parameters || {};
+  const what = p.fault === 'container_stop' ? `Stop ${p.target}`
+    : p.fault === 'network_delay' ? `Add ${p.magnitude} ms delay to ${p.target}`
+    : p.fault === 'traffic_spike' ? `Raise traffic on ${p.target} from ${x.baseline_users} to ${x.peak_users} users`
+    : `${FAULT_LABELS[p.fault] || p.fault} on ${p.target}`;
+  return `${what} for ${planDuration(p)} s: ${planQuestion(p, v)}`;
+}
+const PRED_METRIC = { p95_ms: 'p95', p99_ms: 'p99', error_rate: 'errors' };
+const PRED_ARROW = { up: ['↑', 'up', 'rises'], down: ['↓', 'down', 'falls'] };
+function predictionRows(r) {                                  // [{svc, metric, arrow, cls, said, factor}]
+  return ((r && r.predictions) || []).map(x => {
+    const [arrow, cls, said] = PRED_ARROW[x.direction] || ['→', 'flat', 'stays the same'];
+    const f = Number(x.min_factor);
+    return { svc: x.svc, metric: PRED_METRIC[x.metric] || x.metric, arrow, cls, said,
+             factor: isFinite(f) && f > 1 && x.direction !== 'flat' ? `≥${Math.round(f * 10) / 10}×` : '' };
+  });
+}
+function chosenCandidate(r) { return r && (r.top_k || []).find(c => c.candidate_id === r.chosen) || null; }
+function whyFacts(r) {                                         // 2-3 short facts: the ranker's reasons, then the agent's evidence
+  const c = chosenCandidate(r);
+  if (!c) return [];
+  const why = String(c.why || '').split('|')[0].split(';').map(t => t.trim()).filter(Boolean);
+  const ev = (c.evidence || []).filter(e => e && e.finding).map(e => {
+    const f = String(e.finding).trim();
+    return `${f.length > 110 ? f.slice(0, 108) + '…' : f} (${String(e.tool || 'agent').replaceAll('_', ' ')})`;
+  });
+  const out = [...why.slice(0, 2), ...ev.slice(0, 1)];
+  for (const t of [...why.slice(2), ...ev.slice(1)]) if (out.length < 3) out.push(t);
+  return out.slice(0, 3);
+}
+const fmtNum = x => { const n = Number(x); return String(n >= 100 ? Math.round(n) : Math.round(n * 10) / 10); };
+function rangeText(vals, unit) {
+  const v = vals.filter(x => x != null && isFinite(x)).map(Number);
+  if (!v.length) return '';
+  const lo = Math.min(...v), hi = Math.max(...v);
+  return fmtNum(lo) === fmtNum(hi) ? `${fmtNum(lo)}${unit}` : `${fmtNum(lo)}–${fmtNum(hi)}${unit}`;
+}
+function abortText(g) {                                        // from /api/status guard_preview; '' when it is not there
+  if (!g || !(g.services || []).length) return '';
+  const lim = Object.values(g.abort || {});
+  const err = rangeText(lim.map(x => x.error_rate), '%'), p95 = rangeText(lim.map(x => x.p95_ms), ' ms');
+  const parts = [err && `error rate above ${err}`, p95 && `p95 above ${p95}`].filter(Boolean);
+  if (!parts.length) return '';
+  const each = lim.length > 1 ? ' (each service’s baseline limit)' : ' (baseline limit)';
+  return `${parts.join(' or ')}${each} for ${g.breaches_in_a_row} samples in a row; stops anyway at ${g.max_duration_s} s`;
+}
+/* plan:pure end */
 const agentStats = { run: '', llm: 0, tools: 0, last: null, seen: new Set() };       // what the planning agent has done so far, from its events
 function noteAgentEvents(evs) {                                    // called by the feed for every batch of events
   for (const e of evs) {
@@ -984,7 +1042,7 @@ function renderPlan() {
   $('propose').disabled = !!running || proposing;
   $('propose').innerHTML = proposing ? `<span class="spin"></span>${$('goalSel').value ? 'LLM call…' : 'Agent running…'}` : 'Propose experiment';
   const canDecide = s && s.phase === 'proposed' && p;
-  const planKey = p ? JSON.stringify(p) : ''; if (planKey !== lastPlanKey) { lastPlanKey = planKey; $('reviewed').checked = false; }
+  const planKey = p ? JSON.stringify(p) : ''; if (planKey !== lastPlanKey) { lastPlanKey = planKey; $('reviewed').checked = false; planOpen = {}; }
   const trafficReady = p && p.fault === 'traffic_spike'
     ? !!(readiness && readiness.checks.find(c => c.name === 'Traffic spike' && c.ok)) : true;
   const safe = !!(canDecide && v && v.valid && readiness && readiness.ready && trafficReady);
@@ -1003,28 +1061,84 @@ function renderPlan() {
     return;
   }
   const faultName = FAULT_LABELS[p.fault] || p.fault;
-  const key = JSON.stringify([p, v, s.source, s.note]);
+  const g = s.guard_preview || null;
+  const key = JSON.stringify([p, v, s.source, s.note, g]);
   if (key === lastPlanHtml) return;                       // the poll runs every second: do not rebuild (and deselect) unchanged text
   lastPlanHtml = key;
-  $('plan').innerHTML = `<div class="plan-grid">
-    <div class="plan-main">
-      <div class="plan-headline"><span class="plan-target">${esc(p.target)}</span>
-        <span class="pill ${p.fault === 'container_stop' ? 'bad' : 'warn'}">${esc(faultName)}</span>
-        <span class="pill ${['llm', 'rank_agent'].includes(s.source) ? 'info' : 'warn'}">${esc(SOURCE_LABEL[s.source] || 'FALLBACK PLAN')}</span></div>
-      <dl class="facts">${planFacts(p)}</dl>
-      <div class="prose"><h3 class="sub">Hypothesis</h3><p>${esc(p.hypothesis)}</p><h3 class="sub">Reasoning</h3><p>${esc(p.reasoning)}</p>
-        <p class="muted">${esc(s.note)}</p></div>
-      ${rankingHtml(p.ranking)}
+  const r = p.ranking, c = chosenCandidate(r), preds = predictionRows(r), facts = whyFacts(r);
+  const checks = v.checks || [], failed = checks.filter(k => !k.passed), blast = v.blast_radius || [];
+  const more = (id, label) => `<button type="button" class="pc-more" data-pt="${id}" aria-expanded="${!!planOpen[id]}" aria-controls="pt-${id}">${planOpen[id] ? 'Show less' : label}</button>`;
+  const long = t => String(t || '').length > 110;
+  const x = p.parameters || {};
+  const faultLine = p.fault === 'traffic_spike'
+    ? `${faultName}: ${x.baseline_users} → ${x.peak_users} users at ${x.spawn_rate_per_second}/s${x.journey_profile ? ', ' + String(x.journey_profile).replaceAll('-', ' ') : ''}, ${planDuration(p)} s`
+    : `${faultName}${p.fault === 'network_delay' ? ` +${p.magnitude} ms` : ''}, ${p.duration_s} s`;
+  const watched = g && (g.services || []).length ? g.services : [p.target, ...blast];
+  const abort = abortText(g);
+  const passIf = `${preds.length ? 'the predictions hold' : 'the hypothesis holds'} and the system recovers${g ? ` within ${g.recovery_timeout_s} s` : ''}`;
+  const reasonFull = [p.reasoning, c && c.reason && c.reason !== p.reasoning ? c.reason : ''].filter(Boolean);
+  const evidence = (c && c.evidence) || [];
+  const gateOpen = planOpen.gate ?? !v.valid;              // a blocked plan opens its failures by default
+  const checkLi = k => `<li><span class="ic ${k.passed ? 'ok' : 'no'}" aria-hidden="true">${k.passed ? '&#10003;' : '&#10007;'}</span><span>${esc(k.name)}<span class="sr">: ${k.passed ? 'passed' : 'failed'}</span> <small class="muted">${esc(k.detail)}</small></span></li>`;
+  const blastChips = `<div>${blast.length ? blast.map(n => `<span class="chip blast">${esc(n)}</span>`).join('') : '<span class="muted">none</span>'}</div>`;
+  const gateSummary = v.valid
+    ? `${ChaosUI.chip('ok', 'Safety gate passed', 'check')}<span>${checks.length}/${checks.length} checks &middot; blast radius: ${blast.length} service${blast.length === 1 ? '' : 's'}</span>`
+    : `${ChaosUI.icon('x')}<span>Blocked by the safety gate &middot; ${failed.length || (v.reasons || []).length} check${(failed.length || (v.reasons || []).length) === 1 ? '' : 's'} failed</span>`;
+  const gateBody = v.valid
+    ? `<ul class="gate">${checks.map(checkLi).join('')}</ul><h4 class="pc-sub">Blast radius: everything that depends on ${esc(p.target)}</h4>${blastChips}`
+    : `${failed.length ? `<ul class="gate">${failed.map(checkLi).join('')}</ul>` : ''}
+       ${!checks.length && (v.reasons || []).length ? `<ul class="reasons">${v.reasons.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+       ${checks.length ? `<details data-pt="gateAll"${planOpen.gateAll ? ' open' : ''}><summary>Show all ${checks.length} checks and the blast radius</summary>
+         <ul class="gate">${checks.map(checkLi).join('')}</ul><h4 class="pc-sub">Blast radius</h4>${blastChips}</details>` : ''}`;
+  $('plan').innerHTML = `
+    <p class="plan-sum">${esc(planSummary(p, v))}</p>
+    <div class="plan-pills"><span class="pill ${p.fault === 'container_stop' ? 'bad' : 'warn'}">${esc(faultName)}</span>
+      <span class="pill ${['llm', 'rank_agent'].includes(s.source) ? 'info' : 'warn'}">${esc(SOURCE_LABEL[s.source] || 'FALLBACK PLAN')}</span>
+      ${r && (r.top_k || []).length ? `<span class="pill">1 of ${r.top_k.length} candidates</span>` : ''}</div>
+    <div class="pc-cards">
+      <section class="pc-card" aria-labelledby="pc-h-expect"><h3 id="pc-h-expect">${ChaosUI.icon('analysis')}We expect</h3>
+        <p class="pc-text${long(p.hypothesis) && !planOpen.hyp ? ' clamp' : ''}" id="pt-hyp">${esc(p.hypothesis)}</p>
+        ${long(p.hypothesis) ? more('hyp', 'Show full') : ''}
+        ${preds.length ? `<h4 class="pc-sub">Predictions</h4><ul class="pc-preds" aria-label="Predicted changes">${preds.map(q => `<li>
+          <span class="svc">${esc(q.svc)}</span><span class="met">${esc(q.metric)}</span><span class="arr ${q.cls}" aria-hidden="true">${q.arrow}</span><span class="fac">${esc(q.factor)}</span>
+          <span class="sr">${esc(q.metric)} ${q.said}${q.factor ? ' by at least ' + esc(q.factor.replace('≥', '').replace('×', ' times')) : ''}</span></li>`).join('')}</ul>` : ''}
+      </section>
+      <section class="pc-card" aria-labelledby="pc-h-why"><h3 id="pc-h-why">${ChaosUI.icon('planner')}Why this one</h3>
+        ${facts.length ? `<ul class="pc-facts">${facts.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`
+          : `<p class="pc-text${long(p.reasoning) && !planOpen.why ? ' clamp' : ''}" id="pt-why">${esc(p.reasoning)}</p>`}
+        ${facts.length && (reasonFull.length || evidence.length) ? `${more('why', 'Show full')}
+          <div class="pc-full" id="pt-why"${planOpen.why ? '' : ' hidden'}>${reasonFull.map(t => `<p>${esc(t)}</p>`).join('')}
+            ${evidence.length ? `<h4 class="pc-sub">Evidence</h4><ul>${evidence.map(e => `<li><code>${esc(e.tool)}</code> ${esc(e.finding)}</li>`).join('')}</ul>` : ''}</div>`
+          : !facts.length && long(p.reasoning) ? more('why', 'Show full') : ''}
+      </section>
+      <section class="pc-card" aria-labelledby="pc-h-how"><h3 id="pc-h-how">${ChaosUI.icon('guard')}How we'll test it</h3>
+        <dl class="pc-test">
+          <dt>Fault</dt><dd>${esc(faultLine)}</dd>
+          <dt>Watching</dt><dd>${watched.map(n => `<span class="chip ${n === p.target ? 'target' : 'blast'}">${esc(n)}</span>`).join('')}</dd>
+          ${abort ? `<dt>Abort if</dt><dd>${esc(abort)}</dd>` : ''}
+          ${g && g.rollback ? `<dt>Rollback</dt><dd>${esc(g.rollback)}</dd>` : ''}
+          <dt>Pass if</dt><dd>${esc(passIf)}</dd>
+        </dl>
+      </section>
     </div>
-    <aside class="plan-side">
-      <h3 class="sub">Safety gate</h3><span class="pill ${v.valid ? 'ok' : 'bad'}">${v.valid ? 'ALL CHECKS PASSED' : 'BLOCKED'}</span>
-      <ul class="gate">${(v.checks || []).map(c => `<li><span class="ic ${c.passed ? 'ok' : 'no'}">${c.passed ? '&#10003;' : '&#10007;'}</span><span>${esc(c.name)} <small class="muted">${esc(c.detail)}</small></span></li>`).join('')}</ul>
-      ${(v.checks || []).length ? '' : v.reasons.length ? `<ul class="reasons">${v.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
-      <h3 class="sub">Blast radius</h3>
-      <div>${v.blast_radius.length ? v.blast_radius.map(n => `<span class="chip blast">${esc(n)}</span>`).join('') : '<span class="muted">none</span>'}</div>
-      <p class="muted" style="font-size:12px;margin-top:6px">Everything that depends on ${esc(p.target)}.</p>
-    </aside></div>`;
+    ${s.note || (r && (r.top_k || []).length) ? `<p class="pc-note">${esc(s.note || '')}${r && (r.top_k || []).length ? `<a href="#agentSec">Full ranking and the agent's steps</a>` : ''}</p>` : ''}
+    <details class="gate-strip ${v.valid ? 'passed' : 'blocked'}" data-pt="gate"${gateOpen ? ' open' : ''}>
+      <summary>${gateSummary}<span class="more">details</span></summary>
+      <div class="gate-body">${gateBody}</div>
+    </details>`;
+  announce(`Plan for ${p.target}: ${v.valid ? 'Safety gate passed' : 'Blocked by the safety gate'}`);
 }
+$('plan').addEventListener('click', e => {                   // "Show full" toggles: flip in place, remember across re-renders
+  const b = e.target.closest('button[data-pt]');
+  if (!b) return;
+  const id = b.dataset.pt, open = planOpen[id] = !planOpen[id], target = $('pt-' + id);
+  b.setAttribute('aria-expanded', String(open)); b.textContent = open ? 'Show less' : 'Show full';
+  if (target) target.classList.contains('pc-full') ? (target.hidden = !open) : target.classList.toggle('clamp', !open);
+});
+$('plan').addEventListener('toggle', e => {                  // <details> in the card: remember what the user opened or closed
+  const d = e.target;
+  if (d.matches && d.matches('details[data-pt]')) planOpen[d.dataset.pt] = d.open;
+}, true);
 
 /* ---------- 4. live ---------- */
 /* cmp:pure begin (no DOM, no Chart.js: unit-tested from tests/test_ui_comparison.js) */
