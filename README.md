@@ -298,7 +298,14 @@ under `results/` and listed in the History panel.
 - **Result:** a resilience score out of 100 (deterministic: error rise, latency rise, shop-probe availability,
   recovery time), a claim-by-claim verdict, amplification ratios, and a recommended next move.
 
-**Tests:** `python -m unittest discover -s tests -t .` (no containers are touched; the LLM and Docker are stubbed).
+**Workflow panel and design system.** Both UIs (this one, `python app.py`, and the PRD UI in `frontend/`, `uvicorn api:app`)
+share `chaos-ui.css`, `chaos-ui.js` and `component-meta.json`. The **Agent & Workflow Activity** card shows the lifecycle
+stepper and six components; each component has an *implementation status* (from `component-meta.json`, edit it when a
+component's maturity changes) and a separate *runtime status* (from the live state and events only, never invented).
+Keep the two copies of the shared files identical: `tests/test_design_system.py` fails when they drift.
+
+**Tests:** `python -m unittest discover -s tests -t .` (no containers are touched; the LLM and Docker are stubbed). It also
+runs the node tests for both UIs when node is installed (`cd frontend && npm test` runs the api-UI ones alone).
 
 **Safety.** STOP, a threshold breach and Ctrl+C all take the same rollback path. On startup `app.py` (and
 `run_experiment.py`) first rolls back any fault left in `active_experiment.json` by a crashed run. Stopping the
@@ -317,7 +324,8 @@ rather than Prometheus, because span metrics reach Prometheus only once a minute
 ├── discovery.py           # Trace- and Compose-based topology discovery
 ├── dependency_map.json    # Sample generated graph and journey data
 ├── dependency_map.png     # Sample generated graph visualization
-├── frontend/              # Single-screen operator console
+├── frontend/              # Single-screen operator console (api.py UI)
+├── static/                # The app.py UI (index.html) plus the shared chaos-ui.* design system
 ├── tests/                 # Safe tests with fake fault/telemetry adapters
 ├── requirements.txt       # Python dependencies
 └── .env.example           # Runtime endpoints and safety configuration

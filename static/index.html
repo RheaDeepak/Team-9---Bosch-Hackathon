@@ -3,32 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0b0e15">
+<meta name="theme-color" content="#0B0F14">
 <title>Chaos Copilot</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23121723'/%3E%3Cpath d='M5 17h5l3-9 5 16 3-9h6' fill='none' stroke='%236b97ff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111821'/%3E%3Cpath d='M5 17h5l3-9 5 16 3-9h6' fill='none' stroke='%2338bdf8' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<script src="chaos-ui.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="chaos-ui.css">
 <style>
-/* ================= Design tokens ================= */
-:root {
-  color-scheme: dark;
-  /* surfaces, darkest to lightest */
-  --bg:#0b0e15; --well:#090c12; --surface:#121723; --surface-2:#192033; --surface-3:#222b42;
-  --line:#222a3c; --line-2:#313c56;
-  /* text */
-  --text:#e9ecf3; --text-2:#b3bbcd; --text-3:#8d96ac;
-  /* one accent, plus status colours (each with a tinted background for pills and notices) */
-  --accent:#6b97ff; --accent-solid:#3d6be8; --accent-hover:#3158cc; --accent-soft:#15213f;
-  --ok:#46d39a; --ok-soft:#0f2f23; --go-solid:#147f52; --go-hover:#0f6a44;
-  --warn:#f6ad37; --warn-soft:#38290e;
-  --bad:#ff7673; --bad-soft:#3a1618; --bad-solid:#cf3434; --bad-hover:#b02a2a;
-  /* spacing, radius, type */
-  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
-  --r-sm:8px; --r-md:12px; --r-lg:14px;
-  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
-  --ease:.15s ease;
-}
+/* Design tokens, status chips, agent rows and the lifecycle stepper live in the shared chaos-ui.css (also used by frontend/). */
 * { box-sizing:border-box; }
 html { background:var(--bg); scroll-padding-top:calc(var(--topbar-h,64px) + 12px); scroll-padding-bottom:110px; scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
 body { margin:0; color:var(--text); font:14px/1.55 var(--font); -webkit-font-smoothing:antialiased; }
@@ -56,7 +40,8 @@ main:focus { outline:none; }
 .steps-nav a { padding:6px 11px; border-radius:var(--r-sm); color:var(--text-2); text-decoration:none; font-size:13px; white-space:nowrap; transition:background-color var(--ease), color var(--ease); }
 .steps-nav a:hover { background:var(--surface-2); color:var(--text); }
 .steps-nav a[aria-current] { background:var(--accent-soft); color:var(--accent); }
-#phasePill { margin-left:auto; flex:none; }
+#phasePill { flex:none; } .top-status { margin-left:auto; display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; justify-content:flex-end; }
+.brand p.cc-label { font-size:10px; letter-spacing:.12em; margin-top:3px; }
 
 /* ================= Page composition ================= */
 main { max-width:1240px; margin:0 auto; padding:var(--s5) var(--s5) 140px; display:grid; gap:var(--s5); }
@@ -74,7 +59,7 @@ main[data-mode="review"] #resultPanel { order:-8; } main[data-mode="review"] #li
 .card-actions { display:flex; align-items:center; flex-wrap:wrap; gap:var(--s2) var(--s3); }
 .eyebrow { font-size:11px; font-weight:600; letter-spacing:.09em; text-transform:uppercase; color:var(--text-3); }
 .eyebrow b { color:var(--accent); font-weight:700; margin-right:6px; }
-.card.primary { border-color:#2b3f73; background:linear-gradient(180deg,#151d34 0,var(--surface) 140px); box-shadow:inset 0 2px 0 var(--accent-solid), 0 12px 32px -16px rgba(0,0,0,.6); }
+.card.primary { border-color:rgba(56,189,248,.32); background:linear-gradient(180deg,var(--accent-soft) 0,var(--surface) 140px); box-shadow:inset 0 2px 0 var(--accent-solid), 0 12px 32px -16px rgba(0,0,0,.6); }
 .card.is-live { border-color:#6b2a2d; box-shadow:0 0 0 1px rgba(255,118,115,.22), 0 16px 48px -16px rgba(207,52,52,.4); }
 .sub { font-size:11.5px; font-weight:650; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin:0 0 var(--s2); }
 .block { margin-top:var(--s5); }
@@ -147,7 +132,7 @@ button.chip.link { transition:background-color var(--ease); } button.chip.link:h
 /* The banner is a toast under the top bar, so an error from a button halfway down the page is never out of sight. */
 #banner { display:none; position:fixed; z-index:45; top:calc(var(--topbar-h,64px) + 8px); left:50%; transform:translateX(-50%); width:min(1192px, calc(100% - 24px));
   align-items:flex-start; gap:var(--s3); padding:var(--s3) var(--s4); border-radius:var(--r-md); background:var(--bad-soft); color:#ffc4c2; border:1px solid #6b2a2d; box-shadow:0 12px 32px rgba(0,0,0,.55); }
-#banner.show { display:flex; } #banner.note { background:var(--accent-soft); color:#bcd2ff; border-color:#27407a; }
+#banner.show { display:flex; } #banner.note { background:var(--accent-soft); color:#BAE6FD; border-color:rgba(56,189,248,.35); }
 #bannerText { flex:1; min-width:0; overflow-wrap:anywhere; }
 .banner-x { flex:none; width:28px; height:28px; display:grid; place-items:center; border:0; border-radius:6px; background:transparent; color:inherit; font-size:20px; line-height:1; opacity:.8; transition:background-color var(--ease), opacity var(--ease); }
 .banner-x:hover { opacity:1; background:rgba(255,255,255,.1); }
@@ -157,8 +142,10 @@ button.chip.link { transition:background-color var(--ease); } button.chip.link:h
 #readyDetails summary::-webkit-details-marker { display:none; }
 #readyDetails summary::before { content:""; width:7px; height:7px; border-right:2px solid var(--text-3); border-bottom:2px solid var(--text-3); transform:rotate(-45deg); transition:transform var(--ease); margin-right:4px; }
 #readyDetails[open] summary::before { transform:rotate(45deg); }
-.checks { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr)); gap:var(--s2); margin-top:var(--s3); }
-.check { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); min-width:0; }
+.checks { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr)); gap:var(--s1) var(--s3); margin-top:var(--s3); }
+.rd-block { display:flex; gap:var(--s2); align-items:center; margin:0 0 var(--s2); padding:8px 12px; border-radius:var(--r-sm); background:var(--bad-soft); color:var(--bad); font-weight:600; border:1px solid rgba(248,113,113,.35); }
+.check { display:flex; gap:8px; align-items:flex-start; padding:6px 10px; background:var(--surface-2); border:1px solid var(--line); border-left:3px solid var(--line-2); border-radius:var(--r-sm); min-width:0; }
+.check.bad { border-left-color:var(--bad); } .check.warn { border-left-color:var(--warn); } .check.ok { border-left-color:var(--ok); }
 .check .d { color:var(--text-3); font-size:12px; overflow-wrap:anywhere; }
 .ico { width:18px; height:18px; border-radius:50%; flex:none; display:grid; place-items:center; font-size:11px; font-weight:800; margin-top:1px; background:var(--surface-3); color:var(--text-2); }
 .ico.ok { background:var(--ok-soft); color:var(--ok); } .ico.bad { background:var(--bad-soft); color:var(--bad); } .ico.warn { background:var(--warn-soft); color:var(--warn); }
@@ -322,7 +309,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
   .grid2 { grid-template-columns:1fr; }
   .topbar-in { flex-wrap:wrap; gap:var(--s2) var(--s4); }
   .steps-nav { order:3; flex-basis:100%; margin:0 -6px; padding:4px 6px; }
-  #phasePill { margin-left:auto; }
+  .top-status { margin-left:auto; }
   .toolbar .hint { margin-left:0; flex-basis:100%; }
 }
 @media (max-width:640px) {
@@ -343,6 +330,11 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
   html { scroll-behavior:auto; }
   *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
 }
+.human-gate { display:flex; gap:var(--s2); align-items:flex-start; width:100%; margin:0; padding:8px 12px; border-radius:var(--r-sm); background:var(--warn-soft); color:var(--text); font-size:var(--fs-small); border:1px solid rgba(251,191,36,.3); }
+.human-gate .cc-svg { color:var(--warn); margin-top:2px; }
+.cmp-ic { display:inline-grid; vertical-align:-2px; margin-right:6px; } .cmp-ic.ok { color:var(--ok); } .cmp-ic.bad { color:var(--bad); }
+.wf-note { margin:var(--s3) 0 0; font-size:var(--fs-small); color:var(--text-3); }
+main[data-mode="run"] #workflowSec, main[data-mode="review"] #workflowSec { order:-9; }
 </style>
 </head>
 <body>
@@ -350,14 +342,18 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#192033"/><path d="M5 17h5l3-9 5 16 3-9h6" fill="none" stroke="#6b97ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div><h1>Chaos Copilot</h1><p>AI proposes. Policy decides. You approve.</p></div>
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#161F2B"/><path d="M5 17h5l3-9 5 16 3-9h6" fill="none" stroke="#38BDF8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><h1>Chaos Copilot</h1><p class="cc-label">Resilience operations</p></div>
     </div>
     <nav class="steps-nav" aria-label="Steps">
-      <a href="#readiness" data-for="readiness">Readiness</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a><a href="#agentSec" data-for="agentSec">Agent</a>
+      <a href="#readiness" data-for="readiness">Readiness</a><a href="#workflowSec" data-for="workflowSec">Workflow</a><a href="#graphSec" data-for="graphSec">Graph</a><a href="#planSec" data-for="planSec">Plan</a><a href="#agentSec" data-for="agentSec">Agent</a>
       <a href="#live" data-for="live">Live</a><a href="#grafanaSec" data-for="grafanaSec">Grafana</a><a href="#resultPanel" data-for="resultPanel">Result</a><a href="#historySec" data-for="historySec">History</a><a href="#findingsSec" data-for="findingsSec">Findings</a>
     </nav>
-    <span id="phasePill" class="pill" role="status">idle</span>
+    <div class="top-status">
+      <span id="connChip" class="cc-chip" role="status"><svg class="cc-svg cc-spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 019 9"/></svg>Connecting</span>
+      <span id="phasePill" class="pill" role="status">idle</span>
+      <span class="cc-chip outline" title="Faults only run against the local Docker demo, on an allow-list, behind a human approval"><svg class="cc-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6z"/></svg>Local sandbox only</span>
+    </div>
   </div>
 </header>
 <button id="stop" type="button" aria-label="Emergency stop: abort the experiment and roll the fault back">STOP EXPERIMENT</button>
@@ -371,13 +367,28 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
       <div class="card-actions"><button id="refreshReady" class="btn btn-sm" type="button">Refresh</button></div>
     </header>
     <div class="card-body">
+      <p id="readyBlock" class="rd-block hide" role="alert"></p>
       <details id="readyDetails" open><summary id="readySummary">Checking…</summary><div id="checks" class="checks"></div></details>
+    </div>
+  </section>
+
+  <section id="workflowSec" class="card">
+    <header class="card-head">
+      <div class="card-title"><span class="eyebrow"><b>02</b>Workflow</span><h2>Agent &amp; Workflow Activity</h2></div>
+      <div class="card-actions"><span id="wfElapsed" class="cc-chip outline hide"></span></div>
+    </header>
+    <div class="card-body">
+      <div class="cc-steps-meta"><span class="cc-label">Experiment lifecycle</span><span id="wfHeadline" class="muted" role="status"></span></div>
+      <div id="wfSteps"></div>
+      <p class="wf-note">Deterministic policy, not the LLM, decides whether an experiment may run, and a human approves it before anything is injected.</p>
+      <h3 class="sub" style="margin-top:var(--s4)">Components <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(what each does now, and how far it is built)</span></h3>
+      <div id="wfAgents"><p class="muted">Loading components…</p></div>
     </div>
   </section>
 
   <section id="graphSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>02</b>Understand</span><h2>Dependency graph</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>03</b>Understand</span><h2>Dependency graph</h2></div>
     </header>
     <div class="card-body">
       <div class="toolbar">
@@ -396,7 +407,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
       <div id="nodeDetail" class="detail muted">Select a service to see its role, health, safety status and dependencies.</div>
       <div id="journeyDetail" class="detail hide"></div>
       <div class="legend">
-        <div class="legend-group"><b>Edges</b><span><i style="border-color:#5b8cff"></i>sync call</span><span><i style="border-color:#e0589a"></i>async (Kafka)</span><span><i style="border-color:#2fbf9b"></i>database / cache</span><span><i style="border-color:#8d96ac;border-top-style:dashed"></i>config (hidden)</span><span>width = call volume</span></div>
+        <div class="legend-group"><b>Edges</b><span><i style="border-color:#38BDF8"></i>sync call</span><span><i style="border-color:#e0589a"></i>async (Kafka)</span><span><i style="border-color:#2fbf9b"></i>database / cache</span><span><i style="border-color:#8d96ac;border-top-style:dashed"></i>config (hidden)</span><span>width = call volume</span></div>
         <div class="legend-group"><b>Nodes</b><span>height = fan-in</span><span>rounded = service</span><span>barrel = data store</span><span style="color:#e8c14a">&#128274; protected, never a target</span></div>
         <div class="legend-group hide" id="overlayLegend"><b>Findings</b><span><span class="dotk" style="background:var(--ok)"></span>resilience 80+</span><span><span class="dotk" style="background:var(--warn)"></span>60-79</span><span><span class="dotk" style="background:var(--bad)"></span>below 60</span><span><span class="dotk" style="background:var(--text-3)"></span>not tested</span><span>click a service to filter its findings</span></div>
         <div class="legend-group"><b>Status</b><span><span class="dotk" style="background:#f0524f"></span>container down</span><span><span class="dotk" style="background:#e5484d"></span>target</span><span><span class="dotk" style="background:#c8761e"></span>blast radius</span></div>
@@ -406,7 +417,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="planSec" class="card primary">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>03</b>Decide</span><h2>Experiment plan</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>04</b>Decide</span><h2>Experiment plan</h2></div>
       <div class="card-actions">
         <label class="field"><span class="sr">Learning goal (optional)</span><select id="goalSel"><option value="">No preference: let the AI explore</option></select></label>
         <button id="propose" class="btn btn-primary" type="button">Propose experiment</button>
@@ -416,6 +427,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
       <div id="retestNote" class="notice info hide" role="status"></div>
       <div id="plan"><p class="plan-empty">No plan yet. Propose one: the planner picks a target, policy validates it, then you decide.</p></div>
       <div id="decision" class="decision hide">
+        <p class="human-gate"><svg class="cc-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/></svg><span><b>Human approval required.</b> Nothing is injected until you approve. The safety policy has already decided whether approval is possible.</span></p>
         <label class="chk"><input type="checkbox" id="reviewed" disabled aria-describedby="approveHint"> I reviewed the hypothesis and blast radius</label>
         <div class="btns"><button id="reject" class="btn btn-quiet-danger" type="button" disabled>Reject</button><button id="approve" class="btn btn-go" type="button" disabled aria-describedby="approveHint">Approve and run</button></div>
         <span id="approveHint" class="muted" aria-live="polite"></span>
@@ -425,7 +437,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="agentSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>04</b>Explain</span><h2>Planning agent</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>05</b>Explain</span><h2>Planning agent</h2></div>
       <div class="card-actions">
         <label class="field"><span class="sr">Replay a saved agent session</span><select id="sessionSel"><option value="">Live / latest session</option></select></label>
         <button id="refreshRanking" class="btn btn-sm" type="button">Refresh ranking</button>
@@ -449,12 +461,11 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="live" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>05</b>Observe</span><h2 id="liveTitle" tabindex="-1"><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>06</b>Observe</span><h2 id="liveTitle" tabindex="-1"><span class="live-dot" aria-hidden="true"></span>Live experiment</h2></div>
       <div class="card-actions"><span id="faultPill" class="pill warn"></span></div>
     </header>
     <div class="card-body">
       <div class="run-top">
-        <div id="steps" class="steps"></div>
         <div class="kpis"><div class="kpi"><span>Elapsed</span><b id="elapsed">0s</b></div><div class="kpi"><span>Active fault</span><b id="fault" style="font-size:15px;line-height:1.5">-</b></div></div>
       </div>
       <div class="focusbar">Baseline and abort threshold (dashed) for <label class="field"><span class="sr">Service for baseline lines</span><select id="focus"></select></label></div>
@@ -469,7 +480,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="grafanaSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>06</b>Correlate</span><h2>Grafana: Spanmetrics <span id="gRange" class="pill info"></span></h2></div>
+      <div class="card-title"><span class="eyebrow"><b>07</b>Correlate</span><h2>Grafana: Spanmetrics <span id="gRange" class="pill info"></span></h2></div>
       <div class="card-actions">
         <label class="field">Service <select id="gService"></select></label>
         <a id="gLink" class="btn btn-sm" href="#" target="_blank" rel="noopener">Open full dashboard in Grafana<span class="sr"> (opens in a new tab)</span></a>
@@ -488,7 +499,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="resultPanel" class="card hide">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>07</b>Learn</span><h2 id="resultTitle" tabindex="-1">Result</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>08</b>Learn</span><h2 id="resultTitle" tabindex="-1">Result</h2></div>
       <div class="card-actions"><span id="resultNote" class="muted"></span></div>
     </header>
     <div class="card-body"><div id="result"></div></div>
@@ -496,7 +507,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="historySec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>08</b>Review</span><h2>History</h2></div>
+      <div class="card-title"><span class="eyebrow"><b>09</b>Review</span><h2>History</h2></div>
       <div class="card-actions"><button id="refreshHistory" class="btn btn-sm" type="button">Refresh</button></div>
     </header>
     <div class="card-body"><div id="history" class="muted">Loading…</div></div>
@@ -504,7 +515,7 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 
   <section id="findingsSec" class="card">
     <header class="card-head">
-      <div class="card-title"><span class="eyebrow"><b>09</b>Improve</span><h2>Findings <span id="findingsPill" class="pill">loading</span></h2></div>
+      <div class="card-title"><span class="eyebrow"><b>10</b>Improve</span><h2>Findings <span id="findingsPill" class="pill">loading</span></h2></div>
       <div class="card-actions">
         <label class="chk"><input type="checkbox" id="autoAnalyse"> Auto-analyse after each experiment</label>
         <a class="btn btn-sm" href="/api/report" target="_blank" rel="noopener">Open full report<span class="sr"> (opens in a new tab)</span></a>
@@ -527,9 +538,8 @@ button.pill[aria-pressed="true"] { box-shadow:inset 0 0 0 2px currentColor; }
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = (x, d = 1) => x == null ? '-' : Number(x).toFixed(d);
-const COLORS = ['#5b8cff', '#f6ad37', '#46d39a', '#e0589a', '#a78bfa', '#22c7d6', '#ff8f6b', '#c4d84a'];
+const COLORS = ['#38BDF8', '#f6ad37', '#46d39a', '#e0589a', '#a78bfa', '#22c7d6', '#ff8f6b', '#c4d84a'];
 if (window.Chart && Chart.defaults) Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
-const STEPS = ['injecting', 'monitoring', 'rolling_back', 'recovering', 'analyzing', 'done'];
 let status = null, readiness = null, graph = null, cy = null, charts = {}, chartSig = '', viewingId = null, lastDone = null;
 let gcfg = null, gKey = '', gSel = '', gCtx = '', viewedResult = null;
 
@@ -578,9 +588,12 @@ async function loadReadiness(quiet = false) {
   const passed = readiness.checks.filter(c => c.ok).length, blocking = readiness.checks.filter(c => !c.ok && !c.optional).length;
   $('checks').innerHTML = readiness.checks.map(c => {
     const kind = c.ok ? 'ok' : c.optional ? 'warn' : 'bad', glyph = c.ok ? '&#10003;' : c.optional ? '!' : '&#10005;';
-    return `<div class="check"><span class="ico ${kind}" aria-hidden="true">${glyph}</span><div><b>${esc(c.name)}</b>${c.optional ? ' <span class="muted">(optional)</span>' : ''}<span class="sr">: ${c.ok ? 'passed' : c.optional ? 'warning' : 'failed'}</span><div class="d">${esc(c.detail)}</div></div></div>`;
+    return `<div class="check ${kind}"><span class="ico ${kind}" aria-hidden="true">${glyph}</span><div><b>${esc(c.name)}</b>${c.optional ? ' <span class="muted">(optional)</span>' : ''}<span class="sr">: ${c.ok ? 'passed' : c.optional ? 'warning' : 'failed'}</span><div class="d">${esc(c.detail)}</div></div></div>`;
   }).join('');
   $('readySummary').textContent = `${passed} of ${readiness.checks.length} checks passed${blocking ? `, ${blocking} blocking` : ''}`;
+  const down = readiness.checks.filter(c => !c.ok && !c.optional), busyNow = !!(status && status.running);
+  $('readyBlock').classList.toggle('hide', !down.length || busyNow);                // an experiment cannot start: say so plainly, with the reasons
+  $('readyBlock').textContent = down.length ? `Experiments cannot start: ${down.map(c => `${c.name} (${c.detail})`).join('; ')}.` : '';
   const state = readiness.ready ? 'ready' : 'blocked';
   const busy = !!(status && status.running);                         // while a fault runs, "not ready" is expected, not an alarm
   if (state !== lastReadyState) { $('readyDetails').open = !readiness.ready && !busy; lastReadyState = state; }   // folds away once everything is fine
@@ -592,8 +605,112 @@ async function loadReadiness(quiet = false) {
   renderPlan();
 }
 
+/* ---------- 3. workflow: lifecycle stepper + Agent & Workflow Activity ---------- */
+/* wf:pure begin (no DOM; unit-tested by tests/test_ui_workflow.js, which supplies ChaosUI). Maps app.py's real phases and
+   fields onto the shared models; it never invents a state, a timestamp or an event. */
+const LIFECYCLE = [
+  { id: 'proposed', label: 'Proposed' }, { id: 'validated', label: 'Validated' }, { id: 'approved', label: 'Approved', checkpoint: true },
+  { id: 'injecting', label: 'Injecting' }, { id: 'monitoring', label: 'Observing' }, { id: 'rolling_back', label: 'Rolling back' },
+  { id: 'recovering', label: 'Recovering' }, { id: 'analyzing', label: 'Analyzing' }, { id: 'done', label: 'Completed' }];
+const PHASE_HEADLINE = { proposing: 'Drafting a proposal', starting: 'Approved; preparing to inject', injecting: 'Injecting the fault', monitoring: 'Fault active; the guard is watching',
+                         rolling_back: 'Rolling the fault back', recovering: 'Fault removed; waiting for recovery', analyzing: 'Scoring the run' };
+function lifecycleModel(s) {
+  const U = ChaosUI, v = s && s.validation, r = s && s.result;
+  if (!s || s.phase === 'idle') return { steps: U.buildSteps(LIFECYCLE, null, null), headline: 'No experiment in progress', outcome: null };
+  if (s.phase === 'proposed') return v && !v.valid
+    ? { steps: U.buildSteps(LIFECYCLE, 'validated', 'failed'), headline: 'Blocked by the safety policy: nothing can run', outcome: 'failed' }
+    : { steps: U.buildSteps(LIFECYCLE, 'approved', null), headline: 'Waiting for human approval; nothing has been injected', outcome: null };
+  if (s.phase === 'refused') return { steps: U.buildSteps(LIFECYCLE, 'injecting', 'failed'), headline: `Not injected: ${s.refused || 'refused'}`, outcome: 'failed' };
+  if (s.phase === 'error') return { steps: U.buildSteps(LIFECYCLE, s.fault_started_ts ? 'monitoring' : 'injecting', 'failed'), headline: `Failed: ${s.refused || 'unexpected error'}`, outcome: 'failed' };
+  if (s.phase === 'done') {
+    const g = (r && r.guard) || {}, rbBad = !!r && r.rollback_verified === false, recBad = !!r && !(r.recovery && r.recovery.recovered);
+    const steps = LIFECYCLE.map(st => ({ ...st, state: 'done' })), set = (id, patch) => Object.assign(steps.find(t => t.id === id), patch);
+    const stopped = /stop/i.test(g.reason || '');
+    if (rbBad) set('rolling_back', { state: 'failed', note: 'not verified' });
+    if (recBad) set('recovering', { state: 'failed', note: 'not verified' });
+    if (g.aborted) { set('monitoring', { note: stopped ? 'stopped' : 'guard abort' }); set('done', { label: 'Aborted', state: 'aborted', note: stopped ? 'stopped by operator' : 'auto-abort' }); }
+    else if (rbBad || recBad) set('done', { label: 'Needs attention', state: 'failed' });
+    const outcome = g.aborted ? 'aborted' : rbBad || recBad ? 'failed' : 'completed';
+    return { steps, outcome, headline: g.aborted ? `Aborted and rolled back: ${g.reason}` : outcome === 'failed' ? 'Finished, but rollback or recovery was not verified' : 'Completed: rolled back and recovered' };
+  }
+  const at = s.phase === 'proposing' ? 'proposed' : s.phase;
+  return { steps: U.buildSteps(LIFECYCLE, at, null), headline: PHASE_HEADLINE[s.phase] || '', outcome: null };
+}
+const AGENT_ORDER = ['topology', 'planner', 'policy', 'executor', 'guard', 'analysis'];
+const FALLBACK_NAMES = { topology: 'Topology Discovery', planner: 'Experiment Planner', policy: 'Safety Policy Engine', executor: 'Experiment Executor', guard: 'Telemetry Guard', analysis: 'Analysis & Scoring' };
+const SOURCE_TEXT = { rank_agent: 'planning agent (an LLM investigated the top candidates)', ranker_fallback: 'ranker fallback (the LLM was not used)', llm: 'LLM planner',
+                      fallback: 'fixed fallback plan', 'deterministic-capability': 'deterministic capability check' };
+const fl = x => String(x || '').replace('_', ' ');
+function agentModel(ctx) {
+  const s = ctx.status || { phase: 'idle' }, g = ctx.graph || { state: 'loading' }, plan = s.plan, v = s.validation, r = s.result, ph = s.phase || 'idle';
+  const byId = Object.fromEntries((ctx.meta || []).map(m => [m.id, m])), rt = {}, latest = {};
+  const exec = plan ? `${fl(plan.fault)} on ${plan.target}` : '', samples = s.samples || [], events = s.events || [];
+  // topology: the dependency map the rest relies on
+  if (g.state === 'loading') rt.topology = 'loading';
+  else if (g.state === 'error') { rt.topology = 'failed'; latest.topology = `Graph unavailable: ${g.error}`; }
+  else { rt.topology = 'completed'; latest.topology = `${g.nodes} services, ${g.edges} dependencies discovered${g.protected ? `, ${g.protected} protected` : ''}`; }
+  // planner
+  if (ph === 'proposing') { rt.planner = 'running'; latest.planner = ctx.goal ? 'Making an LLM call to propose an experiment' : ctx.agent ? `Agent running: ${ctx.agent.llm} LLM calls, ${ctx.agent.tools} of ${ctx.agent.cap} tool calls so far` : 'Agent starting'; }
+  else if (plan) { rt.planner = 'completed'; latest.planner = `Proposed ${exec} via ${SOURCE_TEXT[s.source] || s.source || 'unknown source'}${s.note ? ` (${s.note})` : ''}`; }
+  else rt.planner = 'idle';
+  // policy: deterministic, never the LLM
+  if (!plan || !v) rt.policy = 'idle';
+  else if (v.valid) { const c = v.checks || []; rt.policy = 'completed'; latest.policy = c.length ? `${c.filter(x => x.passed).length} of ${c.length} checks passed` : 'All checks passed'; }
+  else { rt.policy = 'blocked'; latest.policy = `${(v.reasons || []).length} check(s) failed: ${(v.reasons || []).join('; ')}`; }
+  // executor: waits for the human, then injects, then rolls back
+  if (ph === 'proposed') { if (v && v.valid) { rt.executor = 'waiting'; latest.executor = `Approval required before injecting ${exec}`; } else { rt.executor = 'blocked'; latest.executor = 'Blocked by policy: nothing will be injected'; } }
+  else if (['starting', 'injecting', 'monitoring'].includes(ph)) { rt.executor = 'running'; latest.executor = ph === 'starting' ? 'Approved; preparing to inject' : ph === 'injecting' ? `Injecting ${exec}` : `Fault active: ${exec}`; }
+  else if (ph === 'rolling_back') { rt.executor = 'running'; latest.executor = `Rolling back ${exec}`; }
+  else if (ph === 'recovering' || ph === 'analyzing') { rt.executor = 'completed'; latest.executor = `${exec}: rollback verified`; }
+  else if (ph === 'done') { const ok = !r || r.rollback_verified !== false; rt.executor = ok ? 'completed' : 'failed'; latest.executor = ok ? `${exec}: rollback verified` : `${exec}: ROLLBACK NOT VERIFIED`; }
+  else if (ph === 'refused') { rt.executor = 'blocked'; latest.executor = `Not injected: ${s.refused}`; }
+  else if (ph === 'error') { rt.executor = 'failed'; latest.executor = s.refused || 'The experiment failed'; }
+  else rt.executor = 'idle';
+  // guard: watches the fault window and the recovery
+  const last = samples[samples.length - 1], breaches = last ? Object.entries(last.breaches || {}) : [];
+  const lastEvent = pattern => { const e = [...events].reverse().find(x => pattern.test(x.msg)); return e ? e.msg : ''; };
+  if (ph === 'monitoring') { rt.guard = 'running'; latest.guard = `${samples.length} sample(s)` + (breaches.length ? `; breach: ${breaches.map(([k, x]) => `${k} ${x}`).join(', ')}` : '; no breach so far'); }
+  else if (ph === 'rolling_back') { rt.guard = 'running'; latest.guard = lastEvent(/ABORTED|Fault window finished|Rolling back/) || 'Fault window ended'; }
+  else if (ph === 'recovering') { rt.guard = 'running'; latest.guard = lastEvent(/recovery/i) || 'Checking recovery'; }
+  else if (ph === 'analyzing') { rt.guard = 'completed'; latest.guard = 'Monitoring finished'; }
+  else if (ph === 'done' && r) {
+    const gr = r.guard || {}, rec = r.recovery || {};
+    rt.guard = /telemetry unavailable/.test(gr.reason || '') ? 'failed' : 'completed';
+    latest.guard = `${gr.aborted ? 'Aborted the fault' : 'Fault window finished'}: ${gr.reason}. Recovery ${rec.recovered ? `verified after ${rec.seconds} s` : 'NOT verified'}`;
+  } else rt.guard = 'idle';
+  // analysis: scoring + verdict, and the findings agent
+  if (ph === 'analyzing') { rt.analysis = 'running'; latest.analysis = 'Scoring the run and asking the LLM for a verdict'; }
+  else if (s.analysis && s.analysis.running) { rt.analysis = 'running'; latest.analysis = 'Findings analysis running (steps in the Findings section)'; }
+  else if (ph === 'done' && r) { rt.analysis = 'completed'; latest.analysis = `${r.score ? `Resilience ${r.score.resilience_score}/100, ` : ''}verdict: ${r.verdict ? r.verdict.verdict : 'unknown'}`; }
+  else rt.analysis = 'idle';
+  return AGENT_ORDER.map(id => { const m = byId[id] || {};
+    return { id, name: m.name || FALLBACK_NAMES[id], summary: m.summary || '', module: m.module, maturity: m.implementation || 'unknown', notes: m.notes || [], runtime: rt[id], latest: latest[id] || '' }; });
+}
+/* wf:pure end */
+
+let compMeta = null, graphState = { state: 'loading' }, lastWf = '', lastConn = '';
+async function loadCompMeta() { try { compMeta = (await api('component-meta.json')).components || []; } catch (e) { compMeta = []; } renderWorkflow(); }
+function setConn(state) {
+  if (state === lastConn) return; lastConn = state;
+  const el = $('connChip'), [kind, label, ic] = state === 'ok' ? ['ok', 'API connected', 'check'] : ['bad', 'API unreachable', 'plug'];
+  el.className = 'cc-chip ' + kind; el.innerHTML = ChaosUI.icon(ic) + label;
+}
+function renderWorkflow() {
+  const s = status || { phase: 'idle' }, el = $('wfElapsed');
+  const timing = s.running || s.phase === 'done';                       // the backend's own timer; shown only when it means something
+  el.classList.toggle('hide', !(timing && s.elapsed_s > 0)); el.textContent = `${s.running ? 'Elapsed' : 'Ran'} ${ChaosUI.mmss(s.elapsed_s)}`;
+  const life = lifecycleModel(s);
+  const fresh = typeof agentStats !== 'undefined' && agentStats.run && agentStats.run !== (mainFeed.ignoreRun || '');
+  const rows = agentModel({ status: s, meta: compMeta || [], graph: graphState, goal: $('goalSel').value,
+    agent: fresh ? { llm: agentStats.llm, tools: agentStats.tools, cap: AGENT_TOOL_CAP } : null });
+  const sig = JSON.stringify([life, rows, compMeta === null]);
+  if (sig === lastWf) return; lastWf = sig;
+  $('wfSteps').innerHTML = ChaosUI.stepperHtml(life); $('wfHeadline').textContent = life.headline;
+  $('wfAgents').innerHTML = ChaosUI.agentsHtml(rows);
+}
+
 /* ---------- 2. graph ---------- */
-const EDGE_COLOR = { sync: '#5b8cff', async: '#e0589a', data: '#2fbf9b' };
+const EDGE_COLOR = { sync: '#38BDF8', async: '#e0589a', data: '#2fbf9b' };
 const edgeKind = e => e.mode === 'async' ? 'async' : ['database', 'cache'].includes(e.type) ? 'data' : 'sync';
 const X_GAP = 200, Y_GAP = 62;                         // layout units; loadGraph rescales x to the real width
 const xGapFor = (width, columns) => Math.max(150, Math.min(230, (width - 170) / Math.max(1, columns - 1)));
@@ -692,8 +809,9 @@ const edgeTip = e => `<b>${esc(e.parent)} &rarr; ${esc(e.child)}</b><br>${esc(e.
   + (e.avg_latency_ms != null ? `<br>avg ${num(e.avg_latency_ms)} ms` : '') + (e.call_count ? `<br>${esc(e.call_count)} calls in the sampled hour` : '');
 
 async function loadGraph() {
-  try { graph = await api('/api/graph'); } catch (e) { $('cy').innerHTML = `<p class="muted" style="padding:14px">Graph unavailable: ${esc(e.message)}</p>`; return; }
+  try { graph = await api('/api/graph'); } catch (e) { graphState = { state: 'error', error: e.message }; renderWorkflow(); $('cy').innerHTML = `<p class="muted" style="padding:14px">Graph unavailable: ${esc(e.message)}</p>`; return; }
   info = graph.nodes_info || {};
+  graphState = { state: 'ok', nodes: graph.nodes.length, edges: graph.edges.length, protected: Object.values(info).filter(i => i.protected).length }; renderWorkflow();
   if (typeof cytoscape === 'undefined') { $('cy').innerHTML = '<p class="muted" style="padding:16px">The graph library could not be loaded from cdnjs.cloudflare.com. Check your connection and reload.</p>'; return; }
   const { pos, layers } = layerGraph(graph.nodes, graph.edges, info);
   const width = $('cy').clientWidth || 1000, k = xGapFor(width, layers.length) / X_GAP;
@@ -706,9 +824,9 @@ async function loadGraph() {
       w: 1.3 + 2.2 * Math.log10(1 + (e.call_count || 0)) / Math.log10(1 + maxCalls), tip: edgeTip(e) }, classes: [e.source === 'config' ? 'config' : '', (info[e.child] || {}).role === 'control plane' ? 'ctl' : ''].join(' ') })));
   cy = cytoscape({ container: $('cy'), elements, layout: { name: 'preset', padding: 30 }, wheelSensitivity: 0.3, minZoom: 0.3, maxZoom: 2.5,
     style: [
-      { selector: 'node', style: { shape: 'round-rectangle', 'background-color': '#27324f', label: 'data(label)', color: '#eef1f8', 'font-weight': 600,
+      { selector: 'node', style: { shape: 'round-rectangle', 'background-color': tok('--surface-3'), label: 'data(label)', color: tok('--text'), 'font-weight': 600,
           'font-size': `mapData(fan, 0, ${maxFan}, 11, 13)`, 'text-valign': 'center', 'text-halign': 'center', width: 'label', padding: '10px',
-          height: `mapData(fan, 0, ${maxFan}, 30, 44)`, 'border-width': 1.5, 'border-color': '#4b5d8c' } },
+          height: `mapData(fan, 0, ${maxFan}, 30, 44)`, 'border-width': 1.5, 'border-color': '#4A5C75' } },
       { selector: 'node.role-datastore', style: { shape: 'barrel', 'background-color': '#17503f', 'border-color': '#2fbf9b' } },
       { selector: 'node.role-client', style: { 'background-color': '#262b38', 'border-color': '#6f7a91', 'border-style': 'dashed' } },
       { selector: 'node.role-control-plane', style: { 'background-color': '#4a3b63', 'border-color': '#a58be0' } },
@@ -926,11 +1044,6 @@ function renderPlan() {
 }
 
 /* ---------- 4. live ---------- */
-function renderSteps(s) {
-  const cur = STEPS.indexOf(s.phase === 'starting' ? 'injecting' : s.phase), bad = ['refused', 'error'].includes(s.phase);
-  $('steps').innerHTML = STEPS.map((n, i) => `<span class="step ${bad ? '' : i < cur || s.phase === 'done' ? 'done' : i === cur ? 'now' : ''}">${n.replace('_', ' ')}</span>`).join('')
-    + (bad ? `<span class="step fail">${esc(s.phase)}: ${esc(s.refused)}</span>` : '');
-}
 /* cmp:pure begin (no DOM, no Chart.js: unit-tested from tests/test_ui_comparison.js) */
 const CMP_METRICS = [{ key: 'p95_ms', title: 'p95 latency', unit: 'ms', floor: 1 }, { key: 'error_rate', title: 'Error rate', unit: '%', floor: 0.1 }];
 const CMP_EXTRA = 3;                                         // the target plus this many most affected services by default
@@ -1003,7 +1116,7 @@ const cmpId = (prefix, key, side) => `${prefix}_${key}_${side}`;
 function cmpHtml(prefix) {
   const btn = (kind, v, label, on) => `<button type="button" class="btn btn-sm" data-cmp="${kind}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
   const row = m => `<section class="cmp-row" aria-label="${m.title}"><h3 class="sub">${m.title} (${m.unit})</h3><div class="cmp-pair">
-    ${['normal', 'attack'].map(side => `<div class="panel"><h4 class="cmp-side">${side === 'normal' ? '✅ Normal' : '🔴 Under attack'} <small class="muted" id="${cmpId(prefix, m.key, side)}_note"></small></h4>
+    ${['normal', 'attack'].map(side => `<div class="panel"><h4 class="cmp-side">${side === 'normal' ? `<span class="cmp-ic ok">${ChaosUI.icon('check')}</span>Normal` : `<span class="cmp-ic bad">${ChaosUI.icon('alert')}</span>Under attack`} <small class="muted" id="${cmpId(prefix, m.key, side)}_note"></small></h4>
       <div class="chartbox"><canvas id="${cmpId(prefix, m.key, side)}" role="img" aria-label="${m.title}, ${side === 'normal' ? 'normal operation before the fault' : 'during the experiment'}, same scale as the other chart in this row" aria-describedby="${prefix}_summary"></canvas></div></div>`).join('')}
     </div><p class="cmp-sum" id="${prefix}_${m.key}_sum"></p></section>`;
   return `<div id="${prefix}Cmp"><div class="cmp-bar">
@@ -1011,10 +1124,22 @@ function cmpHtml(prefix) {
     <div class="seg" role="group" aria-label="Scale">${btn('scale', 'linear', 'Linear', 'true')}${btn('scale', 'log', 'Log scale', 'false')}</div></div>
     <p id="${prefix}_summary" class="sr"></p>${CMP_METRICS.map(row).join('')}</div>`;
 }
-function cmpChart(canvas, log) {
+function cmpChart(canvas, log, unit) {
   let c = cmpCharts[canvas.id];
   if (c && (c.canvas !== canvas || c.cmpLog !== log)) { c.destroy(); c = null; }          // the panel was re-rendered, or the scale type changed
   if (c) return c;
+  const bands = { id: 'bands', beforeDatasetsDraw(ch) {                              // consistent phase shading: fault window red, recovery green
+    const a = ch.chartArea, g = ch.ctx;
+    for (const b of ch.cmpBands || []) {
+      const x1 = ch.scales.x.getPixelForValue(b.from), x2 = ch.scales.x.getPixelForValue(b.to), l = Math.max(a.left, Math.min(x1, x2)), r = Math.min(a.right, Math.max(x1, x2));
+      if (r <= l) continue;
+      g.save(); g.fillStyle = b.color; g.fillRect(l, a.top, r - l, a.bottom - a.top); g.fillStyle = b.text; g.font = '11px sans-serif'; g.textAlign = 'left'; g.fillText(b.label, l + 4, a.bottom - 6); g.restore();
+    } },
+    afterDraw(ch) {
+      if (!ch.cmpNoData) return;
+      const a = ch.chartArea, g = ch.ctx;
+      g.save(); g.fillStyle = '#8896A8'; g.font = '600 13px sans-serif'; g.textAlign = 'center'; g.fillText('No data', (a.left + a.right) / 2, (a.top + a.bottom) / 2); g.restore();   // never a fabricated zero line
+    } };
   const markers = { id: 'markers', afterDraw(ch) {
     for (const mk of ch.cmpMarkers || []) {
       const px = ch.scales.x.getPixelForValue(mk.x), a = ch.chartArea, g = ch.ctx; if (px < a.left - 1 || px > a.right + 1) continue;
@@ -1023,12 +1148,13 @@ function cmpChart(canvas, log) {
       g.setLineDash([]); g.font = '11px sans-serif'; g.textAlign = left ? 'right' : 'left'; g.fillText(mk.label, px + (left ? -4 : 4), a.top + 12); g.restore();
     } } };
   const axis = { color: '#8d96ac' };
-  c = new Chart(canvas, { type: 'line', data: { datasets: [] }, plugins: [markers], options: { animation: false, maintainAspectRatio: false, parsing: false,
+  c = new Chart(canvas, { type: 'line', data: { datasets: [] }, plugins: [bands, markers], options: { animation: false, maintainAspectRatio: false, parsing: false,
     interaction: { mode: 'nearest', intersect: false }, elements: { point: { radius: 2 } },
     scales: { x: { type: 'linear', min: 0, title: { display: true, text: 'seconds', ...axis }, grid: { color: '#1d2539' }, ticks: axis },
-              y: { type: log ? 'logarithmic' : 'linear', grid: { color: '#1d2539' }, ticks: axis } },
-    plugins: { legend: { labels: { color: '#b3bbcd', boxWidth: 12, filter: i => !i.text.includes('~') || i.text.includes('baseline') || i.text.includes('abort') } } } } });
-  c.cmpLog = log; cmpCharts[canvas.id] = c;
+              y: { type: log ? 'logarithmic' : 'linear', title: { display: true, text: unit, ...axis }, grid: { color: '#1d2539' }, ticks: axis } },
+    plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y == null ? 'no data' : +c.parsed.y.toFixed(1) + ' ' + c.chart.cmpUnit}` } },
+      legend: { labels: { color: '#b3bbcd', boxWidth: 12, filter: i => !i.text.includes('~') || i.text.includes('baseline') || i.text.includes('abort') } } } } });
+  c.cmpLog = log; c.cmpUnit = unit; cmpCharts[canvas.id] = c;
   return c;
 }
 function drawCmp(prefix, d) {
@@ -1052,7 +1178,11 @@ function drawCmp(prefix, d) {
       const w = side === 'attack' && d.limits && d.focus ? d.limits[d.focus] : null;      // guard lines for the chosen service
       if (w) for (const [lab, val, col] of [[`${d.focus} baseline`, w.baseline[m.key], '#8d96ac'], [`${d.focus} abort threshold`, w.abort[m.key], '#f0524f']])
         if (val != null) ds.push({ label: lab, borderColor: col, borderDash: [6, 5], borderWidth: 1.4, pointRadius: 0, data: [{ x: 0, y: clamp(val) }, { x: span, y: clamp(val) }] });
-      const chart = cmpChart(canvas, cmpState.log);
+      const chart = cmpChart(canvas, cmpState.log, m.unit);
+      const end = d.rollback_at_s != null ? d.rollback_at_s : Math.max(0, ...(d.attack || []).map(x => x.t));
+      chart.cmpBands = side === 'normal' ? [{ from: 0, to: span, color: 'rgba(52,211,153,.05)', text: '#34D399', label: 'baseline' }]
+        : [{ from: 0, to: end, color: 'rgba(248,113,113,.07)', text: '#F87171', label: 'fault active' }, ...(d.rollback_at_s != null ? [{ from: end, to: span, color: 'rgba(52,211,153,.06)', text: '#34D399', label: 'recovery' }] : [])];
+      chart.cmpNoData = !ds.some(x => x.data.some(q => q.y != null));
       chart.options.scales.x.max = span; chart.options.scales.y.min = range.min; chart.options.scales.y.max = range.max;   // identical on both sides
       chart.cmpMarkers = side === 'attack' ? markers : [];
       chart.data.datasets = ds; chart.update('none');
@@ -1109,7 +1239,6 @@ function renderLive(s) {
   $('live').classList.toggle('is-live', !!s.running);
   if (!s.running) { $('stop').disabled = false; $('stop').textContent = 'STOP EXPERIMENT'; }
   if (!show) return;
-  renderSteps(s);
   $('elapsed').textContent = Math.round(s.elapsed_s) + 's';
   $('fault').textContent = s.plan ? `${s.plan.fault} on ${s.plan.target} (${magnitudeText(s.plan)})` : '-';
   $('faultPill').textContent = s.running ? (s.phase === 'monitoring' ? 'FAULT ACTIVE' : s.phase.replace('_', ' ')) : '';
@@ -1630,14 +1759,15 @@ function syncNav() {                                      // nav links to sectio
 async function poll() {
   if (!started) return;                                    // the fresh start below decides what the first screen shows
   try { status = await api('/api/status'); }
-  catch (e) { offline = true; banner('Backend unreachable (' + e.message + '). Check that python app.py is still running; this page reconnects by itself.'); return; }
+  catch (e) { offline = true; setConn('down'); banner('Backend unreachable (' + e.message + '). Check that python app.py is still running; this page reconnects by itself.'); return; }
+  setConn('ok');
   if (offline) { offline = false; banner(''); }
   if (status.startup_note && !startupSeen) { startupSeen = true; banner(status.startup_note, true); }
   $('phasePill').textContent = status.phase.replace('_', ' ');
   $('phasePill').className = 'pill ' + (status.running ? 'warn' : status.phase === 'done' ? 'ok' : ['refused', 'error'].includes(status.phase) ? 'bad' : status.phase === 'proposed' ? 'info' : '');
   if (status.phase !== lastPhase) { if (lastPhase !== null) announce(phaseMessage(status)); lastPhase = status.phase; }
   document.title = status.running ? `● ${status.phase.replace('_', ' ')} · Chaos Copilot` : 'Chaos Copilot';
-  renderPlan(); renderLive(status); highlight(); setMode(status); syncNav();
+  renderPlan(); renderLive(status); renderWorkflow(); highlight(); setMode(status); syncNav();
   const planRun = (status.plan && status.plan.ranking && status.plan.ranking.run_id) || '';
   if (!mainFeed.viewRun && mainFeed.mode !== 'analysis' && (status.phase === 'proposing' || planRun !== lastAgentRun)) mainFeed.poll();   // live feed: once a second while the agent works
   analysisTick(status);
@@ -1682,6 +1812,7 @@ $('stop').onclick = async () => {
 };
 
 $('liveCmpMount').innerHTML = cmpHtml('live');
+loadCompMeta();
 loadGraph(); loadReadiness(); loadHistory(); loadGrafanaCfg(); loadGoals(); loadSessions(); loadFindings();
 /* Reloading the page (F5 / Ctrl+F5) starts from a clean screen: an unapproved plan, the last result card and the previous agent
    sessions are put away (results stay in History, sessions in the replay menu). A running experiment is never touched. */
