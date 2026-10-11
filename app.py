@@ -21,6 +21,8 @@ from fastapi.staticfiles import StaticFiles
 import activity
 import analysis
 import analysis_agent
+from agents.activity_store import connect as connect_agent_store
+from agents.planning import CapabilityUnavailable
 import discovery
 import planner
 import ranker
@@ -196,6 +198,7 @@ def _traffic_capability():
 
 @asynccontextmanager
 async def lifespan(app):
+    connect_agent_store().close()
     if inject.ACTIVE_FILE.exists():  # a previous run died mid-experiment: undo it first
         ok = exp._recover_crashed_run(_log)
         STATE["startup_note"] = ("Rolled back a leftover experiment from a previous run." if ok
@@ -293,6 +296,10 @@ def api_propose(body: dict = Body(default=None)):
         STATE.update(_blank(), phase="proposing")
     try:
         p = exp.propose(goal)
+    except CapabilityUnavailable as e:
+        with LOCK:
+            STATE.update(_blank())
+        raise HTTPException(409, str(e))
     except Exception as e:
         with LOCK:
             STATE.update(_blank())
@@ -325,7 +332,8 @@ def api_ranking():
     def view(c):
         a = by_id.get(c["id"], {})
         return {"id": c["id"], **{k: c[k] for k in CANDIDATE_FIELDS}, "in_top_k": c["id"] in by_id,
-                **{k: c[k] for k in ("parameters", "candidate_id", "capability_version") if k in c},
+                **{k: c[k] for k in ("parameters", "candidate_id", "capability_version", "unavailable",
+                                     "unavailable_reason") if k in c},
                 "adjusted_risk": a.get("adjusted_risk"), "adjusted_priority": a.get("adjusted_priority"),
                 "reason": a.get("reason"), "evidence": a.get("evidence") or []}
 
@@ -355,15 +363,18 @@ def _feed_mode(mode):
 
 @app.get("/api/agent-events")
 def api_agent_events(run: str = "", after: int = 0, mode: str = ""):
-    """Structured agent steps for the activity feed: the newest run (of `mode`, if given) unless `run` is given,
-    only those after `after`. mode=all streams every agent's steps of this server session."""
+    """Structured agent steps for the live feed or an explicitly selected saved session.
+
+    A blank ``run`` streams only work observed since this server started; callers
+    must supply a run ID to replay a persisted SQLite/legacy session.
+    """
     run_id, evs, last = activity.events(run or None, after, mode=_feed_mode(mode))
     return {"run_id": run_id, "events": evs, "last": last}
 
 
 @app.get("/api/agent-sessions")
 def api_agent_sessions(mode: str = ""):
-    """Saved agent sessions (sessions/<run_id>.jsonl), newest first, for replay; optionally of one agent."""
+    """Saved SQLite agent sessions, plus legacy JSONL sessions, newest first."""
     m = _feed_mode(mode)
     return activity.list_sessions(mode=None if m == "all" else m)
 

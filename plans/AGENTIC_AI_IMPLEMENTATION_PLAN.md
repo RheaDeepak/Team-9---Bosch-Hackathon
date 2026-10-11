@@ -144,7 +144,7 @@ Use a custom bounded function-calling loop built with:
 - existing persistence and audit layers;
 - existing OpenTelemetry instrumentation where practical.
 
-Do not add LangChain or LangGraph for the MVP. Do not adopt a second state-machine framework when the application already has an experiment state machine.
+Use LangGraph only for the read-only planning and evidence-analysis workflows. The deterministic experiment state machine, approval, execution, guard, and rollback remain outside the graph.
 
 The provider and agent runner must remain separated so a deterministic fake provider can run tests and the demo fallback.
 
@@ -1425,7 +1425,7 @@ Do not implement in the MVP:
 4. Do not modify the separate OpenTelemetry Demo repository.
 5. Reuse existing services and models.
 6. Do not create a parallel experiment runner, policy engine, telemetry client, or rollback path.
-7. Do not add LangChain, LangGraph, MCP, or multi-agent frameworks.
+7. Do not give an AI framework authority over approval, injection, rollback, shell execution, or Docker. LangGraph is limited to the two read-only reasoning workflows.
 8. Do not register mutating tools.
 9. Implement one phase at a time.
 10. Add tests with implementation.

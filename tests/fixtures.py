@@ -4,6 +4,7 @@
            checkout -> queue <- worker (async only)
     web, checkout -> flagd             (protected)
     web -> ghost                       (no running container)
+    load-generator -> web              (users' traffic: web is the entry point)
 """
 import sys
 from pathlib import Path
@@ -25,6 +26,7 @@ def graph():
     g.add_edge("web", "flagd", **SYNC)
     g.add_edge("checkout", "flagd", **SYNC)
     g.add_edge("web", "ghost", **SYNC)
+    g.add_edge("load-generator", "web", **SYNC)
     return g
 
 

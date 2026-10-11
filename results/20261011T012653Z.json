@@ -1,0 +1,2651 @@
+{
+  "id": "20261011T012653Z",
+  "plan": {
+    "target": "astronomy-db",
+    "fault": "network_delay",
+    "magnitude": 200,
+    "duration_s": 60,
+    "hypothesis": "Adding network delay to astronomy-db will increase p95 latency for services querying the database on the checkout path without causing widespread uncaught errors.",
+    "reasoning": "Network delay on astronomy-db cleanly tests database latency handling on the checkout path with predictable impact."
+  },
+  "plan_source": "rank_agent",
+  "ranking": {
+    "source": "rank_agent",
+    "note": "model gemini-3.5-flash-lite, 8 tool calls (cap reached)",
+    "model": "gemini-3.5-flash-lite",
+    "run_id": "a8c9b68d",
+    "tool_calls": 8,
+    "chosen": "astronomy-db:network_delay:200",
+    "predictions": [
+      {
+        "svc": "astronomy-db",
+        "metric": "p95_ms",
+        "direction": "up",
+        "min_factor": 1.5
+      },
+      {
+        "svc": "product-catalog",
+        "metric": "error_rate",
+        "direction": "flat",
+        "min_factor": 1.0
+      }
+    ],
+    "top_k": [
+      {
+        "candidate_id": "astronomy-db:network_delay:200",
+        "rank": 1,
+        "risk": 0.418,
+        "info": 0.687,
+        "priority": 0.499,
+        "why": "service never tested; blast radius 8; on checkout path",
+        "outage": 0.0,
+        "factors": [
+          {
+            "name": "novelty",
+            "kind": "info",
+            "score": 1.0,
+            "contribution": 0.18,
+            "label": "service never tested"
+          },
+          {
+            "name": "blast_radius",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.066,
+            "label": "blast radius 8"
+          },
+          {
+            "name": "checkout_path",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.066,
+            "label": "on checkout path"
+          },
+          {
+            "name": "uncertainty",
+            "kind": "info",
+            "score": 0.6,
+            "contribution": 0.054,
+            "label": "no prior verdict"
+          },
+          {
+            "name": "partial",
+            "kind": "info",
+            "score": 0.92,
+            "contribution": 0.041,
+            "label": "likely partial degradation"
+          },
+          {
+            "name": "safety",
+            "kind": "penalty",
+            "score": 0.2,
+            "contribution": -0.04,
+            "label": "blast 8 at severity 0.2"
+          },
+          {
+            "name": "traffic",
+            "kind": "risk",
+            "score": 0.519,
+            "contribution": 0.034,
+            "label": "traffic 0.89 req/s via callers"
+          },
+          {
+            "name": "clarity",
+            "kind": "info",
+            "score": 0.5,
+            "contribution": 0.034,
+            "label": "no baseline metrics"
+          },
+          {
+            "name": "fan_in",
+            "kind": "risk",
+            "score": 0.667,
+            "contribution": 0.033,
+            "label": "fan-in 2 (2 sync, 0 async)"
+          },
+          {
+            "name": "journeys",
+            "kind": "risk",
+            "score": 0.625,
+            "contribution": 0.031,
+            "label": "in 5 user journeys"
+          },
+          {
+            "name": "recovery",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "past recovery Nones"
+          },
+          {
+            "name": "escalation",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "escalate: Nonems held"
+          },
+          {
+            "name": "prior_abort",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "guard aborted at Nonems"
+          },
+          {
+            "name": "outage",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "stops 5 user journeys (near-total outage)"
+          }
+        ],
+        "adjusted_risk": 0.38,
+        "adjusted_priority": 0.55,
+        "evidence": [
+          {
+            "tool": "get_edges",
+            "finding": "astronomy-db has sync callers product-catalog and accounting with moderate traffic"
+          }
+        ],
+        "reason": "Network delay on astronomy-db cleanly tests database latency handling on the checkout path with predictable impact."
+      },
+      {
+        "candidate_id": "frontend:traffic_spike:8",
+        "rank": 8,
+        "risk": 0.428,
+        "info": 0.737,
+        "priority": 0.457,
+        "why": "service never tested; traffic 1.71 req/s; in 8 user journeys | penalty: blast 3 at severity 0.8, entry point: users hit it directly",
+        "outage": 0.2,
+        "factors": [
+          {
+            "name": "novelty",
+            "kind": "info",
+            "score": 1.0,
+            "contribution": 0.18,
+            "label": "service never tested"
+          },
+          {
+            "name": "traffic",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.099,
+            "label": "traffic 1.71 req/s"
+          },
+          {
+            "name": "journeys",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.074,
+            "label": "in 8 user journeys"
+          },
+          {
+            "name": "clarity",
+            "kind": "info",
+            "score": 0.965,
+            "contribution": 0.065,
+            "label": "clean baseline (noise 0.03)"
+          },
+          {
+            "name": "safety",
+            "kind": "penalty",
+            "score": 0.3,
+            "contribution": -0.06,
+            "label": "blast 3 at severity 0.8"
+          },
+          {
+            "name": "uncertainty",
+            "kind": "info",
+            "score": 0.6,
+            "contribution": 0.054,
+            "label": "no prior verdict"
+          },
+          {
+            "name": "outage",
+            "kind": "penalty",
+            "score": 0.2,
+            "contribution": -0.05,
+            "label": "entry point: users hit it directly"
+          },
+          {
+            "name": "blast_radius",
+            "kind": "risk",
+            "score": 0.375,
+            "contribution": 0.037,
+            "label": "blast radius 3"
+          },
+          {
+            "name": "partial",
+            "kind": "info",
+            "score": 0.72,
+            "contribution": 0.032,
+            "label": "likely partial degradation"
+          },
+          {
+            "name": "fan_in",
+            "kind": "risk",
+            "score": 0.333,
+            "contribution": 0.025,
+            "label": "fan-in 1 (1 sync, 0 async)"
+          },
+          {
+            "name": "checkout_path",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "on checkout path"
+          },
+          {
+            "name": "recovery",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "past recovery Nones"
+          },
+          {
+            "name": "escalation",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "escalate: None users held"
+          },
+          {
+            "name": "prior_abort",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "guard aborted at None users"
+          }
+        ],
+        "adjusted_risk": 0.45,
+        "adjusted_priority": 0.42,
+        "evidence": [
+          {
+            "tool": "get_candidate",
+            "finding": "frontend traffic spike affects multiple user journeys directly"
+          }
+        ],
+        "reason": "Traffic spike directly impacts entry-point frontend with higher risk of cascading queuing."
+      },
+      {
+        "candidate_id": "valkey-cart:container_stop:0",
+        "rank": 16,
+        "risk": 0.524,
+        "info": 0.635,
+        "priority": 0.424,
+        "why": "service never tested; on checkout path; blast radius 6 | penalty: blast 6 at severity 1.0",
+        "outage": 0.0,
+        "factors": [
+          {
+            "name": "novelty",
+            "kind": "info",
+            "score": 1.0,
+            "contribution": 0.18,
+            "label": "service never tested"
+          },
+          {
+            "name": "safety",
+            "kind": "penalty",
+            "score": 0.75,
+            "contribution": -0.15,
+            "label": "blast 6 at severity 1.0"
+          },
+          {
+            "name": "checkout_path",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.11,
+            "label": "on checkout path"
+          },
+          {
+            "name": "blast_radius",
+            "kind": "risk",
+            "score": 0.75,
+            "contribution": 0.083,
+            "label": "blast radius 6"
+          },
+          {
+            "name": "uncertainty",
+            "kind": "info",
+            "score": 0.6,
+            "contribution": 0.054,
+            "label": "no prior verdict"
+          },
+          {
+            "name": "journeys",
+            "kind": "risk",
+            "score": 0.5,
+            "contribution": 0.041,
+            "label": "in 4 user journeys"
+          },
+          {
+            "name": "clarity",
+            "kind": "info",
+            "score": 0.5,
+            "contribution": 0.034,
+            "label": "no baseline metrics"
+          },
+          {
+            "name": "fan_in",
+            "kind": "risk",
+            "score": 0.333,
+            "contribution": 0.028,
+            "label": "fan-in 1 (1 sync, 0 async)"
+          },
+          {
+            "name": "traffic",
+            "kind": "risk",
+            "score": 0.245,
+            "contribution": 0.027,
+            "label": "traffic 0.42 req/s via callers"
+          },
+          {
+            "name": "partial",
+            "kind": "info",
+            "score": 0.4,
+            "contribution": 0.018,
+            "label": "likely partial degradation"
+          },
+          {
+            "name": "recovery",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "past recovery Nones"
+          },
+          {
+            "name": "escalation",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "escalate: Nonems held"
+          },
+          {
+            "name": "prior_abort",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "guard aborted before"
+          },
+          {
+            "name": "outage",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "stops 4 user journeys (near-total outage)"
+          }
+        ],
+        "adjusted_risk": 0.55,
+        "adjusted_priority": 0.39,
+        "evidence": [
+          {
+            "tool": "get_edges",
+            "finding": "valkey-cart is a sync cache for cart service on checkout path"
+          }
+        ],
+        "reason": "Container stop on valkey-cart is disruptive and carries higher risk of complete cart failure."
+      }
+    ]
+  },
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "accounting",
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator",
+      "product-catalog",
+      "recommendation"
+    ],
+    "checks": [
+      {
+        "name": "Plan is complete",
+        "passed": true,
+        "detail": "all fields present"
+      },
+      {
+        "name": "Fault type is allowed",
+        "passed": true,
+        "detail": "network_delay is on the allowlist"
+      },
+      {
+        "name": "Magnitude within cap",
+        "passed": true,
+        "detail": "200 ms delay (cap 1000 ms)"
+      },
+      {
+        "name": "Duration within cap",
+        "passed": true,
+        "detail": "60 s (cap 60 s)"
+      },
+      {
+        "name": "Target exists in the dependency map",
+        "passed": true,
+        "detail": "astronomy-db is a discovered service"
+      },
+      {
+        "name": "Target is not protected",
+        "passed": true,
+        "detail": "astronomy-db is not on the protected list"
+      }
+    ]
+  },
+  "started_at": "2026-10-11T01:26:53+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: recommendation p95_ms (10620.5ms > 104.6ms); frontend p95_ms (8253.9ms > 133.6ms); product-catalog p95_ms (7142.2ms > 119.6ms); frontend-proxy p95_ms (6307.1ms > 132.7ms)",
+    "elapsed_s": 8.9,
+    "peaks": {
+      "accounting": {
+        "error_rate": null,
+        "p95_ms": null
+      },
+      "checkout": {
+        "error_rate": null,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 8253.945821
+      },
+      "frontend-proxy": {
+        "error_rate": 1.2658227848101267,
+        "p95_ms": 6307.13
+      },
+      "product-catalog": {
+        "error_rate": 0.0,
+        "p95_ms": 7142.179485
+      },
+      "recommendation": {
+        "error_rate": 0.0,
+        "p95_ms": 10620.46143
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 4.513589533932952,
+        "memory_mb": 39.58203125
+      },
+      "frontend": {
+        "cpu_percent": 7.270499999999999,
+        "memory_mb": 128.5859375
+      },
+      "checkout": {
+        "cpu_percent": 68.57455429497568,
+        "memory_mb": 13.5625
+      },
+      "recommendation": {
+        "cpu_percent": 10.109073170731707,
+        "memory_mb": 49.97265625
+      },
+      "product-catalog": {
+        "cpu_percent": 220.9039729501268,
+        "memory_mb": 19.80078125
+      },
+      "accounting": {
+        "cpu_percent": 0.43323753169907014,
+        "memory_mb": 138.9140625
+      },
+      "astronomy-db": {
+        "cpu_percent": 2.4580555555555557,
+        "memory_mb": 55.73046875
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "accounting": {
+            "n": 0,
+            "errors": 0,
+            "request_rate": 0.0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "request_rate": 0.0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 100,
+            "errors": 0,
+            "request_rate": 3.3333333333333335,
+            "error_rate": 0.0,
+            "p95_ms": 6303.687051
+          },
+          "frontend-proxy": {
+            "n": 84,
+            "errors": 0,
+            "request_rate": 2.8,
+            "error_rate": 0.0,
+            "p95_ms": 3185.268
+          },
+          "product-catalog": {
+            "n": 62,
+            "errors": 0,
+            "request_rate": 2.066666666666667,
+            "error_rate": 0.0,
+            "p95_ms": 2375.931203
+          },
+          "recommendation": {
+            "n": 13,
+            "errors": 0,
+            "request_rate": 0.43333333333333335,
+            "error_rate": 0.0,
+            "p95_ms": 6512.972497
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "6303.7ms > 133.6ms",
+          "frontend-proxy p95_ms": "3185.3ms > 132.7ms",
+          "product-catalog p95_ms": "2375.9ms > 119.6ms",
+          "recommendation p95_ms": "6513.0ms > 104.6ms"
+        },
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3017
+          },
+          "cart": {
+            "ok": true,
+            "ms": 27
+          }
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "accounting": {
+            "n": 0,
+            "errors": 0,
+            "request_rate": 0.0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "request_rate": 0.0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 97,
+            "errors": 0,
+            "request_rate": 3.2333333333333334,
+            "error_rate": 0.0,
+            "p95_ms": 8253.945821
+          },
+          "frontend-proxy": {
+            "n": 79,
+            "errors": 1,
+            "request_rate": 2.6333333333333333,
+            "error_rate": 1.2658227848101267,
+            "p95_ms": 6307.13
+          },
+          "product-catalog": {
+            "n": 63,
+            "errors": 0,
+            "request_rate": 2.1,
+            "error_rate": 0.0,
+            "p95_ms": 7142.179485
+          },
+          "recommendation": {
+            "n": 13,
+            "errors": 0,
+            "request_rate": 0.43333333333333335,
+            "error_rate": 0.0,
+            "p95_ms": 10620.46143
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "8253.9ms > 133.6ms",
+          "frontend-proxy p95_ms": "6307.1ms > 132.7ms",
+          "product-catalog p95_ms": "7142.2ms > 119.6ms",
+          "recommendation p95_ms": "10620.5ms > 104.6ms"
+        },
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3036
+          },
+          "cart": {
+            "ok": true,
+            "ms": 14
+          }
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "fault_evidence": {
+    "verified": true,
+    "fault": "network_delay",
+    "target": "astronomy-db"
+  },
+  "fault_recovery": {
+    "verified": true,
+    "fault": "network_delay",
+    "target": "astronomy-db"
+  },
+  "recovery": {
+    "recovered": false,
+    "seconds": null,
+    "first_healthy_seconds": null,
+    "healthy_samples": 0,
+    "required_samples": 2,
+    "elapsed_seconds": 184.3,
+    "metrics_confirmed": false,
+    "metrics_seconds": null,
+    "samples": [
+      {
+        "t": 0.0,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3013
+          },
+          "cart": {
+            "ok": true,
+            "ms": 24
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {}
+      },
+      {
+        "t": 6.6,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3041
+          },
+          "cart": {
+            "ok": true,
+            "ms": 22
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3005.1ms > 133.6ms",
+          "frontend-proxy p95_ms": "3003.9ms > 132.7ms"
+        }
+      },
+      {
+        "t": 12.6,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3014
+          },
+          "cart": {
+            "ok": true,
+            "ms": 29
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "2995.8ms > 133.6ms",
+          "product-catalog p95_ms": "4112.3ms > 119.6ms"
+        }
+      },
+      {
+        "t": 18.4,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3030
+          },
+          "cart": {
+            "ok": true,
+            "ms": 21
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3260.9ms > 133.6ms",
+          "frontend-proxy p95_ms": "3061.7ms > 132.7ms",
+          "product-catalog p95_ms": "7562.9ms > 119.6ms"
+        }
+      },
+      {
+        "t": 24.3,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 1393
+          },
+          "cart": {
+            "ok": true,
+            "ms": 14
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "5232.3ms > 133.6ms",
+          "frontend-proxy p95_ms": "3731.2ms > 132.7ms",
+          "product-catalog p95_ms": "5116.4ms > 119.6ms"
+        }
+      },
+      {
+        "t": 29.3,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 323
+          },
+          "cart": {
+            "ok": true,
+            "ms": 18
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "4033.0ms > 133.6ms",
+          "frontend-proxy p95_ms": "3796.4ms > 132.7ms",
+          "product-catalog p95_ms": "2692.8ms > 119.6ms",
+          "recommendation p95_ms": "2015.2ms > 104.6ms"
+        }
+      },
+      {
+        "t": 34.3,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 2585
+          },
+          "cart": {
+            "ok": true,
+            "ms": 30
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "1862.9ms > 133.6ms",
+          "frontend-proxy p95_ms": "3071.7ms > 132.7ms",
+          "product-catalog p95_ms": "1954.5ms > 119.6ms",
+          "recommendation p95_ms": "1620.1ms > 104.6ms"
+        }
+      },
+      {
+        "t": 41.2,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 1711
+          },
+          "cart": {
+            "ok": true,
+            "ms": 15
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3224.9ms > 133.6ms",
+          "frontend-proxy p95_ms": "3142.6ms > 132.7ms",
+          "recommendation p95_ms": "1620.1ms > 104.6ms"
+        }
+      },
+      {
+        "t": 46.7,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3017
+          },
+          "cart": {
+            "ok": true,
+            "ms": 16
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3713.6ms > 133.6ms",
+          "frontend-proxy p95_ms": "3013.4ms > 132.7ms",
+          "product-catalog p95_ms": "6559.5ms > 119.6ms"
+        }
+      },
+      {
+        "t": 52.6,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 2338
+          },
+          "cart": {
+            "ok": true,
+            "ms": 41
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "4515.3ms > 133.6ms",
+          "frontend-proxy p95_ms": "3097.5ms > 132.7ms",
+          "product-catalog p95_ms": "6662.5ms > 119.6ms"
+        }
+      },
+      {
+        "t": 58.3,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 2037
+          },
+          "cart": {
+            "ok": true,
+            "ms": 11
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3158.3ms > 133.6ms",
+          "frontend-proxy p95_ms": "3097.5ms > 132.7ms",
+          "product-catalog p95_ms": "3933.7ms > 119.6ms",
+          "recommendation p95_ms": "4123.7ms > 104.6ms"
+        }
+      },
+      {
+        "t": 63.7,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3005
+          },
+          "cart": {
+            "ok": true,
+            "ms": 10
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3158.3ms > 133.6ms",
+          "frontend-proxy p95_ms": "3144.6ms > 132.7ms",
+          "product-catalog p95_ms": "3172.7ms > 119.6ms"
+        }
+      },
+      {
+        "t": 69.6,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 1362
+          },
+          "cart": {
+            "ok": true,
+            "ms": 33
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3495.1ms > 133.6ms",
+          "frontend-proxy p95_ms": "3151.6ms > 132.7ms",
+          "product-catalog p95_ms": "4706.2ms > 119.6ms",
+          "recommendation p95_ms": "2951.9ms > 104.6ms"
+        }
+      },
+      {
+        "t": 74.6,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3010
+          },
+          "cart": {
+            "ok": true,
+            "ms": 11
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "4807.1ms > 133.6ms",
+          "frontend-proxy p95_ms": "3246.2ms > 132.7ms",
+          "product-catalog p95_ms": "2566.3ms > 119.6ms",
+          "recommendation p95_ms": "3975.7ms > 104.6ms"
+        }
+      },
+      {
+        "t": 81.4,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3019
+          },
+          "cart": {
+            "ok": true,
+            "ms": 24
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "5879.2ms > 133.6ms",
+          "frontend-proxy p95_ms": "3154.6ms > 132.7ms",
+          "product-catalog p95_ms": "2959.6ms > 119.6ms"
+        }
+      },
+      {
+        "t": 87.8,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3017
+          },
+          "cart": {
+            "ok": true,
+            "ms": 7
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3405.6ms > 133.6ms",
+          "frontend-proxy p95_ms": "3159.0ms > 132.7ms"
+        }
+      },
+      {
+        "t": 93.9,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3005
+          },
+          "cart": {
+            "ok": true,
+            "ms": 19
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3125.1ms > 133.6ms",
+          "frontend-proxy p95_ms": "3124.6ms > 132.7ms"
+        }
+      },
+      {
+        "t": 100.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 2075
+          },
+          "cart": {
+            "ok": true,
+            "ms": 14
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "5561.9ms > 133.6ms",
+          "frontend-proxy p95_ms": "5251.2ms > 132.7ms"
+        }
+      },
+      {
+        "t": 105.2,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3016
+          },
+          "cart": {
+            "ok": true,
+            "ms": 21
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "4631.8ms > 133.6ms",
+          "frontend-proxy p95_ms": "3115.7ms > 132.7ms",
+          "product-catalog p95_ms": "4686.7ms > 119.6ms",
+          "recommendation p95_ms": "6005.8ms > 104.6ms"
+        }
+      },
+      {
+        "t": 111.9,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3008
+          },
+          "cart": {
+            "ok": true,
+            "ms": 38
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3417.7ms > 133.6ms",
+          "frontend-proxy p95_ms": "3287.4ms > 132.7ms",
+          "product-catalog p95_ms": "4490.9ms > 119.6ms",
+          "recommendation p95_ms": "6005.8ms > 104.6ms"
+        }
+      },
+      {
+        "t": 117.7,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3019
+          },
+          "cart": {
+            "ok": true,
+            "ms": 14
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3001.6ms > 133.6ms",
+          "frontend-proxy p95_ms": "2999.3ms > 132.7ms",
+          "product-catalog p95_ms": "5837.3ms > 119.6ms"
+        }
+      },
+      {
+        "t": 123.9,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3015
+          },
+          "cart": {
+            "ok": true,
+            "ms": 8
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3001.8ms > 133.6ms",
+          "frontend-proxy p95_ms": "3008.0ms > 132.7ms",
+          "product-catalog p95_ms": "8050.4ms > 119.6ms"
+        }
+      },
+      {
+        "t": 130.5,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 1960
+          },
+          "cart": {
+            "ok": true,
+            "ms": 25
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3007.6ms > 133.6ms",
+          "frontend-proxy p95_ms": "3008.0ms > 132.7ms",
+          "product-catalog p95_ms": "4761.2ms > 119.6ms"
+        }
+      },
+      {
+        "t": 136.1,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3023
+          },
+          "cart": {
+            "ok": true,
+            "ms": 40
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3251.2ms > 133.6ms",
+          "frontend-proxy p95_ms": "3250.9ms > 132.7ms",
+          "product-catalog p95_ms": "2038.9ms > 119.6ms"
+        }
+      },
+      {
+        "t": 142.5,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3011
+          },
+          "cart": {
+            "ok": true,
+            "ms": 23
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "5742.1ms > 133.6ms",
+          "frontend-proxy p95_ms": "3205.0ms > 132.7ms",
+          "product-catalog p95_ms": "6358.6ms > 119.6ms"
+        }
+      },
+      {
+        "t": 148.9,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 1746
+          },
+          "cart": {
+            "ok": true,
+            "ms": 14
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "5388.3ms > 133.6ms",
+          "frontend-proxy p95_ms": "3014.3ms > 132.7ms",
+          "product-catalog p95_ms": "4799.7ms > 119.6ms"
+        }
+      },
+      {
+        "t": 153.9,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 388
+          },
+          "cart": {
+            "ok": true,
+            "ms": 15
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "4962.4ms > 133.6ms",
+          "frontend-proxy p95_ms": "2998.8ms > 132.7ms",
+          "product-catalog p95_ms": "4433.9ms > 119.6ms",
+          "recommendation p95_ms": "4744.4ms > 104.6ms"
+        }
+      },
+      {
+        "t": 158.9,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3036
+          },
+          "cart": {
+            "ok": true,
+            "ms": 27
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "2483.1ms > 133.6ms",
+          "frontend-proxy p95_ms": "3011.4ms > 132.7ms",
+          "product-catalog p95_ms": "784.1ms > 119.6ms"
+        }
+      },
+      {
+        "t": 165.4,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 2127
+          },
+          "cart": {
+            "ok": true,
+            "ms": 31
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3435.9ms > 133.6ms",
+          "frontend-proxy p95_ms": "3435.7ms > 132.7ms",
+          "product-catalog p95_ms": "8797.3ms > 119.6ms"
+        }
+      },
+      {
+        "t": 171.1,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3015
+          },
+          "cart": {
+            "ok": true,
+            "ms": 11
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "5347.5ms > 133.6ms",
+          "frontend-proxy p95_ms": "3209.2ms > 132.7ms",
+          "product-catalog p95_ms": "4360.5ms > 119.6ms"
+        }
+      },
+      {
+        "t": 177.5,
+        "probes": {
+          "products": {
+            "ok": false,
+            "ms": 3027
+          },
+          "cart": {
+            "ok": true,
+            "ms": 21
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "3144.3ms > 133.6ms",
+          "frontend-proxy p95_ms": "3014.4ms > 132.7ms"
+        }
+      }
+    ]
+  },
+  "impact": [
+    {
+      "service": "accounting",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": null,
+        "change": null
+      },
+      "p95_ms": {
+        "baseline": 95.05,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": null,
+        "change": null
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 8253.945821,
+        "change": 8220.318478342657
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 1.2658227848101267,
+        "change": 1.2658227848101267
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 6307.13,
+        "change": 6274.444393939394
+      }
+    },
+    {
+      "service": "product-catalog",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 19.622380952380894,
+        "peak": 7142.179485,
+        "change": 7122.557104047619
+      }
+    },
+    {
+      "service": "recommendation",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 4.58,
+        "peak": 10620.46143,
+        "change": 10615.88143
+      }
+    }
+  ],
+  "amplification": [
+    {
+      "service": "frontend",
+      "role": "caller",
+      "increase_ms": 8220.3,
+      "delay_ms": 200,
+      "ratio": 41.1,
+      "amplified": true
+    },
+    {
+      "service": "frontend-proxy",
+      "role": "caller",
+      "increase_ms": 6274.4,
+      "delay_ms": 200,
+      "ratio": 31.4,
+      "amplified": true
+    },
+    {
+      "service": "product-catalog",
+      "role": "caller",
+      "increase_ms": 7122.6,
+      "delay_ms": 200,
+      "ratio": 35.6,
+      "amplified": true
+    },
+    {
+      "service": "recommendation",
+      "role": "caller",
+      "increase_ms": 10615.9,
+      "delay_ms": 200,
+      "ratio": 53.1,
+      "amplified": true
+    }
+  ],
+  "score": {
+    "impact_score": 55.4,
+    "resilience_score": 45,
+    "severity": "High",
+    "confidence": "Medium confidence",
+    "availability_pct": 50.0,
+    "components": {
+      "error_impact": 0.013,
+      "latency_impact": 1.0,
+      "availability_loss": 0.5,
+      "recovery_impact": 1.0
+    },
+    "limitations": [
+      "No data for: accounting, checkout",
+      "Stopped after 9s, so the evidence covers only the start of the fault"
+    ]
+  },
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 4.513589533932952
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 39.58203125
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 7.270499999999999
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 128.5859375
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 68.57455429497568
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 13.5625
+      }
+    },
+    {
+      "container": "recommendation",
+      "cpu_percent": {
+        "baseline": 2.7665186252937053,
+        "peak": 10.109073170731707
+      },
+      "memory_mb": {
+        "baseline": 48.0232421875,
+        "peak": 49.97265625
+      }
+    },
+    {
+      "container": "product-catalog",
+      "cpu_percent": {
+        "baseline": 0.7358883746434256,
+        "peak": 220.9039729501268
+      },
+      "memory_mb": {
+        "baseline": 11.0890625,
+        "peak": 19.80078125
+      }
+    },
+    {
+      "container": "accounting",
+      "cpu_percent": {
+        "baseline": 0.29841439842141293,
+        "peak": 0.43323753169907014
+      },
+      "memory_mb": {
+        "baseline": 142.7537109375,
+        "peak": 138.9140625
+      }
+    },
+    {
+      "container": "astronomy-db",
+      "cpu_percent": {
+        "baseline": 0.5772778642827671,
+        "peak": 2.4580555555555557
+      },
+      "memory_mb": {
+        "baseline": 57.06953125,
+        "peak": 55.73046875
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "held",
+    "explanation": "The experiment successfully demonstrated that injecting 200ms of network delay into astronomy-db significantly increased p95 latency across dependent services on the checkout path (frontend, frontend-proxy, product-catalog, and recommendation) while error rates remained essentially at zero (with a tiny 1.27% increase on frontend-proxy), fully supporting the hypothesis.",
+    "claims": [
+      {
+        "claim": "adding network delay to astronomy-db will increase p95 latency for services querying the database on the checkout path",
+        "evidence": "recommendation p95_ms increased from 4.58 to 10620.46ms, product-catalog p95_ms increased from 19.62 to 7142.18ms, frontend p95_ms increased from 33.63 to 8253.95ms, and frontend-proxy p95_ms increased from 32.69 to 6307.13ms.",
+        "status": "supported"
+      },
+      {
+        "claim": "adding network delay to astronomy-db will not cause widespread uncaught errors",
+        "evidence": "error rates remained at 0.0 for frontend, product-catalog, and recommendation, with a minimal increase to 1.27 for frontend-proxy.",
+        "status": "supported"
+      }
+    ],
+    "recommendation": "Implement bounded timeouts and circuit breakers on the product-catalog and recommendation services when querying astronomy-db to prevent severe latency amplification and thread pool exhaustion.",
+    "model": "gemini-3.5-flash-lite",
+    "skipped_models": []
+  },
+  "normal": [
+    {
+      "t": -120,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 74,
+          "errors": 0,
+          "request_rate": 2.466666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 7509.920103
+        },
+        "frontend-proxy": {
+          "n": 37,
+          "errors": 0,
+          "request_rate": 1.2333333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 5621.265
+        },
+        "product-catalog": {
+          "n": 82,
+          "errors": 0,
+          "request_rate": 2.7333333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 3427.891359
+        },
+        "recommendation": {
+          "n": 12,
+          "errors": 0,
+          "request_rate": 0.4,
+          "error_rate": 0.0,
+          "p95_ms": 3055.106605
+        }
+      }
+    },
+    {
+      "t": -115,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 66,
+          "errors": 0,
+          "request_rate": 2.2,
+          "error_rate": 0.0,
+          "p95_ms": 7509.920103
+        },
+        "frontend-proxy": {
+          "n": 33,
+          "errors": 0,
+          "request_rate": 1.1,
+          "error_rate": 0.0,
+          "p95_ms": 5621.265
+        },
+        "product-catalog": {
+          "n": 80,
+          "errors": 0,
+          "request_rate": 2.6666666666666665,
+          "error_rate": 0.0,
+          "p95_ms": 3427.891359
+        },
+        "recommendation": {
+          "n": 12,
+          "errors": 0,
+          "request_rate": 0.4,
+          "error_rate": 0.0,
+          "p95_ms": 3055.106605
+        }
+      }
+    },
+    {
+      "t": -110,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 76,
+          "errors": 0,
+          "request_rate": 2.533333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 7509.920103
+        },
+        "frontend-proxy": {
+          "n": 38,
+          "errors": 0,
+          "request_rate": 1.2666666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 5621.265
+        },
+        "product-catalog": {
+          "n": 84,
+          "errors": 0,
+          "request_rate": 2.8,
+          "error_rate": 0.0,
+          "p95_ms": 3397.517118
+        },
+        "recommendation": {
+          "n": 12,
+          "errors": 0,
+          "request_rate": 0.4,
+          "error_rate": 0.0,
+          "p95_ms": 3055.106605
+        }
+      }
+    },
+    {
+      "t": -105,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 74,
+          "errors": 0,
+          "request_rate": 2.466666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 7509.920103
+        },
+        "frontend-proxy": {
+          "n": 37,
+          "errors": 0,
+          "request_rate": 1.2333333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 5621.265
+        },
+        "product-catalog": {
+          "n": 86,
+          "errors": 0,
+          "request_rate": 2.8666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 3102.414699
+        },
+        "recommendation": {
+          "n": 12,
+          "errors": 0,
+          "request_rate": 0.4,
+          "error_rate": 0.0,
+          "p95_ms": 3055.106605
+        }
+      }
+    },
+    {
+      "t": -100,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 70,
+          "errors": 0,
+          "request_rate": 2.3333333333333335,
+          "error_rate": 0.0,
+          "p95_ms": 5620.014889
+        },
+        "frontend-proxy": {
+          "n": 35,
+          "errors": 0,
+          "request_rate": 1.1666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 5621.265
+        },
+        "product-catalog": {
+          "n": 91,
+          "errors": 0,
+          "request_rate": 3.033333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 3070.657779
+        },
+        "recommendation": {
+          "n": 13,
+          "errors": 0,
+          "request_rate": 0.43333333333333335,
+          "error_rate": 0.0,
+          "p95_ms": 2262.09151
+        }
+      }
+    },
+    {
+      "t": -95,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 84,
+          "errors": 0,
+          "request_rate": 2.8,
+          "error_rate": 0.0,
+          "p95_ms": 5567.686941
+        },
+        "frontend-proxy": {
+          "n": 42,
+          "errors": 0,
+          "request_rate": 1.4,
+          "error_rate": 0.0,
+          "p95_ms": 3146.915
+        },
+        "product-catalog": {
+          "n": 93,
+          "errors": 0,
+          "request_rate": 3.1,
+          "error_rate": 0.0,
+          "p95_ms": 2942.760147
+        },
+        "recommendation": {
+          "n": 15,
+          "errors": 0,
+          "request_rate": 0.5,
+          "error_rate": 0.0,
+          "p95_ms": 5017.159693
+        }
+      }
+    },
+    {
+      "t": -90,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 94,
+          "errors": 0,
+          "request_rate": 3.1333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 5567.686941
+        },
+        "frontend-proxy": {
+          "n": 47,
+          "errors": 0,
+          "request_rate": 1.5666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 3146.915
+        },
+        "product-catalog": {
+          "n": 110,
+          "errors": 0,
+          "request_rate": 3.6666666666666665,
+          "error_rate": 0.0,
+          "p95_ms": 2416.181232
+        },
+        "recommendation": {
+          "n": 16,
+          "errors": 0,
+          "request_rate": 0.5333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 5017.159693
+        }
+      }
+    },
+    {
+      "t": -85,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 90,
+          "errors": 0,
+          "request_rate": 3.0,
+          "error_rate": 0.0,
+          "p95_ms": 5567.686941
+        },
+        "frontend-proxy": {
+          "n": 45,
+          "errors": 0,
+          "request_rate": 1.5,
+          "error_rate": 0.0,
+          "p95_ms": 3193.851
+        },
+        "product-catalog": {
+          "n": 99,
+          "errors": 0,
+          "request_rate": 3.3,
+          "error_rate": 0.0,
+          "p95_ms": 2489.212247
+        },
+        "recommendation": {
+          "n": 17,
+          "errors": 0,
+          "request_rate": 0.5666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 5017.159693
+        }
+      }
+    },
+    {
+      "t": -80,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 80,
+          "errors": 0,
+          "request_rate": 2.6666666666666665,
+          "error_rate": 0.0,
+          "p95_ms": 6097.697525
+        },
+        "frontend-proxy": {
+          "n": 40,
+          "errors": 0,
+          "request_rate": 1.3333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 5049.123
+        },
+        "product-catalog": {
+          "n": 99,
+          "errors": 0,
+          "request_rate": 3.3,
+          "error_rate": 0.0,
+          "p95_ms": 3676.999415
+        },
+        "recommendation": {
+          "n": 18,
+          "errors": 0,
+          "request_rate": 0.6,
+          "error_rate": 0.0,
+          "p95_ms": 5017.159693
+        }
+      }
+    },
+    {
+      "t": -75,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 74,
+          "errors": 0,
+          "request_rate": 2.466666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 6300.387517
+        },
+        "frontend-proxy": {
+          "n": 37,
+          "errors": 0,
+          "request_rate": 1.2333333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 5568.549
+        },
+        "product-catalog": {
+          "n": 112,
+          "errors": 0,
+          "request_rate": 3.7333333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 3607.098233
+        },
+        "recommendation": {
+          "n": 19,
+          "errors": 0,
+          "request_rate": 0.6333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 5017.159693
+        }
+      }
+    },
+    {
+      "t": -70,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 84,
+          "errors": 0,
+          "request_rate": 2.8,
+          "error_rate": 0.0,
+          "p95_ms": 6097.697525
+        },
+        "frontend-proxy": {
+          "n": 42,
+          "errors": 0,
+          "request_rate": 1.4,
+          "error_rate": 0.0,
+          "p95_ms": 5049.123
+        },
+        "product-catalog": {
+          "n": 116,
+          "errors": 0,
+          "request_rate": 3.8666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 3607.098233
+        },
+        "recommendation": {
+          "n": 18,
+          "errors": 0,
+          "request_rate": 0.6,
+          "error_rate": 0.0,
+          "p95_ms": 5017.159693
+        }
+      }
+    },
+    {
+      "t": -65,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 78,
+          "errors": 0,
+          "request_rate": 2.6,
+          "error_rate": 0.0,
+          "p95_ms": 5295.778059
+        },
+        "frontend-proxy": {
+          "n": 39,
+          "errors": 0,
+          "request_rate": 1.3,
+          "error_rate": 0.0,
+          "p95_ms": 4247.275
+        },
+        "product-catalog": {
+          "n": 120,
+          "errors": 0,
+          "request_rate": 4.0,
+          "error_rate": 0.0,
+          "p95_ms": 3028.465738
+        },
+        "recommendation": {
+          "n": 17,
+          "errors": 0,
+          "request_rate": 0.5666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 2137.513878
+        }
+      }
+    },
+    {
+      "t": -60,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 78,
+          "errors": 0,
+          "request_rate": 2.6,
+          "error_rate": 0.0,
+          "p95_ms": 5295.778059
+        },
+        "frontend-proxy": {
+          "n": 39,
+          "errors": 0,
+          "request_rate": 1.3,
+          "error_rate": 0.0,
+          "p95_ms": 4247.275
+        },
+        "product-catalog": {
+          "n": 107,
+          "errors": 0,
+          "request_rate": 3.566666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 3028.465738
+        },
+        "recommendation": {
+          "n": 17,
+          "errors": 0,
+          "request_rate": 0.5666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 2137.513878
+        }
+      }
+    },
+    {
+      "t": -55,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 114,
+          "errors": 0,
+          "request_rate": 3.8,
+          "error_rate": 0.0,
+          "p95_ms": 4244.85733
+        },
+        "frontend-proxy": {
+          "n": 63,
+          "errors": 0,
+          "request_rate": 2.1,
+          "error_rate": 0.0,
+          "p95_ms": 3125.957
+        },
+        "product-catalog": {
+          "n": 130,
+          "errors": 0,
+          "request_rate": 4.333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 3025.105969
+        },
+        "recommendation": {
+          "n": 18,
+          "errors": 0,
+          "request_rate": 0.6,
+          "error_rate": 0.0,
+          "p95_ms": 2137.513878
+        }
+      }
+    },
+    {
+      "t": -50,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 165,
+          "errors": 0,
+          "request_rate": 5.5,
+          "error_rate": 0.0,
+          "p95_ms": 3095.77218
+        },
+        "frontend-proxy": {
+          "n": 103,
+          "errors": 0,
+          "request_rate": 3.433333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 2968.166
+        },
+        "product-catalog": {
+          "n": 129,
+          "errors": 0,
+          "request_rate": 4.3,
+          "error_rate": 0.0,
+          "p95_ms": 2597.424509
+        },
+        "recommendation": {
+          "n": 17,
+          "errors": 0,
+          "request_rate": 0.5666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 2137.513878
+        }
+      }
+    },
+    {
+      "t": -45,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 208,
+          "errors": 0,
+          "request_rate": 6.933333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 3057.397834
+        },
+        "frontend-proxy": {
+          "n": 139,
+          "errors": 0,
+          "request_rate": 4.633333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 2963.808
+        },
+        "product-catalog": {
+          "n": 122,
+          "errors": 0,
+          "request_rate": 4.066666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 2456.873605
+        },
+        "recommendation": {
+          "n": 18,
+          "errors": 0,
+          "request_rate": 0.6,
+          "error_rate": 0.0,
+          "p95_ms": 1944.304171
+        }
+      }
+    },
+    {
+      "t": -40,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 269,
+          "errors": 0,
+          "request_rate": 8.966666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 3143.861828
+        },
+        "frontend-proxy": {
+          "n": 198,
+          "errors": 0,
+          "request_rate": 6.6,
+          "error_rate": 0.0,
+          "p95_ms": 3096.725
+        },
+        "product-catalog": {
+          "n": 121,
+          "errors": 0,
+          "request_rate": 4.033333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 5630.569748
+        },
+        "recommendation": {
+          "n": 22,
+          "errors": 0,
+          "request_rate": 0.7333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 3350.752254
+        }
+      }
+    },
+    {
+      "t": -35,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 289,
+          "errors": 0,
+          "request_rate": 9.633333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 3185.072117
+        },
+        "frontend-proxy": {
+          "n": 222,
+          "errors": 0,
+          "request_rate": 7.4,
+          "error_rate": 0.0,
+          "p95_ms": 3134.213
+        },
+        "product-catalog": {
+          "n": 119,
+          "errors": 0,
+          "request_rate": 3.966666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 7369.76179
+        },
+        "recommendation": {
+          "n": 20,
+          "errors": 0,
+          "request_rate": 0.6666666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 3350.752254
+        }
+      }
+    },
+    {
+      "t": -30,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 273,
+          "errors": 0,
+          "request_rate": 9.1,
+          "error_rate": 0.0,
+          "p95_ms": 4757.505294
+        },
+        "frontend-proxy": {
+          "n": 214,
+          "errors": 0,
+          "request_rate": 7.133333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 3142.096
+        },
+        "product-catalog": {
+          "n": 103,
+          "errors": 0,
+          "request_rate": 3.433333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 7369.76179
+        },
+        "recommendation": {
+          "n": 17,
+          "errors": 0,
+          "request_rate": 0.5666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 4014.48722
+        }
+      }
+    },
+    {
+      "t": -25,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 265,
+          "errors": 0,
+          "request_rate": 8.833333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 4757.505294
+        },
+        "frontend-proxy": {
+          "n": 223,
+          "errors": 0,
+          "request_rate": 7.433333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 3141.938
+        },
+        "product-catalog": {
+          "n": 94,
+          "errors": 0,
+          "request_rate": 3.1333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 7404.551824
+        },
+        "recommendation": {
+          "n": 15,
+          "errors": 0,
+          "request_rate": 0.5,
+          "error_rate": 0.0,
+          "p95_ms": 4014.48722
+        }
+      }
+    },
+    {
+      "t": -20,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 283,
+          "errors": 0,
+          "request_rate": 9.433333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 3209.27093
+        },
+        "frontend-proxy": {
+          "n": 265,
+          "errors": 0,
+          "request_rate": 8.833333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 3134.213
+        },
+        "product-catalog": {
+          "n": 91,
+          "errors": 0,
+          "request_rate": 3.033333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 7404.551824
+        },
+        "recommendation": {
+          "n": 15,
+          "errors": 0,
+          "request_rate": 0.5,
+          "error_rate": 0.0,
+          "p95_ms": 4014.48722
+        }
+      }
+    },
+    {
+      "t": -15,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 303,
+          "errors": 0,
+          "request_rate": 10.1,
+          "error_rate": 0.0,
+          "p95_ms": 3564.025714
+        },
+        "frontend-proxy": {
+          "n": 294,
+          "errors": 0,
+          "request_rate": 9.8,
+          "error_rate": 0.0,
+          "p95_ms": 3134.213
+        },
+        "product-catalog": {
+          "n": 99,
+          "errors": 0,
+          "request_rate": 3.3,
+          "error_rate": 0.0,
+          "p95_ms": 7404.551824
+        },
+        "recommendation": {
+          "n": 16,
+          "errors": 0,
+          "request_rate": 0.5333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 4014.48722
+        }
+      }
+    },
+    {
+      "t": -10,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 269,
+          "errors": 0,
+          "request_rate": 8.966666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 3120.353189
+        },
+        "frontend-proxy": {
+          "n": 265,
+          "errors": 0,
+          "request_rate": 8.833333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 2798.671
+        },
+        "product-catalog": {
+          "n": 96,
+          "errors": 0,
+          "request_rate": 3.2,
+          "error_rate": 0.0,
+          "p95_ms": 7404.551824
+        },
+        "recommendation": {
+          "n": 14,
+          "errors": 0,
+          "request_rate": 0.4666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 1390.319861
+        }
+      }
+    },
+    {
+      "t": -5,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 267,
+          "errors": 0,
+          "request_rate": 8.9,
+          "error_rate": 0.0,
+          "p95_ms": 2755.134664
+        },
+        "frontend-proxy": {
+          "n": 270,
+          "errors": 0,
+          "request_rate": 9.0,
+          "error_rate": 0.0,
+          "p95_ms": 2794.403
+        },
+        "product-catalog": {
+          "n": 88,
+          "errors": 0,
+          "request_rate": 2.933333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 3066.8952
+        },
+        "recommendation": {
+          "n": 15,
+          "errors": 0,
+          "request_rate": 0.5,
+          "error_rate": 0.0,
+          "p95_ms": 1390.319861
+        }
+      }
+    },
+    {
+      "t": 0,
+      "services": {
+        "accounting": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 263,
+          "errors": 0,
+          "request_rate": 8.766666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 2734.661303
+        },
+        "frontend-proxy": {
+          "n": 290,
+          "errors": 0,
+          "request_rate": 9.666666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 2735.811
+        },
+        "product-catalog": {
+          "n": 82,
+          "errors": 0,
+          "request_rate": 2.7333333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 2303.234689
+        },
+        "recommendation": {
+          "n": 15,
+          "errors": 0,
+          "request_rate": 0.5,
+          "error_rate": 0.0,
+          "p95_ms": 1390.319861
+        }
+      }
+    }
+  ],
+  "grafana_window_ms": [
+    1791681895998,
+    1791682256177
+  ]
+}

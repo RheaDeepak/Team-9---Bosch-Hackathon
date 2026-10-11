@@ -7,3 +7,7 @@ python-dotenv
 fastapi
 uvicorn
 typing_extensions
+langgraph>=1.2,<2
+langgraph-checkpoint-sqlite>=3,<4
+langchain-google-genai>=4,<5
+pydantic>=2,<3
