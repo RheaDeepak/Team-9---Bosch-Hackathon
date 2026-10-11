@@ -77,6 +77,157 @@ Open <http://127.0.0.1:8000>. FastAPI serves the frontend and all `/api/*`
 routes from the same localhost origin. Do not approve an experiment unless the
 target is the disposable local Compose project and the readiness bar is green.
 
+### Run Chaos Copilot in Docker
+
+Chaos Copilot is deployed as a local Docker control plane at
+<http://127.0.0.1:8000>. Its own Compose project does not start the system under
+test: start the OpenTelemetry Astronomy Shop separately first. Do not use this
+deployment with a shared or production Docker daemon.
+
+#### Prerequisites
+
+- Docker Desktop running in Linux-container mode, with Docker Compose v2. Use
+  `docker-compose` instead of `docker compose` below if that is the command
+  installed on your machine.
+- A local checkout of the OpenTelemetry Demo, with this repository either next
+  to it or supplied through `OTEL_DEMO_PATH` below.
+- The Astronomy Shop started with its full and observability Compose overlays.
+  Prometheus must be available on host port `9090`; the storefront, Jaeger, and
+  Grafana are reached through the frontend proxy on host port `8080`.
+
+Expected sibling layout:
+
+```text
+Downloads/
+├── opentelemetry-demo/
+└── chaos-copilot/
+    └── Team-9---Bosch-Hackathon/
+```
+
+#### 1. Start the Astronomy Shop
+
+From the `opentelemetry-demo` checkout, start the full demo and its
+observability services. Include the provided Grafana override to allow the
+Chaos Copilot UI to embed the Grafana panels:
+
+```powershell
+docker compose -f compose.yaml -f compose.full.yaml -f compose.observability.yaml `
+  -f ..\chaos-copilot\Team-9---Bosch-Hackathon\grafana-embed.yaml up -d
+```
+
+Wait for the storefront at <http://127.0.0.1:8080> and Prometheus at
+<http://127.0.0.1:9090/-/ready>. Keep the load generator running so Jaeger and
+Prometheus have recent traffic. If the demo is already running without the
+Grafana override, recreate Grafana with the same Compose files and
+`--no-deps grafana`.
+
+#### 2. Configure Chaos Copilot
+
+From this repository, create `.env` if it is not already present:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Set at least the following values in `.env`:
+
+```dotenv
+TARGET_COMPOSE_PROJECT=opentelemetry-demo
+TARGET_REPOSITORY_PATH=../../opentelemetry-demo
+STORE_URL=http://localhost:8080
+PROMETHEUS_URL=http://localhost:9090
+JAEGER_URL=http://localhost:8080/jaeger/ui
+LOCUST_URL=http://localhost:8080/loadgen
+```
+
+`LLM_API_KEY` is optional. Without a Gemini key, planning and analysis use their
+deterministic fallbacks. Keep the configured limits unless you have a reviewed
+reason to change them; they are safety boundaries for experiments.
+
+#### 3. Start the control plane
+
+From this repository's root, build and start the service:
+
+```powershell
+docker compose up --build -d
+docker compose logs -f chaos-copilot
+```
+
+The UI is intentionally bound to localhost only. Confirm the container and the
+application readiness gate:
+
+```powershell
+docker compose ps
+Invoke-RestMethod http://127.0.0.1:8000/api/readiness
+```
+
+The container reports `healthy` once its HTTP health check passes. The UI's
+readiness panel must be green before approving an experiment. If no current
+topology or baseline exists, refresh both from the container after the demo has
+generated traffic:
+
+```powershell
+docker compose exec chaos-copilot python discovery.py
+docker compose exec chaos-copilot python metrics.py
+```
+
+The baseline collection takes about five minutes. The refreshed
+`dependency_map.json`, `dependency_map.png`, and `baseline.json`, along with
+runtime state, reports, and results, remain on the host.
+
+#### Non-default paths and endpoints
+
+The Compose file mounts the sibling `opentelemetry-demo` checkout read-only at
+`/target` and translates the default host URLs to `host.docker.internal`. If the
+demo checkout is elsewhere, provide its absolute path before starting:
+
+```powershell
+$env:OTEL_DEMO_PATH = "C:\path\to\opentelemetry-demo"
+docker compose up --build -d
+```
+
+For non-default host ports or routes, set a `CHAOS_*` variable in the shell
+before `docker compose up`. These values override the equivalent `.env` setting
+inside the container only:
+
+| Service | Override | Default in container |
+| --- | --- | --- |
+| Storefront | `CHAOS_STORE_URL` | `http://host.docker.internal:8080` |
+| Prometheus | `CHAOS_PROMETHEUS_URL` | `http://host.docker.internal:9090` |
+| Jaeger | `CHAOS_JAEGER_URL` | `http://host.docker.internal:8080/jaeger/ui` |
+| Locust | `CHAOS_LOCUST_URL` | `http://host.docker.internal:8080/loadgen` |
+| Grafana | `CHAOS_GRAFANA_URL` | `http://host.docker.internal:8080/grafana` |
+
+For example:
+
+```powershell
+$env:CHAOS_PROMETHEUS_URL = "http://host.docker.internal:19090"
+docker compose up -d
+```
+
+#### Operate and update
+
+```powershell
+# Follow logs
+docker compose logs -f chaos-copilot
+
+# Apply repository or dependency changes
+docker compose up --build -d
+
+# Stop only the control plane after no experiment is active
+docker compose down
+```
+
+Do not stop or recreate the control-plane container while an experiment is
+active: stopping it requests rollback and waits for recovery. Never remove
+`state/` while a fault may be active; it contains the recovery checkpoint.
+
+> [!WARNING]
+> This deployment mounts the Docker socket so Chaos Copilot can execute its
+> policy-gated local experiments. The socket effectively grants control of the
+> local Docker daemon: use it only with the disposable local Astronomy Shop
+> environment, never a shared or production daemon.
+
 ## Why Chaos Copilot?
 
 Observable microservices provide a great deal of data, but they do not answer

@@ -3,11 +3,12 @@
 Grafana is reached through the demo's Envoy front door. Anonymous access is enabled in the demo's
 grafana.ini, so no credentials are needed; embedding needs grafana-embed.yaml (see README).
 """
+import os
 import time
 
 import requests
 
-GRAFANA_URL = "http://localhost:8080/grafana"
+GRAFANA_URL = os.getenv("GRAFANA_URL", "http://localhost:8080/grafana").rstrip("/")
 # Looked up through /api/search and /api/dashboards/uid/<uid>: these three panels live in the Demo folder's
 # "Demo Dashboard" (not in "Spanmetrics Demo Dashboard"). Panel ids are per dashboard.
 DASHBOARD_UID = "W2gX2zHVk"

@@ -1,0 +1,36 @@
+services:
+  chaos-copilot:
+    build:
+      context: .
+    image: chaos-copilot:local
+    container_name: chaos-copilot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TARGET_REPOSITORY_PATH: /target
+      STORE_URL: ${CHAOS_STORE_URL:-http://host.docker.internal:8080}
+      PROMETHEUS_URL: ${CHAOS_PROMETHEUS_URL:-http://host.docker.internal:9090}
+      JAEGER_URL: ${CHAOS_JAEGER_URL:-http://host.docker.internal:8080/jaeger/ui}
+      LOCUST_URL: ${CHAOS_LOCUST_URL:-http://host.docker.internal:8080/loadgen}
+      GRAFANA_URL: ${CHAOS_GRAFANA_URL:-http://host.docker.internal:8080/grafana}
+    ports:
+      - "${CHAOS_BIND_ADDRESS:-127.0.0.1}:8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${OTEL_DEMO_PATH:-../../opentelemetry-demo}:/target:ro
+      - ./results:/app/results
+      - ./reports:/app/reports
+      - ./sessions:/app/sessions
+      - ./state:/app/state
+      - ./baseline.json:/app/baseline.json
+      - ./dependency_map.json:/app/dependency_map.json
+      - ./dependency_map.png:/app/dependency_map.png
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/readiness', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
