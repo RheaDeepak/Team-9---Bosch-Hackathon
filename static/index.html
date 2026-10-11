@@ -1319,8 +1319,8 @@ function renderFindings() {
   const col = ov.score == null ? 'var(--text-3)' : ov.score >= 80 ? 'var(--ok)' : ov.score >= 60 ? 'var(--warn)' : 'var(--bad)';
   $('findings').className = '';
   $('findings').innerHTML = `${noticesHtml(d)}
-    <div class="scorewrap"><div class="scorebar" style="margin-bottom:0"><div class="ring" style="--p:${ov.score ?? 0};--c:${col}"><div><span><b>${ov.score ?? '&ndash;'}</b><br><small>/100</small></span></div></div>
-      <div><small class="muted">OVERALL RESILIENCE</small><div style="font-size:16px;font-weight:600">${a.findings.length} weakness${a.findings.length === 1 ? '' : 'es'} &middot; ${a.strengths.length} strength${a.strengths.length === 1 ? '' : 's'} &middot; ${a.results_used.length} experiments</div>
+    <div class="scorewrap"><div class="scorebar" style="margin-bottom:0"><div class="ring" style="--p:${ov.score ?? 0};--c:${col}"${ov.provisional ? ` title="${esc(ov.provisional_note)}"` : ''}><div><span><b>${ov.score ?? '&ndash;'}</b><br><small>/100${ov.provisional ? '<br>provisional' : ''}</small></span></div></div>
+      <div><small class="muted">OVERALL RESILIENCE</small>${ov.provisional ? ` <span class="pill warn" title="Fewer than 3 runs have quality ok">${esc(ov.provisional_note)}</span>` : ''}<div style="font-size:16px;font-weight:600">${a.findings.length} weakness${a.findings.length === 1 ? '' : 'es'} &middot; ${a.strengths.length} strength${a.strengths.length === 1 ? '' : 's'} &middot; ${a.results_used.length} experiments</div>
         <div class="muted">${esc(ov.explain)}</div>
         <div class="muted">${a.source === 'analysis_agent' ? `AI-checked by ${esc(a.model || 'the analysis agent')}, ${esc(a.tool_calls)} tool calls` : 'Deterministic rules only'}${d.generated_at ? ' &middot; ' + esc(d.generated_at.replace('T', ' ').replace('+00:00', ' UTC')) : ''}</div></div></div>
       ${serviceTableHtml(a.scores)}</div>

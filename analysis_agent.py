@@ -254,7 +254,8 @@ def deterministic_summary(data):
     parts = [f"{counts[s]} {s}" for s in analysis.SEVERITY_ORDER if counts[s]]
     head = f"{len(ws)} weaknesses ({', '.join(parts)})" if ws else "No weaknesses found"
     top = f"; the most severe: {ws[0]['title']} ({ws[0]['severity']})" if ws else ""
-    score = (f" Overall resilience {ov['score']}/100 over {ov['tested']} tested services." if ov["score"] is not None
+    score = (f" Overall resilience {ov['score']}/100 over {ov['tested']} tested services"
+             + (f" ({ov['provisional_note']})" if ov.get("provisional") else "") + "." if ov["score"] is not None
              else " No service has a resilience score yet.")
     return f"{head}{top}. {len(data['strengths'])} strengths.{score}"
 

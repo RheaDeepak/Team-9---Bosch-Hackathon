@@ -14,6 +14,7 @@ import analysis  # noqa: E402
 import analysis_agent  # noqa: E402
 import guard  # noqa: E402
 import ranker  # noqa: E402
+import report  # noqa: E402
 import run_experiment as exp  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -142,6 +143,36 @@ class EvidenceInFindingsTest(unittest.TestCase):
                   "summary": "s", "strengths": []}
         with self.assertRaisesRegex(ValueError, "low-evidence"):
             analysis_agent.check_answer(answer, [w], data)
+
+
+class PenaltyAndProvisionalTest(unittest.TestCase):
+    def analyse(self, results):
+        return analysis.analyse(results, [], graph(), None, baseline(), {})
+
+    def test_medium_findings_still_lower_the_score_by_confidence(self):
+        a = self.analyse([sampled(CART_DOWN(f"20261010T11{i}000Z"), n=2) for i in range(2)])   # low evidence only
+        cart = [w for w in a["weaknesses"] if w["service"] == "cart"]
+        self.assertTrue(cart and all(w["severity"] in ("Medium", "Low") for w in cart))
+        expected = round(min(analysis.WEAKNESS_PENALTY_CAP, sum(
+            analysis.WEAKNESS_PENALTY["Medium"] * w["confidence"] for w in cart if w["severity"] == "Medium")), 1)
+        s = a["scores"]["services"]["cart"]
+        self.assertGreater(expected, 0)
+        self.assertEqual(s["penalty"], expected)
+        self.assertEqual(s["score"], max(0, round(s["mean_run_score"] - expected)))
+        self.assertIn("Medium 5 x confidence", s["explain"])
+        self.assertNotIn("Low", analysis.WEAKNESS_PENALTY)                       # Low findings cost nothing
+        self.assertEqual(analysis.WEAKNESS_PENALTY_CAP, 30)
+
+    def test_overall_score_is_provisional_with_fewer_than_3_reliable_runs(self):
+        few = self.analyse([sampled(CART_DOWN(f"20261010T11{i}000Z"), n=6) for i in range(2)])["scores"]["overall"]
+        self.assertTrue(few["provisional"])
+        self.assertEqual((few["reliable_runs"], few["provisional_note"]), (2, "provisional: based on 2 reliable runs"))
+        many = self.analyse([sampled(CART_DOWN(f"20261010T11{i}000Z"), n=6) for i in range(3)])["scores"]["overall"]
+        self.assertEqual((many["provisional"], many["provisional_note"]), (False, None))
+        out = analysis_agent.build_output(self.analyse([sampled(CART_DOWN("20261010T110000Z"))]), "analysis_fallback", "t")
+        self.assertIn("provisional: based on 1 reliable runs", report.render_md(out))
+        self.assertIn("provisional: based on 1 reliable runs", report.render_html(out))
+        self.assertIn("provisional: based on 1 reliable runs", out["summary"])
 
 
 class RankerAfterAbortTest(unittest.TestCase):

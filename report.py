@@ -55,8 +55,10 @@ def method_lines(data):
         f"Weakness severity (0-100) = 100 x pattern weight x ({comp}) x ({sw['conf_floor']:g} + {1 - sw['conf_floor']:g} x confidence); "
         "Critical >= 70, High >= 50, Medium >= 30, else Low. Confidence grows with the number of runs that show the same weakness "
         "and falls with missing data.",
-        f"Service resilience = mean of its experiment scores minus {analysis.WEAKNESS_PENALTY['Critical']} per open Critical and "
-        f"{analysis.WEAKNESS_PENALTY['High']} per open High weakness (at most {analysis.WEAKNESS_PENALTY_CAP}); overall = mean over "
+        f"Service resilience = mean of its experiment scores minus {analysis.WEAKNESS_PENALTY['Critical']} per open Critical, "
+        f"{analysis.WEAKNESS_PENALTY['High']} per open High and {analysis.WEAKNESS_PENALTY['Medium']} x confidence per open Medium "
+        f"weakness (at most {analysis.WEAKNESS_PENALTY_CAP}); the overall score is provisional with fewer than "
+        f"{analysis.MIN_RELIABLE_RUNS} reliable (quality ok) runs; overall = mean over "
         "tested services weighted by 1 + criticality. Untested services are shown as not tested, never as 100.",
         "Deterministic: evidence index, weakness rules (thresholds in analysis.py), severity and all scores. "
         "AI (when available): root-cause explanation, source/config/trace investigation, specific fix and verification. "
@@ -78,7 +80,8 @@ def render_md(data):
            f"({len(data['skipped'])} skipped). Analysis: {SOURCES.get(data['source'], data['source'])}"
            + (f" - {data['note']}" if data.get("note") else "") + ".", "",
            f"**Overall resilience: {ov['score'] if ov['score'] is not None else 'not tested'}"
-           f"{'/100' if ov['score'] is not None else ''}** ({ov['explain']})", "",
+           f"{'/100' if ov['score'] is not None else ''}**"
+           + (f" **({ov['provisional_note']})**" if ov.get("provisional") else "") + f" ({ov['explain']})", "",
            f"> {data['summary']}", "", "## Resilience by service", "",
            "| Service | Score | How it is computed |", "|---|---:|---|"]
     for s, v in sorted(data["scores"]["services"].items(), key=lambda kv: (kv[1]["score"] is None, kv[1]["score"] or 0, kv[0])):
@@ -154,7 +157,8 @@ def render_html(data):
              f"{' - ' + e(data['note']) if data.get('note') else ''}.</p>",
              f"<div class='card'><div class='overall'>{e(ov['score']) if ov['score'] is not None else 'not tested'}"
              f"<span class='muted' style='font-size:16px'>{'/100' if ov['score'] is not None else ''} overall resilience</span></div>"
-             f"<div class='muted'>{e(ov['explain'])}</div></div>",
+             + (f"<div><span class='pill Medium'>{e(ov['provisional_note'])}</span></div>" if ov.get("provisional") else "")
+             + f"<div class='muted'>{e(ov['explain'])}</div></div>",
              f"<p class='summary'>{e(data['summary'])}</p>",
              "<h2>Resilience by service</h2><div class='table-wrap'><table><tr><th>Service</th><th>Score</th><th>How it is computed</th></tr>"]
     for s, v in sorted(data["scores"]["services"].items(), key=lambda kv: (kv[1]["score"] is None, kv[1]["score"] or 0, kv[0])):

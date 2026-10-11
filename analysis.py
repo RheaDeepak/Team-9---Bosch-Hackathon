@@ -60,7 +60,11 @@ SEVERITY_WEIGHTS = {
 SEVERITY_BANDS = ((70, "Critical"), (50, "High"), (30, "Medium"), (0, "Low"))   # lower bound -> label
 SEVERITY_ORDER = ("Critical", "High", "Medium", "Low")
 # Resilience: subtracted from a service's average experiment score per open weakness of this severity.
-WEAKNESS_PENALTY = {"Critical": 15, "High": 8}
+# Resilience: subtracted from a service's average run score per open weakness. Medium findings (often held at
+# Medium only because their evidence is thin) still count, scaled by the finding's confidence; Low findings do not.
+WEAKNESS_PENALTY = {"Critical": 15, "High": 8, "Medium": 5}
+PENALTY_SCALED_BY_CONFIDENCE = ("Medium",)
+MIN_RELIABLE_RUNS = 3   # fewer "ok" runs than this: the overall score is shown as provisional
 WEAKNESS_PENALTY_CAP = 30   # related weaknesses often share one root cause; do not stack without limit
 USER_STOPS = ("stopped by user", "interrupted by user")   # guard reasons of runs a person ended early
 
@@ -470,7 +474,7 @@ def measures_resilience(r):
 
 
 def resilience_scores(results, weaknesses, services, crit):
-    """Per service: mean experiment resilience score minus open Critical/High weakness penalties.
+    """Per service: mean experiment resilience score minus open-weakness penalties (Medium scaled by confidence).
     Overall: criticality-weighted mean over tested services. Untested services are "not tested"."""
     per = {}
     for s in sorted(services):
@@ -486,13 +490,17 @@ def resilience_scores(results, weaknesses, services, crit):
             continue
         scores = [r["score"]["resilience_score"] for r in runs]
         open_w = [w for w in weaknesses if w["service"] == s and w["severity"] in WEAKNESS_PENALTY]
-        penalty = min(WEAKNESS_PENALTY_CAP, sum(WEAKNESS_PENALTY[w["severity"]] for w in open_w))
+        penalty = round(min(WEAKNESS_PENALTY_CAP, sum(
+            WEAKNESS_PENALTY[w["severity"]] * (w["confidence"] if w["severity"] in PENALTY_SCALED_BY_CONFIDENCE else 1.0)
+            for w in open_w)), 1)
         mean = sum(scores) / len(scores)
         score = max(0, round(mean - penalty))
         per[s] = {"score": score, "status": "tested", "runs": len(runs), "mean_run_score": round(mean, 1),
                   "penalty": penalty, "open_weaknesses": [w["id"] for w in open_w], "criticality": crit.get(s, 0.0),
                   "explain": f"mean of {len(runs)} run scores ({round(mean, 1)}) minus {penalty} for "
-                             f"{len(open_w)} open Critical/High weaknesses (cap {WEAKNESS_PENALTY_CAP}) = {score}"}
+                             f"{len(open_w)} open weaknesses (Critical {WEAKNESS_PENALTY['Critical']}, High "
+                             f"{WEAKNESS_PENALTY['High']}, Medium {WEAKNESS_PENALTY['Medium']} x confidence; cap "
+                             f"{WEAKNESS_PENALTY_CAP}) = {score}"}
     tested = {s: v for s, v in per.items() if v["score"] is not None}
     if tested:
         weights = {s: 1 + v["criticality"] for s, v in tested.items()}
@@ -501,7 +509,11 @@ def resilience_scores(results, weaknesses, services, crit):
                    f"{len(per) - len(tested)} services not tested yet and not included")
     else:
         overall, explain = None, "no service has been tested yet"
-    return {"overall": {"score": overall, "tested": len(tested), "services": len(per), "explain": explain},
+    reliable = sum(r.get("quality", "ok") == "ok" for r in results)
+    provisional = overall is not None and reliable < MIN_RELIABLE_RUNS
+    return {"overall": {"score": overall, "tested": len(tested), "services": len(per), "explain": explain,
+                        "reliable_runs": reliable, "provisional": provisional,
+                        "provisional_note": f"provisional: based on {reliable} reliable runs" if provisional else None},
             "services": per}
 
 
