@@ -33,7 +33,7 @@ import inject
 import metrics
 import run_experiment as exp
 import traffic_spike
-from policy import PROTECTED, validate
+from policy import ALLOWED_FAULTS, PROTECTED, validate
 
 BASE_DIR = Path(__file__).resolve().parent
 os.chdir(BASE_DIR)  # the modules read baseline.json, results/ ... relative to the repo
@@ -330,16 +330,13 @@ def api_propose(body: dict = Body(default=None)):
     return p
 
 
-RANKING_ROWS = 40   # rows shown: one per service and fault
+RANKING_ROWS = 40   # candidate cards returned to the UI
 CANDIDATE_FIELDS = ("rank", "target", "fault", "magnitude", "risk", "info", "priority", "outage", "why", "factors")
 
 
 @app.get("/api/ranking")
 def api_ranking():
-    """The ranker's scored candidates (no LLM) merged with the planning agent's decision for the current plan.
-    One row per service and fault: the variant the agent examined (else the ranker's best magnitude); the other
-    magnitudes of that fault come along as `variants`. A stop and a delay on one service are separate rows,
-    because the mildest delay would otherwise hide every container_stop."""
+    """Candidate-level ranking merged with the planning agent's candidate-specific findings."""
     try:
         ranking, _ = ranker.rank_from_files()
     except (OSError, ValueError, KeyError) as e:
@@ -351,23 +348,33 @@ def api_ranking():
 
     def view(c):
         a = by_id.get(c["id"], {})
+        candidate_plan = {**{k: c[k] for k in ("target", "fault", "magnitude", "duration_s")},
+                          "hypothesis": "(ranking candidate)", "reasoning": "(ranking candidate)"}
+        candidate_plan.update({k: c[k] for k in ("parameters", "candidate_id", "capability_version") if k in c})
+        checked = a.get("evidence") or []
         return {"id": c["id"], **{k: c[k] for k in CANDIDATE_FIELDS}, "in_top_k": c["id"] in by_id,
                 **{k: c[k] for k in ("parameters", "candidate_id", "capability_version", "unavailable",
                                      "unavailable_reason") if k in c},
                 "adjusted_risk": a.get("adjusted_risk"), "adjusted_priority": a.get("adjusted_priority"),
-                "reason": a.get("reason"), "evidence": a.get("evidence") or []}
+                "reason": a.get("reason") or c["why"], "evidence": checked,
+                "checked": [f"checked {item.get('tool', 'evidence')}: {item.get('finding', '')}" for item in checked],
+                "blast_radius": validate(candidate_plan, _).get("blast_radius", [])}
 
-    groups = {}
-    for c in ranking:  # already best first, so each group's first entry is the ranker's best variant
-        groups.setdefault((c["target"], c["fault"]), []).append(view(c))
-    rows = []
-    for variants in groups.values():
-        primary = next((v for v in variants if v["in_top_k"]), variants[0])
-        rows.append({**primary, "variants": [v for v in variants if v is not primary]})
-    rows.sort(key=lambda r: r["rank"])
-    rows = rows[:RANKING_ROWS]
+    rows = [view(c) for c in ranking[:RANKING_ROWS]]
     chosen = agent.get("chosen")
-    return {"candidates": rows, "total": len(ranking), "services": len({c["target"] for c in ranking}), "chosen": chosen,
+    # The ranker only returns valid candidates. Surface policy rejections separately so the UI can make that
+    # safety boundary visible without allowing those candidates into the ranking.
+    rejected = []
+    for target in sorted(set(_)):
+        for fault in ALLOWED_FAULTS:
+            magnitude = 0 if fault == "container_stop" else 200 if fault == "network_delay" else 8
+            trial = {"target": target, "fault": fault, "magnitude": magnitude, "duration_s": ranker.DEFAULT_DURATION_S,
+                     "hypothesis": "(policy check)", "reasoning": "(policy check)"}
+            check = validate(trial, _)
+            if not check["valid"]:
+                rejected.append({"id": f"{target}:{fault}:{magnitude}", "target": target, "fault": fault,
+                                 "magnitude": magnitude, "reason": "; ".join(check["reasons"])})
+    return {"candidates": rows, "rejected": rejected, "total": len(ranking), "services": len({c["target"] for c in ranking}), "chosen": chosen,
             "source": agent.get("source"), "run_id": agent.get("run_id"), "note": agent.get("note"),
             "chosen_reason": next((r["reason"] for r in rows if r["id"] == chosen), None) or plan.get("reasoning")}
 

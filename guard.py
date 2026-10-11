@@ -57,6 +57,12 @@ def watched_services(plan, baseline, blast_radius):
             if any(thr.get(s, {}).get(m) is not None for m in METRICS)]
 
 
+def probe_availability(timeline):
+    """Return synthetic-probe availability when probes were recorded in a timeline."""
+    results = [probe["ok"] for sample in timeline for probe in sample.get("probes", {}).values()]
+    return 100 * sum(results) / len(results) if results else None
+
+
 def _is_tooling(span):
     return span["svc"] == "frontend-proxy" and \
         urlparse(span["attrs"].get("http.url", "")).path.startswith(TOOLING_PATHS)
