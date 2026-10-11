@@ -13,6 +13,8 @@ import run_experiment as exp
 
 MD_PATH = analysis.REPORTS_DIR / "findings_report.md"
 HTML_PATH = analysis.REPORTS_DIR / "findings_report.html"
+QUALITY_LABEL = {"ok": "ok", "low_evidence": "low evidence", "excluded": "excluded"}
+QUALITY_CLASS = {"ok": "ok", "low_evidence": "Medium", "excluded": "Low"}
 SOURCES = {"analysis_agent": "AI analysis agent (validated against stored evidence)",
            "analysis_fallback": "deterministic rules only (AI analysis not used)"}
 
@@ -104,11 +106,18 @@ def render_md(data):
     out += ["## Strengths: what held up", ""]
     out += [f"- **{s['title']}** ({len(s['runs'])} run(s)): {s['detail']}" for s in data["strengths"]] or ["- None observed yet."]
     out += [f"- {n}" for n in data.get("strength_notes", [])]
-    out += ["", "## Experiments run", "", "| Result | Target | Fault | Magnitude | Outcome | Recovery | Score |",
-            "|---|---|---|---:|---|---|---:|"]
+    qc = data.get("quality_counts") or {}
+    out += ["", "## Experiments", "", f"{qc.get('ok', 0)} ok, {qc.get('low_evidence', 0)} low evidence, "
+            f"{qc.get('excluded', 0)} excluded. Low-evidence runs count less towards a finding's confidence and never carry "
+            "a Critical/High finding alone; excluded runs feed no finding or score.", "",
+            "| Result | Target | Fault | Magnitude | Outcome | Recovery | Score | Quality |", "|---|---|---|---:|---|---|---:|---|"]
     for e in data["experiments"]:
         rec = f"{e['recovery_s']} s" if e["recovered"] else "not recovered"
-        out.append(f"| {e['id']} | {e['target']} | {e['fault']} | {e['magnitude']} | {_md_cell(e['outcome'][:90])} | {rec} | {e['score']} |")
+        quality = QUALITY_LABEL.get(e.get("quality", "ok"), e.get("quality")) + (f": {e['quality_reason']}" if e.get("quality_reason") else "")
+        out.append(f"| {e['id']} | {e['target']} | {e['fault']} | {e['magnitude']} | {_md_cell(e['outcome'][:90])} | {rec} | {e['score']} | {_md_cell(quality)} |")
+    out += ["", "## Excluded runs", ""]
+    out += [f"- `{x['id']}` ({x['fault']} on {x['target']}): {x['reason']}" for x in data.get("excluded", [])] \
+        or ["None: every run feeds the analysis."]
     out += ["", "## Method", ""] + [f"- {line}" for line in method_lines(data)] + [""]
     return "\n".join(out)
 
@@ -173,13 +182,22 @@ def render_html(data):
     parts += [f"<li><b>{e(s['title'])}</b> ({len(s['runs'])} run(s)): {e(s['detail'])}</li>" for s in data["strengths"]] \
         or ["<li class='muted'>None observed yet.</li>"]
     parts += [f"<li>{e(n)}</li>" for n in data.get("strength_notes", [])]
-    parts.append("</ul><h2>Experiments run</h2><div class='table-wrap'><table><tr><th>Result</th><th>Target</th><th>Fault</th>"
-                 "<th>Magnitude</th><th>Outcome</th><th>Recovery</th><th>Score</th></tr>")
+    qc = data.get("quality_counts") or {}
+    parts.append(f"</ul><h2>Experiments</h2><p class='muted'>{qc.get('ok', 0)} ok, {qc.get('low_evidence', 0)} low evidence, "
+                 f"{qc.get('excluded', 0)} excluded. Low-evidence runs count less towards a finding's confidence and never carry a "
+                 "Critical/High finding alone; excluded runs feed no finding or score.</p><div class='table-wrap'><table><tr><th>Result</th><th>Target</th><th>Fault</th>"
+                 "<th>Magnitude</th><th>Outcome</th><th>Recovery</th><th>Score</th><th>Quality</th></tr>")
     for x in data["experiments"]:
+        q = x.get("quality", "ok")
         parts.append(f"<tr><td><a href='{e(x['grafana_url'])}'>{e(x['id'])}</a></td><td>{e(x['target'])}</td><td>{e(x['fault'])}</td>"
                      f"<td>{e(x['magnitude'])}</td><td>{e(x['outcome'][:90])}</td>"
-                     f"<td>{e(str(x['recovery_s']) + ' s') if x['recovered'] else 'not recovered'}</td><td>{e(x['score'])}</td></tr>")
-    parts.append("</table></div><h2>Method</h2><ul>" + "".join(f"<li>{e(l)}</li>" for l in method_lines(data)) + "</ul></main>")
+                     f"<td>{e(str(x['recovery_s']) + ' s') if x['recovered'] else 'not recovered'}</td><td>{e(x['score'])}</td>"
+                     f"<td><span class='pill {QUALITY_CLASS.get(q, '')}'>{e(QUALITY_LABEL.get(q, q))}</span>"
+                     f"{' <span class=muted>' + e(x['quality_reason']) + '</span>' if x.get('quality_reason') else ''}</td></tr>")
+    parts.append("</table></div><h2>Excluded runs</h2><ul>")
+    parts += [f"<li><code>{e(x['id'])}</code> ({e(x['fault'])} on {e(x['target'])}): {e(x['reason'])}</li>" for x in data.get("excluded", [])] \
+        or ["<li class='muted'>None: every run feeds the analysis.</li>"]
+    parts.append("</ul><h2>Method</h2><ul>" + "".join(f"<li>{e(l)}</li>" for l in method_lines(data)) + "</ul></main>")
     return "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" \
            + parts[0] + "</head><body>" + "".join(parts[1:]) + "</body></html>"
 

@@ -210,6 +210,8 @@ def check_answer(obj, top, data, seen_locations=frozenset()):
             raise ValueError(f"finding {f['id']!r} raises severity by more than one level ({w['severity']} -> {f['severity']})")
         if new != old and not reason:
             raise ValueError(f"finding {f['id']!r} changes severity without a reason in agent_adjustment")
+        if w.get("capped_low_evidence") and f["severity"] in ("Critical", "High"):
+            raise ValueError(f"finding {f['id']!r} rests only on low-evidence runs, so it cannot be {f['severity']}")
         score = f["severity_score"]
         if not isinstance(score, (int, float)) or isinstance(score, bool) or not 0 <= score <= 100:
             raise ValueError(f"finding {f['id']!r}: severity_score must be 0-100")
@@ -265,7 +267,8 @@ def build_output(data, source, note, agent=None, model=None, run_id=None, tool_c
     cited = {e for f in findings for e in f["evidence_ids"]} | {e for s in data["strengths"] for e in s["evidence_ids"]}
     return {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "source": source, "note": note,
             "model": model, "run_id": run_id, "tool_calls": tool_calls, "results_used": data["results_used"],
-            "skipped": data["skipped"], "findings": findings, "strengths": data["strengths"],
+            "skipped": data["skipped"], "excluded": data.get("excluded", []),
+            "quality_counts": data.get("quality_counts", {}), "findings": findings, "strengths": data["strengths"],
             "strength_notes": agent.get("strength_notes", []),
             "summary": agent.get("summary") or deterministic_summary(data), "scores": data["scores"],
             "experiments": data["experiments"], "evidence": {e: data["evidence"][e] for e in sorted(cited)},
@@ -345,6 +348,7 @@ def run_analysis(api_key=None, post=None, data=None, results=None, graph=None, l
     if results is None:
         results, skipped = analysis.load_results()
         data = data or analysis.analyse(results, skipped)
+    results = [r for r in results if r.get("quality") != "excluded"]   # the agent's tools never see excluded runs
     data = data or analysis.analyse(results)
     graph = graph if graph is not None else load_graph()[0]
     log = AgentLog(log_path, mode="analysis")

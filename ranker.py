@@ -43,6 +43,10 @@ NOISE_ERR_PP = 1.0    # error-rate std (percentage points) at which a service co
 UNKNOWN_NOISE = 0.5   # no baseline numbers (e.g. kafka, databases): neither clear nor noisy
 OUTAGE_JOURNEY_SHARE = 0.5  # stopping a service on more than this share of the user journeys starts to look like an outage
 PENALTY_NOTE = 0.05     # penalties at least this large are named in the why line
+# After the guard aborted a (service, fault), its lowest magnitude keeps only this share of the prior-abort penalty and
+# every higher magnitude keeps all of it: the mildest step runs longest, so the next run collects enough samples.
+# The guard's thresholds and abort rules are not touched.
+LOWEST_AFTER_ABORT_SHARE = 0.3
 GUARD_ABORT = "threshold breached"  # guard reasons that mean the system really degraded
 
 
@@ -138,12 +142,14 @@ def _history_features(history, t, fault, magnitude):
     smaller = [r for r in same if r["magnitude"] < magnitude]
     # A smaller step held cleanly -> try bigger. A smaller (or this) step tripped the guard -> don't push.
     aborted_at_or_below = [r for r in same if r["magnitude"] <= magnitude and r["guard_aborted"]]
+    aborted_any = [r for r in same if r["guard_aborted"]]
     held_below = [r for r in smaller if r["verdict"] == "held" and not r["guard_aborted"]]
     return {"tested": [f"{r['fault']}@{r['magnitude']} {r['verdict']}" for r in same],
             "novelty": novelty, "repeats": len(exact),
             "escalation": max((r["magnitude"] for r in held_below), default=None) if not aborted_at_or_below else None,
             "last_verdict": same[-1]["verdict"] if same else None,
-            "prior_abort": max((r["magnitude"] for r in aborted_at_or_below), default=None)}
+            "prior_abort": max((r["magnitude"] for r in aborted_at_or_below), default=None),
+            "aborted_at": max((r["magnitude"] for r in aborted_any), default=None)}
 
 
 def _severity(fault, magnitude):
@@ -195,8 +201,10 @@ def _labels(f, c):
         "outage": ("entry point: users hit it directly" if f["entry_point"]
                    else f"stops {f['journeys']} user journeys (near-total outage)"),
         "partial": "likely partial degradation",
-        "prior_abort": (f"guard aborted at {h['prior_abort']}{' users' if c['fault'] == TRAFFIC_SPIKE else 'ms'}" if c["fault"] in {"network_delay", TRAFFIC_SPIKE}
-                         else "guard aborted before"),
+        "prior_abort": (f"guard aborted at {h['aborted_at']}{' users' if c['fault'] == TRAFFIC_SPIKE else 'ms'}"
+                        + ("; lowest magnitude preferred so the run lasts" if c["magnitude"] == min(MAGNITUDES.get(c["fault"], (c["magnitude"],))) else "")
+                        if c["fault"] in {"network_delay", TRAFFIC_SPIKE} and h["aborted_at"] is not None
+                        else "guard aborted before"),
     }
 
 
@@ -232,7 +240,13 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
         risk = sum(wr[k] * score[k] for k in wr) * coupling * sev_factor
         info = sum(wi[k] * score[k] for k in wi)
         safety = score["blast_radius"] * sev
-        prior_abort = 1.0 if h["prior_abort"] is not None else 0.0
+        ladder = MAGNITUDES.get(p["fault"], ())
+        if h["aborted_at"] is None or len(ladder) < 2:
+            prior_abort = 1.0 if h["prior_abort"] is not None else 0.0
+        elif p["magnitude"] == min(ladder):   # the guard aborted this pair before: steer to its lowest magnitude ...
+            prior_abort = LOWEST_AFTER_ABORT_SHARE if h["prior_abort"] is not None else 0.0
+        else:                                 # ... and away from every higher one
+            prior_abort = 1.0
         priority = (wp["risk"] * risk + wp["info"] * info - wp["safety"] * safety - wp["prior_abort"] * prior_abort
                     - wp.get("outage", 0.0) * outage)
 

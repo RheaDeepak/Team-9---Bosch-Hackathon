@@ -181,28 +181,48 @@ def _annotate(emit, text, tags, when):
     emit(f"Grafana annotation {'created' if ok else 'FAILED (continuing)'}: {text} ({detail})")
 
 
-def score_experiment(impact, recovery, availability, elapsed_s=None):
+RECOVERY_NOT_MEASURED_NOTES = ("stopped by user", "interrupted", "rollback failed")   # the wait ended, nothing was measured
+
+
+def recovery_measured(recovery, restart_before_run=False):
+    """False when the recovery wait did not measure anything: it was stopped, interrupted or never started, or it was
+    blocked by a container restart that happened before the run (older results compared restarts with the baseline)."""
+    if recovery.get("recovered"):
+        return True
+    note = str(recovery.get("note") or "")
+    return not (any(x in note for x in RECOVERY_NOT_MEASURED_NOTES) or restart_before_run)
+
+
+def score_experiment(impact, recovery, availability, elapsed_s=None, restart_before_run=False):
     """Deterministic score from measured evidence (no LLM): impact 0-100 (lower is better), resilience = 100 - impact.
     error_impact: worst error-rate rise in points / 100; latency_impact: worst p95 ratio, 5x baseline = full;
-    availability_loss: share of failed probe requests; recovery_impact: time to recover / recovery timeout."""
+    availability_loss: share of failed probe requests; recovery_impact: time to recover / recovery timeout.
+    A component that was not measured (no probes, a recovery wait that never measured) is left out and the remaining
+    weights are renormalised, instead of counting it as "no damage"; score.limitations says which."""
     clamp = lambda v: max(0.0, min(1.0, v))
     rises = [r["error_rate"]["change"] for r in impact if r["error_rate"]["change"] is not None]
     ratios = [r["p95_ms"]["peak"] / r["p95_ms"]["baseline"] - 1 for r in impact
               if r["p95_ms"]["peak"] is not None and r["p95_ms"]["baseline"]]
+    measured_recovery = recovery_measured(recovery, restart_before_run)
     recovery_s = recovery["seconds"] if recovery.get("recovered") else guard.RECOVERY_TIMEOUT_S
     components = {"error_impact": clamp(max(rises, default=0) / 100),
                   "latency_impact": clamp(max(ratios, default=0) / 4),
-                  "availability_loss": clamp((100 - availability) / 100) if availability is not None else 0.0,
-                  "recovery_impact": clamp(recovery_s / guard.RECOVERY_TIMEOUT_S)}
-    total = round(100 * sum(SCORE_WEIGHTS[k] * v for k, v in components.items()), 1)
+                  "availability_loss": clamp((100 - availability) / 100) if availability is not None else None,
+                  "recovery_impact": clamp(recovery_s / guard.RECOVERY_TIMEOUT_S) if measured_recovery else None}
+    used = {k: SCORE_WEIGHTS[k] for k, v in components.items() if v is not None}
+    total = round(100 * sum(w * components[k] for k, w in used.items()) / sum(used.values()), 1)
     no_data = [r["service"] for r in impact if r["error_rate"]["peak"] is None and r["p95_ms"]["peak"] is None]
     limits = ([f"No data for: {', '.join(no_data)}"] if no_data else []) + (
-        [f"Stopped after {elapsed_s:.0f}s, so the evidence covers only the start of the fault"] if elapsed_s is not None and elapsed_s < 15 else [])
+        [f"Stopped after {elapsed_s:.0f}s, so the evidence covers only the start of the fault"] if elapsed_s is not None and elapsed_s < 15 else []) + (
+        ["availability not measured (no probe data); weights renormalised over the rest"] if availability is None else []) + (
+        ["recovery not measured (" + (str(recovery.get("note") or "") or "restart from before the run") + "); weights renormalised over the rest"]
+        if not measured_recovery else [])
     confidence = ("Low" if len(no_data) * 2 >= max(len(impact), 1) else "Medium" if limits else "High") + " confidence"
     return {"impact_score": total, "resilience_score": round(100 - total),
             "severity": next(label for bound, label in SEVERITY_BANDS if total < bound), "confidence": confidence,
             "availability_pct": None if availability is None else round(availability, 1),
-            "components": {k: round(v, 3) for k, v in components.items()}, "limitations": limits}
+            "components": {k: None if v is None else round(v, 3) for k, v in components.items()},
+            "weights": {k: round(w / sum(used.values()), 3) for k, w in used.items()}, "limitations": limits}
 
 
 def propose(goal=None):
@@ -332,6 +352,7 @@ def execute(plan, source, validation, emit=print, on_phase=None, on_sample=None,
         "baseline": {"captured_at": baseline["captured_at"], "flags_enabled": baseline["flags_enabled"]},
         "forced_abort_test": FORCE_ABORT_TEST, "guard": g, "rollback_verified": rolled_back,
         "fault_evidence": fault_evidence, "fault_recovery": fault_recovery,
+        "restart_limits": restart_limits,  # container restart counts taken just before injection (None: unavailable)
         "recovery": recovery, "impact": impact, "amplification": amplified, "score": score,
         "container_resources": containers, "verdict": verdict, "normal": normal,
         "grafana_window_ms": grafana.window_ms(injected_at, ended_at) if injected_at else None,
