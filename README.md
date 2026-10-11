@@ -32,7 +32,7 @@ operator UI**. It:
 - plots live request-rate, error-rate, and latency timelines with Grafana panel links; and
 - generates deterministic impact and resilience scores.
 
-See [INTEGRATION_REPORT.md](INTEGRATION_REPORT.md) for the component map,
+See [plans/INTEGRATION_REPORT.md](plans/INTEGRATION_REPORT.md) for the component map,
 endpoint contract, safety flow, and judge-facing demo explanation.
 
 ## Run the integrated application
@@ -50,7 +50,7 @@ Update `.env` if the Astronomy Shop checkout or local ports differ, then start
 the API and UI together:
 
 ```powershell
-python -m uvicorn api:app --host 127.0.0.1 --port 8000
+python app.py
 ```
 
 Open <http://127.0.0.1:8000>. FastAPI serves the frontend and all `/api/*`
@@ -78,14 +78,14 @@ actions with an idempotent rollback path.
 ```mermaid
 flowchart LR
     Operator[Operator UI] --> API[Chaos Copilot API]
-    API --> Planner[AI planner]
+    API --> Planner[LangGraph planning graph]
     Planner --> Policy[Safety policy]
     Policy --> Runner[Experiment runner]
     Runner --> Faults[Bounded fault executors]
     Faults --> Shop[OpenTelemetry Astronomy Shop]
     Shop --> OTel[OpenTelemetry Collector]
     OTel --> Observability[Prometheus and Jaeger]
-    Observability --> Analyzer[Analyzer and scorer]
+    Observability --> Analyzer[LangGraph analysis graph]
     Analyzer --> Reports[Findings and reports]
     Reports --> Operator
 ```
@@ -99,6 +99,13 @@ Draft -> Validated -> Approved -> Baseline -> Injecting -> Observing
 
 At most one experiment may be active in the MVP. Every active path, including
 abort and error paths, must pass through rollback.
+
+Planning and post-experiment analysis are separate LangGraph workflows. They use
+Gemini through `langchain-google-genai`, Pydantic structured output, bounded
+read-only tool sets, and deterministic fallbacks. Checkpoints, queryable run
+metadata, and append-only UI events share `state/agent_runs.sqlite3`; older
+`sessions/*.jsonl` files remain readable for replay but are no longer written.
+Set `LLM_MODEL` and optional comma-separated `LLM_FALLBACK_MODELS` in `.env`.
 
 ## Safety model
 
@@ -131,7 +138,7 @@ default, including `chaos-copilot`, `otel-collector`, `prometheus`, `jaeger`,
 | --- | --- |
 | Discovery | Compose inventory enriched with Jaeger trace relationships |
 | Baseline | Repeatable load with availability, errors, throughput, and p50/p95 latency |
-| Planning | Provider-neutral LLM returns a schema-validated JSON proposal |
+| Planning | Gemini tool calling selects an immutable deterministic candidate through LangGraph |
 | Policy | Deterministic validation of target, severity, duration, approval, and rollback |
 | Faults | Container kill, container pause, and bounded network delay/loss |
 | Observation | Explicit baseline, fault, and recovery windows from Prometheus and Jaeger |
@@ -298,14 +305,7 @@ under `results/` and listed in the History panel.
 - **Result:** a resilience score out of 100 (deterministic: error rise, latency rise, shop-probe availability,
   recovery time), a claim-by-claim verdict, amplification ratios, and a recommended next move.
 
-**Workflow panel and design system.** Both UIs (this one, `python app.py`, and the PRD UI in `frontend/`, `uvicorn api:app`)
-share `chaos-ui.css`, `chaos-ui.js` and `component-meta.json`. The **Agent & Workflow Activity** card shows the lifecycle
-stepper and six components; each component has an *implementation status* (from `component-meta.json`, edit it when a
-component's maturity changes) and a separate *runtime status* (from the live state and events only, never invented).
-Keep the two copies of the shared files identical: `tests/test_design_system.py` fails when they drift.
-
-**Tests:** `python -m unittest discover -s tests -t .` (no containers are touched; the LLM and Docker are stubbed). It also
-runs the node tests for both UIs when node is installed (`cd frontend && npm test` runs the api-UI ones alone).
+**Tests:** `python -m unittest discover -s tests` (no containers are touched; the LLM and Docker are stubbed).
 
 **Safety.** STOP, a threshold breach and Ctrl+C all take the same rollback path. On startup `app.py` (and
 `run_experiment.py`) first rolls back any fault left in `active_experiment.json` by a crashed run. Stopping the
@@ -316,16 +316,14 @@ rather than Prometheus, because span metrics reach Prometheus only once a minute
 
 ```text
 .
-├── CHAOS_COPILOT_PRD.md   # Product requirements and implementation phases
-├── INTEGRATION_REPORT.md   # Architecture, demo flow, and judge explanation
+├── plans/                  # Product plans and integration documentation
 ├── README.md              # Project setup and overview
-├── api.py                 # REST/SSE API and static frontend hosting
-├── control_plane.py       # State machine, rollback, scoring, and reports
+├── app.py                 # Canonical FastAPI server and experiment control path
+├── agents/                # LangGraph workflows, typed models, tools, prompts, and SQLite store
 ├── discovery.py           # Trace- and Compose-based topology discovery
 ├── dependency_map.json    # Sample generated graph and journey data
 ├── dependency_map.png     # Sample generated graph visualization
-├── frontend/              # Single-screen operator console (api.py UI)
-├── static/                # The app.py UI (index.html) plus the shared chaos-ui.* design system
+├── static/                # Single-screen operator console
 ├── tests/                 # Safe tests with fake fault/telemetry adapters
 ├── requirements.txt       # Python dependencies
 └── .env.example           # Runtime endpoints and safety configuration
@@ -356,7 +354,7 @@ Keep changes scoped to Chaos Copilot and preserve the upstream Astronomy Shop's
 business behavior. New instrumentation must follow the OpenTelemetry Demo's
 telemetry-schema conventions. Before proposing a change:
 
-1. read the [PRD](CHAOS_COPILOT_PRD.md) and the applicable `AGENTS.md` files;
+1. read the [PRD](plans/CHAOS_COPILOT_PRD.md) and the applicable `AGENTS.md` files;
 2. implement one approved phase or milestone at a time;
 3. add tests for policy, state transitions, executors, rollback, and reporting;
 4. manually verify changes against the local Compose sandbox; and

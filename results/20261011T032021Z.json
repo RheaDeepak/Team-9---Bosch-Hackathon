@@ -1,0 +1,1646 @@
+{
+  "id": "20261011T032021Z",
+  "plan": {
+    "target": "payment",
+    "fault": "container_stop",
+    "magnitude": 0,
+    "duration_s": 60,
+    "hypothesis": "Stopping the payment container will completely break the checkout user journey, resulting in a spike in payment and checkout error rates due to hard failures on synchronous calls.",
+    "reasoning": "Payment service is on the core checkout path and stopping its container directly exposes whether the system fails gracefully or halts user journeys."
+  },
+  "plan_source": "rank_agent",
+  "ranking": {
+    "source": "rank_agent",
+    "note": "model gemini-3.5-flash-lite, 8 tool calls",
+    "model": "gemini-3.5-flash-lite",
+    "run_id": "fda861bb",
+    "tool_calls": 8,
+    "chosen": "payment:container_stop:0",
+    "predictions": [
+      {
+        "svc": "payment",
+        "metric": "error_rate",
+        "direction": "up",
+        "min_factor": 5.0
+      }
+    ],
+    "top_k": [
+      {
+        "candidate_id": "valkey-cart:network_delay:200",
+        "rank": 1,
+        "risk": 0.314,
+        "info": 0.687,
+        "priority": 0.452,
+        "why": "service never tested; on checkout path; no prior verdict",
+        "outage": 0.0,
+        "factors": [
+          {
+            "name": "novelty",
+            "kind": "info",
+            "score": 1.0,
+            "contribution": 0.18,
+            "label": "service never tested"
+          },
+          {
+            "name": "checkout_path",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.066,
+            "label": "on checkout path"
+          },
+          {
+            "name": "uncertainty",
+            "kind": "info",
+            "score": 0.6,
+            "contribution": 0.054,
+            "label": "no prior verdict"
+          },
+          {
+            "name": "blast_radius",
+            "kind": "risk",
+            "score": 0.75,
+            "contribution": 0.05,
+            "label": "blast radius 6"
+          },
+          {
+            "name": "partial",
+            "kind": "info",
+            "score": 0.92,
+            "contribution": 0.041,
+            "label": "likely partial degradation"
+          },
+          {
+            "name": "clarity",
+            "kind": "info",
+            "score": 0.5,
+            "contribution": 0.034,
+            "label": "no baseline metrics"
+          },
+          {
+            "name": "safety",
+            "kind": "penalty",
+            "score": 0.15,
+            "contribution": -0.03,
+            "label": "blast 6 at severity 0.2"
+          },
+          {
+            "name": "journeys",
+            "kind": "risk",
+            "score": 0.5,
+            "contribution": 0.025,
+            "label": "in 4 user journeys"
+          },
+          {
+            "name": "fan_in",
+            "kind": "risk",
+            "score": 0.333,
+            "contribution": 0.017,
+            "label": "fan-in 1 (1 sync, 0 async)"
+          },
+          {
+            "name": "traffic",
+            "kind": "risk",
+            "score": 0.245,
+            "contribution": 0.016,
+            "label": "traffic 0.42 req/s via callers"
+          },
+          {
+            "name": "recovery",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "past recovery Nones"
+          },
+          {
+            "name": "escalation",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "escalate: Nonems held"
+          },
+          {
+            "name": "prior_abort",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "guard aborted at Nonems"
+          },
+          {
+            "name": "outage",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "stops 4 user journeys (near-total outage)"
+          }
+        ],
+        "adjusted_risk": 0.314,
+        "adjusted_priority": 0.452,
+        "evidence": [],
+        "reason": "Valkey-cart is a cache layer with lower severity compared to a full container stop on payment."
+      },
+      {
+        "candidate_id": "frontend:traffic_spike:8",
+        "rank": 61,
+        "risk": 0.428,
+        "info": 0.317,
+        "priority": 0.118,
+        "why": "traffic 1.71 req/s; in 8 user journeys; clean baseline (noise 0.03) | penalty: blast 3 at severity 0.8, guard aborted at 8 users, entry point: users hit it directly | exact repeat (x1)",
+        "outage": 0.2,
+        "factors": [
+          {
+            "name": "prior_abort",
+            "kind": "penalty",
+            "score": 1.0,
+            "contribution": -0.15,
+            "label": "guard aborted at 8 users"
+          },
+          {
+            "name": "traffic",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.099,
+            "label": "traffic 1.71 req/s"
+          },
+          {
+            "name": "journeys",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.074,
+            "label": "in 8 user journeys"
+          },
+          {
+            "name": "clarity",
+            "kind": "info",
+            "score": 0.965,
+            "contribution": 0.065,
+            "label": "clean baseline (noise 0.03)"
+          },
+          {
+            "name": "safety",
+            "kind": "penalty",
+            "score": 0.3,
+            "contribution": -0.06,
+            "label": "blast 3 at severity 0.8"
+          },
+          {
+            "name": "outage",
+            "kind": "penalty",
+            "score": 0.2,
+            "contribution": -0.05,
+            "label": "entry point: users hit it directly"
+          },
+          {
+            "name": "uncertainty",
+            "kind": "info",
+            "score": 0.5,
+            "contribution": 0.045,
+            "label": "last verdict not held"
+          },
+          {
+            "name": "blast_radius",
+            "kind": "risk",
+            "score": 0.375,
+            "contribution": 0.037,
+            "label": "blast radius 3"
+          },
+          {
+            "name": "partial",
+            "kind": "info",
+            "score": 0.72,
+            "contribution": 0.032,
+            "label": "likely partial degradation"
+          },
+          {
+            "name": "fan_in",
+            "kind": "risk",
+            "score": 0.333,
+            "contribution": 0.025,
+            "label": "fan-in 1 (1 sync, 0 async)"
+          },
+          {
+            "name": "checkout_path",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "on checkout path"
+          },
+          {
+            "name": "recovery",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "past recovery 0.0s"
+          },
+          {
+            "name": "novelty",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "exact repeat (x1)"
+          },
+          {
+            "name": "escalation",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "escalate: None users held"
+          }
+        ],
+        "adjusted_risk": 0.428,
+        "adjusted_priority": 0.118,
+        "evidence": [],
+        "reason": "Frontend traffic spike previously aborted due to guards and is a traffic injection rather than a dependency failure."
+      },
+      {
+        "candidate_id": "payment:container_stop:0",
+        "rank": 16,
+        "risk": 0.418,
+        "info": 0.585,
+        "priority": 0.368,
+        "why": "untested for container_stop; on checkout path; blast radius 5 | penalty: blast 5 at severity 1.0",
+        "outage": 0.0,
+        "factors": [
+          {
+            "name": "novelty",
+            "kind": "info",
+            "score": 0.7,
+            "contribution": 0.126,
+            "label": "untested for container_stop"
+          },
+          {
+            "name": "safety",
+            "kind": "penalty",
+            "score": 0.625,
+            "contribution": -0.125,
+            "label": "blast 5 at severity 1.0"
+          },
+          {
+            "name": "checkout_path",
+            "kind": "risk",
+            "score": 1.0,
+            "contribution": 0.11,
+            "label": "on checkout path"
+          },
+          {
+            "name": "blast_radius",
+            "kind": "risk",
+            "score": 0.625,
+            "contribution": 0.069,
+            "label": "blast radius 5"
+          },
+          {
+            "name": "clarity",
+            "kind": "info",
+            "score": 0.966,
+            "contribution": 0.065,
+            "label": "clean baseline (noise 0.03)"
+          },
+          {
+            "name": "uncertainty",
+            "kind": "info",
+            "score": 0.6,
+            "contribution": 0.054,
+            "label": "no prior verdict"
+          },
+          {
+            "name": "fan_in",
+            "kind": "risk",
+            "score": 0.333,
+            "contribution": 0.028,
+            "label": "fan-in 1 (1 sync, 0 async)"
+          },
+          {
+            "name": "journeys",
+            "kind": "risk",
+            "score": 0.25,
+            "contribution": 0.021,
+            "label": "in 2 user journeys"
+          },
+          {
+            "name": "partial",
+            "kind": "info",
+            "score": 0.4,
+            "contribution": 0.018,
+            "label": "likely partial degradation"
+          },
+          {
+            "name": "traffic",
+            "kind": "risk",
+            "score": 0.026,
+            "contribution": 0.003,
+            "label": "traffic 0.05 req/s"
+          },
+          {
+            "name": "recovery",
+            "kind": "risk",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "past recovery 0.0s"
+          },
+          {
+            "name": "escalation",
+            "kind": "info",
+            "score": 0.0,
+            "contribution": 0.0,
+            "label": "escalate: Nonems held"
+          },
+          {
+            "name": "prior_abort",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "guard aborted before"
+          },
+          {
+            "name": "outage",
+            "kind": "penalty",
+            "score": 0.0,
+            "contribution": -0.0,
+            "label": "stops 2 user journeys (near-total outage)"
+          }
+        ],
+        "adjusted_risk": 0.418,
+        "adjusted_priority": 0.55,
+        "evidence": [
+          {
+            "tool": "get_history",
+            "finding": "payment has prior network delay history but container_stop is completely untested, making it a critical path dependency to evaluate for hard failures."
+          }
+        ],
+        "reason": "Payment service is on the core checkout path and stopping its container directly exposes whether the system fails gracefully or halts user journeys."
+      }
+    ]
+  },
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ],
+    "checks": [
+      {
+        "name": "Plan is complete",
+        "passed": true,
+        "detail": "all fields present"
+      },
+      {
+        "name": "Fault type is allowed",
+        "passed": true,
+        "detail": "container_stop is on the allowlist"
+      },
+      {
+        "name": "Magnitude within cap",
+        "passed": true,
+        "detail": "no magnitude needed for this fault"
+      },
+      {
+        "name": "Duration within cap",
+        "passed": true,
+        "detail": "60 s (cap 60 s)"
+      },
+      {
+        "name": "Target exists in the dependency map",
+        "passed": true,
+        "detail": "payment is a discovered service"
+      },
+      {
+        "name": "Target is not protected",
+        "passed": true,
+        "detail": "payment is not on the protected list"
+      }
+    ]
+  },
+  "started_at": "2026-10-11T03:20:21+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: frontend p95_ms (697.6ms > 133.6ms); frontend-proxy p95_ms (504.8ms > 132.7ms)",
+    "elapsed_s": 8.1,
+    "peaks": {
+      "payment": {
+        "error_rate": 0.0,
+        "p95_ms": null
+      },
+      "checkout": {
+        "error_rate": 66.66666666666667,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 3.361344537815126,
+        "p95_ms": 697.597992
+      },
+      "frontend-proxy": {
+        "error_rate": 1.6666666666666667,
+        "p95_ms": 504.813
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 8.30760180995475,
+        "memory_mb": 45.6328125
+      },
+      "frontend": {
+        "cpu_percent": 42.510441558441556,
+        "memory_mb": 235.23046875
+      },
+      "checkout": {
+        "cpu_percent": 6.692574341546304,
+        "memory_mb": 14.875
+      },
+      "payment": {
+        "cpu_percent": null,
+        "memory_mb": null
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "payment": {
+            "n": 1,
+            "errors": 0,
+            "request_rate": 0.03333333333333333,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 3,
+            "errors": 2,
+            "request_rate": 0.1,
+            "error_rate": 66.66666666666667,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 101,
+            "errors": 2,
+            "request_rate": 3.3666666666666667,
+            "error_rate": 1.9801980198019802,
+            "p95_ms": 238.549489
+          },
+          "frontend-proxy": {
+            "n": 122,
+            "errors": 2,
+            "request_rate": 4.066666666666666,
+            "error_rate": 1.639344262295082,
+            "p95_ms": 258.295
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "238.5ms > 133.6ms",
+          "frontend-proxy p95_ms": "258.3ms > 132.7ms"
+        },
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 15
+          },
+          "cart": {
+            "ok": true,
+            "ms": 15
+          }
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "payment": {
+            "n": 1,
+            "errors": 0,
+            "request_rate": 0.03333333333333333,
+            "error_rate": 0.0,
+            "p95_ms": null
+          },
+          "checkout": {
+            "n": 3,
+            "errors": 2,
+            "request_rate": 0.1,
+            "error_rate": 66.66666666666667,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 119,
+            "errors": 4,
+            "request_rate": 3.966666666666667,
+            "error_rate": 3.361344537815126,
+            "p95_ms": 697.597992
+          },
+          "frontend-proxy": {
+            "n": 120,
+            "errors": 2,
+            "request_rate": 4.0,
+            "error_rate": 1.6666666666666667,
+            "p95_ms": 504.813
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "697.6ms > 133.6ms",
+          "frontend-proxy p95_ms": "504.8ms > 132.7ms"
+        },
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 33
+          },
+          "cart": {
+            "ok": true,
+            "ms": 20
+          }
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "fault_evidence": {
+    "verified": true,
+    "fault": "container_stop",
+    "target": "payment"
+  },
+  "fault_recovery": {
+    "verified": true,
+    "fault": "container_stop",
+    "target": "payment"
+  },
+  "recovery": {
+    "recovered": true,
+    "seconds": 16.8,
+    "first_healthy_seconds": 16.8,
+    "healthy_samples": 3,
+    "required_samples": 2,
+    "elapsed_seconds": 29.7,
+    "metrics_confirmed": true,
+    "metrics_seconds": 21.8,
+    "samples": [
+      {
+        "t": 0.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 24
+          },
+          "cart": {
+            "ok": true,
+            "ms": 16
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      },
+      {
+        "t": 5.0,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 412
+          },
+          "cart": {
+            "ok": true,
+            "ms": 41
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "389.7ms > 133.6ms",
+          "frontend-proxy p95_ms": "247.7ms > 132.7ms"
+        }
+      },
+      {
+        "t": 10.6,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 1837
+          },
+          "cart": {
+            "ok": true,
+            "ms": 27
+          }
+        },
+        "primary_ok": false,
+        "metric_breaches": {
+          "frontend p95_ms": "391.3ms > 133.6ms"
+        }
+      },
+      {
+        "t": 16.8,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 111
+          },
+          "cart": {
+            "ok": true,
+            "ms": 16
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {
+          "frontend p95_ms": "525.0ms > 133.6ms"
+        }
+      },
+      {
+        "t": 21.8,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 32
+          },
+          "cart": {
+            "ok": true,
+            "ms": 19
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      },
+      {
+        "t": 26.8,
+        "probes": {
+          "products": {
+            "ok": true,
+            "ms": 34
+          },
+          "cart": {
+            "ok": true,
+            "ms": 37
+          }
+        },
+        "primary_ok": true,
+        "metric_breaches": {}
+      }
+    ]
+  },
+  "impact": [
+    {
+      "service": "payment",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 3.3000000000000003,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 66.66666666666667,
+        "change": 66.66666666666667
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 3.361344537815126,
+        "change": 3.361344537815126
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 697.597992,
+        "change": 663.9706493426573
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 1.6666666666666667,
+        "change": 1.6666666666666667
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 504.813,
+        "change": 472.1273939393939
+      }
+    }
+  ],
+  "amplification": [],
+  "score": {
+    "impact_score": 50.2,
+    "resilience_score": 50,
+    "severity": "High",
+    "confidence": "Medium confidence",
+    "availability_pct": 100.0,
+    "components": {
+      "error_impact": 0.667,
+      "latency_impact": 1.0,
+      "availability_loss": 0.0,
+      "recovery_impact": 0.093
+    },
+    "limitations": [
+      "Stopped after 8s, so the evidence covers only the start of the fault"
+    ]
+  },
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 8.30760180995475
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 45.6328125
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 42.510441558441556
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 235.23046875
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 6.692574341546304
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 14.875
+      }
+    },
+    {
+      "container": "payment",
+      "cpu_percent": {
+        "baseline": 14.440081483107999,
+        "peak": null
+      },
+      "memory_mb": {
+        "baseline": 71.5580078125,
+        "peak": null
+      }
+    }
+  ],
+  "verdict": {
+    "claims": [
+      {
+        "claim": "Stopping the payment container will completely break the checkout user journey",
+        "status": "supported",
+        "evidence": "Checkout service error rate spiked to 66.67% during the experiment."
+      },
+      {
+        "claim": "Resulting in a spike in payment and checkout error rates due to hard failures on synchronous calls",
+        "status": "supported",
+        "evidence": "Checkout error rate jumped by 66.67 percentage points, and the safety abort triggered due to severe latency spikes in the frontend and frontend-proxy."
+      }
+    ],
+    "verdict": "held",
+    "explanation": "All claims regarding the breakdown of the checkout user journey and the spike in error rates are supported by the measured evidence showing a 66.67% error rate on the checkout service and safety threshold breaches due to high latency.",
+    "recommendation": "Implement circuit breakers and fallback mechanisms in the checkout service to handle payment container outages gracefully without propagating severe latency and high error rates.",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "normal": [
+    {
+      "t": -120,
+      "services": {
+        "payment": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 10,
+          "errors": 0,
+          "request_rate": 0.3333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 1066.663422
+        },
+        "frontend-proxy": {
+          "n": 5,
+          "errors": 0,
+          "request_rate": 0.16666666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 1065.209
+        }
+      }
+    },
+    {
+      "t": -115,
+      "services": {
+        "payment": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 10,
+          "errors": 0,
+          "request_rate": 0.3333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 1066.663422
+        },
+        "frontend-proxy": {
+          "n": 5,
+          "errors": 0,
+          "request_rate": 0.16666666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 1065.209
+        }
+      }
+    },
+    {
+      "t": -110,
+      "services": {
+        "payment": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 10,
+          "errors": 0,
+          "request_rate": 0.3333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 1066.663422
+        },
+        "frontend-proxy": {
+          "n": 5,
+          "errors": 0,
+          "request_rate": 0.16666666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 1065.209
+        }
+      }
+    },
+    {
+      "t": -105,
+      "services": {
+        "payment": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 10,
+          "errors": 0,
+          "request_rate": 0.3333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 1066.663422
+        },
+        "frontend-proxy": {
+          "n": 5,
+          "errors": 0,
+          "request_rate": 0.16666666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 1065.209
+        }
+      }
+    },
+    {
+      "t": -100,
+      "services": {
+        "payment": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 10,
+          "errors": 0,
+          "request_rate": 0.3333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 1066.663422
+        },
+        "frontend-proxy": {
+          "n": 5,
+          "errors": 0,
+          "request_rate": 0.16666666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 1065.209
+        }
+      }
+    },
+    {
+      "t": -95,
+      "services": {
+        "payment": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -90,
+      "services": {
+        "payment": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -85,
+      "services": {
+        "payment": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -80,
+      "services": {
+        "payment": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -75,
+      "services": {
+        "payment": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -70,
+      "services": {
+        "payment": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        },
+        "frontend-proxy": {
+          "n": 0,
+          "errors": 0,
+          "request_rate": 0.0,
+          "error_rate": null,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -65,
+      "services": {
+        "payment": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 6,
+          "errors": 0,
+          "request_rate": 0.2,
+          "error_rate": 0.0,
+          "p95_ms": 494.796501
+        },
+        "frontend-proxy": {
+          "n": 3,
+          "errors": 0,
+          "request_rate": 0.1,
+          "error_rate": 0.0,
+          "p95_ms": null
+        }
+      }
+    },
+    {
+      "t": -60,
+      "services": {
+        "payment": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 12,
+          "errors": 0,
+          "request_rate": 0.4,
+          "error_rate": 0.0,
+          "p95_ms": 916.171949
+        },
+        "frontend-proxy": {
+          "n": 6,
+          "errors": 0,
+          "request_rate": 0.2,
+          "error_rate": 0.0,
+          "p95_ms": 917.311
+        }
+      }
+    },
+    {
+      "t": -55,
+      "services": {
+        "payment": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 12,
+          "errors": 0,
+          "request_rate": 0.4,
+          "error_rate": 0.0,
+          "p95_ms": 916.171949
+        },
+        "frontend-proxy": {
+          "n": 6,
+          "errors": 0,
+          "request_rate": 0.2,
+          "error_rate": 0.0,
+          "p95_ms": 917.311
+        }
+      }
+    },
+    {
+      "t": -50,
+      "services": {
+        "payment": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 12,
+          "errors": 0,
+          "request_rate": 0.4,
+          "error_rate": 0.0,
+          "p95_ms": 916.171949
+        },
+        "frontend-proxy": {
+          "n": 6,
+          "errors": 0,
+          "request_rate": 0.2,
+          "error_rate": 0.0,
+          "p95_ms": 917.311
+        }
+      }
+    },
+    {
+      "t": -45,
+      "services": {
+        "payment": {
+          "n": 3,
+          "errors": 0,
+          "request_rate": 0.1,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 3,
+          "errors": 0,
+          "request_rate": 0.1,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 26,
+          "errors": 0,
+          "request_rate": 0.8666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 915.842834
+        },
+        "frontend-proxy": {
+          "n": 13,
+          "errors": 0,
+          "request_rate": 0.43333333333333335,
+          "error_rate": 0.0,
+          "p95_ms": 917.311
+        }
+      }
+    },
+    {
+      "t": -40,
+      "services": {
+        "payment": {
+          "n": 3,
+          "errors": 0,
+          "request_rate": 0.1,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 3,
+          "errors": 0,
+          "request_rate": 0.1,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 96,
+          "errors": 0,
+          "request_rate": 3.2,
+          "error_rate": 0.0,
+          "p95_ms": 494.796501
+        },
+        "frontend-proxy": {
+          "n": 62,
+          "errors": 0,
+          "request_rate": 2.066666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 382.326
+        }
+      }
+    },
+    {
+      "t": -35,
+      "services": {
+        "payment": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 141,
+          "errors": 0,
+          "request_rate": 4.7,
+          "error_rate": 0.0,
+          "p95_ms": 322.148515
+        },
+        "frontend-proxy": {
+          "n": 97,
+          "errors": 0,
+          "request_rate": 3.2333333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 316.507
+        }
+      }
+    },
+    {
+      "t": -30,
+      "services": {
+        "payment": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 1,
+          "errors": 0,
+          "request_rate": 0.03333333333333333,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 212,
+          "errors": 0,
+          "request_rate": 7.066666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 92.453446
+        },
+        "frontend-proxy": {
+          "n": 163,
+          "errors": 0,
+          "request_rate": 5.433333333333334,
+          "error_rate": 0.0,
+          "p95_ms": 82.711
+        }
+      }
+    },
+    {
+      "t": -25,
+      "services": {
+        "payment": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 3,
+          "errors": 0,
+          "request_rate": 0.1,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 294,
+          "errors": 0,
+          "request_rate": 9.8,
+          "error_rate": 0.0,
+          "p95_ms": 315.652699
+        },
+        "frontend-proxy": {
+          "n": 239,
+          "errors": 0,
+          "request_rate": 7.966666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 96.276
+        }
+      }
+    },
+    {
+      "t": -20,
+      "services": {
+        "payment": {
+          "n": 3,
+          "errors": 0,
+          "request_rate": 0.1,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 3,
+          "errors": 0,
+          "request_rate": 0.1,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 360,
+          "errors": 0,
+          "request_rate": 12.0,
+          "error_rate": 0.0,
+          "p95_ms": 92.453446
+        },
+        "frontend-proxy": {
+          "n": 317,
+          "errors": 0,
+          "request_rate": 10.566666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 85.298
+        }
+      }
+    },
+    {
+      "t": -15,
+      "services": {
+        "payment": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 393,
+          "errors": 0,
+          "request_rate": 13.1,
+          "error_rate": 0.0,
+          "p95_ms": 92.36892
+        },
+        "frontend-proxy": {
+          "n": 365,
+          "errors": 0,
+          "request_rate": 12.166666666666666,
+          "error_rate": 0.0,
+          "p95_ms": 85.298
+        }
+      }
+    },
+    {
+      "t": -10,
+      "services": {
+        "payment": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 384,
+          "errors": 0,
+          "request_rate": 12.8,
+          "error_rate": 0.0,
+          "p95_ms": 89.566484
+        },
+        "frontend-proxy": {
+          "n": 379,
+          "errors": 0,
+          "request_rate": 12.633333333333333,
+          "error_rate": 0.0,
+          "p95_ms": 85.298
+        }
+      }
+    },
+    {
+      "t": -5,
+      "services": {
+        "payment": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 383,
+          "errors": 0,
+          "request_rate": 12.766666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 220.675411
+        },
+        "frontend-proxy": {
+          "n": 390,
+          "errors": 0,
+          "request_rate": 13.0,
+          "error_rate": 0.0,
+          "p95_ms": 115.421
+        }
+      }
+    },
+    {
+      "t": 0,
+      "services": {
+        "payment": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "checkout": {
+          "n": 2,
+          "errors": 0,
+          "request_rate": 0.06666666666666667,
+          "error_rate": 0.0,
+          "p95_ms": null
+        },
+        "frontend": {
+          "n": 354,
+          "errors": 0,
+          "request_rate": 11.8,
+          "error_rate": 0.0,
+          "p95_ms": 248.550258
+        },
+        "frontend-proxy": {
+          "n": 368,
+          "errors": 0,
+          "request_rate": 12.266666666666667,
+          "error_rate": 0.0,
+          "p95_ms": 93.653
+        }
+      }
+    }
+  ],
+  "grafana_window_ms": [
+    1791688707991,
+    1791688912649
+  ]
+}

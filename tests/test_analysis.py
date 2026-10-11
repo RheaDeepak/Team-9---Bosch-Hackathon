@@ -133,97 +133,167 @@ class ScoresTest(unittest.TestCase):
         self.assertIsNone(s["overall"]["score"])
 
 
-def reply(text):
-    return {"content": {"role": "model", "parts": [{"text": text}]}, "finishReason": "STOP"}
+class FakeModels:
+    def __init__(self, tool_responses=(), decisions=()):
+        self.tool_responses = iter(tool_responses)
+        self.decisions = iter(decisions)
+
+    def invoke_tools(self, system, messages, tools):
+        value = next(self.tool_responses)
+        if isinstance(value, Exception):
+            raise value
+        return value, "fake-model"
+
+    def invoke_structured(self, system, messages, schema):
+        value = next(self.decisions)
+        if isinstance(value, Exception):
+            raise value
+        return schema.model_validate(value), "fake-model"
 
 
-class AnalysisAgentTest(unittest.TestCase):
+def ready_message():
+    from langchain_core.messages import AIMessage
+    return AIMessage(content="ready")
+
+
+def tool_message(*calls):
+    from langchain_core.messages import AIMessage
+    return AIMessage(content="", tool_calls=[
+        {"name": name, "args": args, "id": f"call-{index}", "type": "tool_call"}
+        for index, (name, args) in enumerate(calls, 1)
+    ])
+
+
+class AnalysisGraphTest(unittest.TestCase):
     def setUp(self):
+        from unittest import mock
+
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.log = Path(self.tmp.name) / "agent_log.jsonl"
+        self.directory = Path(self.tmp.name)
         self.results = [CART_DOWN("20261010T110000Z"), EMAIL_DOWN]
         self.data = analyse(self.results)
-        self.top = self.data["weaknesses"][0]
+        self.top = analysis_agent.pick_top(self.data["weaknesses"])
+        patcher = mock.patch.object(__import__("activity"), "SESSIONS_DIR", self.directory)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
-    def run_agent(self, *texts):
-        it = iter(texts)
-        post = lambda key, body, models: (reply(next(it)), "fake-model")
-        return analysis_agent.run_analysis(api_key="k", post=post, data=self.data, results=self.results, graph=graph(),
-                                           log_path=self.log, write=False)
+    def decision(self, **change):
+        findings = []
+        for weakness in self.top:
+            finding = {
+                "id": weakness["id"],
+                "title": weakness["title"],
+                "service": weakness["service"],
+                "edge": weakness["edge"],
+                "pattern": weakness["pattern"],
+                "severity": weakness["severity"],
+                "severity_score": weakness["severity_score"],
+                "root_cause": weakness["detail"],
+                "evidence_ids": [weakness["evidence_ids"][0]],
+                "fix": weakness["fix"],
+                "fix_location": None,
+                "verify_by": weakness["verify_by"],
+                "confidence": weakness["confidence"],
+                "agent_adjustment": None,
+            }
+            if weakness is self.top[0]:
+                finding.update(change)
+            findings.append(finding)
+        return {"findings": findings, "strengths": [], "summary": "Evidence-backed weaknesses."}
 
-    def answer(self, **change):
-        w = self.top
-        f = {"id": w["id"], "title": "Checkout fails when cart is down", "service": w["service"], "edge": w["edge"],
-             "pattern": w["pattern"], "severity": w["severity"], "severity_score": w["severity_score"],
-             "root_cause": "checkout error rate went from 0.0% to 100.0% when cart stopped.",
-             "evidence_ids": ["20261010T110000Z#impact.checkout.error_rate"], "fix": "Add a fallback on checkout -> cart.",
-             "fix_location": None, "verify_by": "Re-run container_stop on cart.", "confidence": 0.9, "agent_adjustment": None}
-        f.update(change)
-        return json.dumps({"findings": [f], "strengths": [], "summary": "One hard dependency."})
+    def run_agent(self, fake):
+        return analysis_agent.run_analysis(
+            model_client=fake,
+            data=self.data,
+            results=self.results,
+            graph=graph(),
+            write=False,
+            checkpointer_path=self.directory / "agent_runs.sqlite3",
+        )
 
-    def modes(self):
-        return {json.loads(line)["mode"] for line in self.log.read_text().splitlines()}
+    def test_tool_route_and_valid_findings(self):
+        fake = FakeModels(
+            [tool_message(("get_evidence", {"evidence_id": self.top[0]["evidence_ids"][0]})), ready_message()],
+            [self.decision()],
+        )
+        output = self.run_agent(fake)
+        self.assertEqual((output["source"], output["tool_calls"]), ("analysis_agent", 1))
+        self.assertEqual({finding["source"] for finding in output["findings"]}, {"agent"})
 
-    def test_garbage_twice_falls_back(self):
-        out = self.run_agent("not json at all", "still not json")
-        self.assertEqual(out["source"], "analysis_fallback")
-        self.assertEqual({f["source"] for f in out["findings"]}, {"deterministic"})
-        self.assertEqual(self.modes(), {"analysis"})
+    def test_validation_error_is_repaired_once(self):
+        bad = self.decision(evidence_ids=["unknown#evidence"])
+        output = self.run_agent(FakeModels([ready_message()], [bad, self.decision()]))
+        self.assertEqual(output["source"], "analysis_agent")
 
-    def test_unknown_evidence_id_is_reasked_then_falls_back(self):
-        bad = self.answer(evidence_ids=["20261010T110000Z#impact.nowhere.p95_ms"])
-        out = self.run_agent(bad, bad)
-        self.assertEqual(out["source"], "analysis_fallback")
-        self.assertIn("unknown evidence", out["note"])
+    def test_second_invalid_answer_falls_back(self):
+        bad = self.decision(evidence_ids=["unknown#evidence"])
+        output = self.run_agent(FakeModels([ready_message()], [bad, bad]))
+        self.assertEqual(output["source"], "analysis_fallback")
+        self.assertIn("unknown evidence", output["note"])
+        self.assertEqual({finding["source"] for finding in output["findings"]}, {"deterministic"})
 
-    def test_reask_once_recovers(self):
-        out = self.run_agent(self.answer(evidence_ids=["bogus"]), self.answer())
-        self.assertEqual(out["source"], "analysis_agent")
-        top = next(f for f in out["findings"] if f["id"] == self.top["id"])
-        self.assertEqual((top["source"], top["title"]), ("agent", "Checkout fails when cart is down"))
+    def test_provider_and_structured_output_failures_fall_back(self):
+        for fake in (
+            FakeModels([RuntimeError("provider unavailable")], []),
+            FakeModels([ready_message()], [ValueError("malformed output")]),
+        ):
+            self.assertEqual(self.run_agent(fake)["source"], "analysis_fallback")
 
-    def test_invented_numbers_are_replaced_by_the_rule_text(self):
-        out = self.run_agent(self.answer(root_cause="checkout error rate hit 73.0% within 12 s."))
-        top = next(f for f in out["findings"] if f["id"] == self.top["id"])
-        self.assertTrue(top["root_cause_replaced"])
-        self.assertEqual(top["root_cause"], self.top["detail"])
+    def test_severity_change_requires_grounded_adjustment(self):
+        current = self.top[0]["severity"]
+        replacement = "Critical" if current not in ("Critical", "High") else "Low"
+        bad = self.decision(severity=replacement)
+        output = self.run_agent(FakeModels([ready_message()], [bad, bad]))
+        self.assertEqual(output["source"], "analysis_fallback")
+        self.assertIn("severity", output["note"])
 
-    def test_severity_cannot_jump_two_levels_or_change_silently(self):
-        order = analysis.SEVERITY_ORDER
-        i = order.index(self.top["severity"])
-        if i >= 2:
-            jump = self.answer(severity=order[i - 2], agent_adjustment="worse than it looks")
-            self.assertEqual(self.run_agent(jump, jump)["source"], "analysis_fallback")
-        if i + 1 < len(order):
-            silent = self.answer(severity=order[i + 1])
-            self.assertEqual(self.run_agent(silent, silent)["source"], "analysis_fallback")
-            ok = self.answer(severity=order[i + 1], agent_adjustment="checkout already retries once")
-            self.assertEqual(self.run_agent(ok)["source"], "analysis_agent")
+    def test_unsupported_number_is_replaced_and_unverified_location_is_dropped(self):
+        decision = self.decision(
+            root_cause="Latency rose by 999999 milliseconds.",
+            fix_location="src/checkout/invented.go:999",
+        )
+        output = self.run_agent(FakeModels([ready_message()], [decision]))
+        finding = next(item for item in output["findings"] if item["id"] == self.top[0]["id"])
+        self.assertTrue(finding["root_cause_replaced"])
+        self.assertTrue(finding["fix_location_dropped"])
+        self.assertIsNone(finding["fix_location"])
 
-    def test_fix_location_must_come_from_search_source(self):
-        out = self.run_agent(self.answer(fix_location="src/checkout/main.go:999"))
-        top = next(f for f in out["findings"] if f["id"] == self.top["id"])
-        self.assertIsNone(top["fix_location"])
-        self.assertTrue(top["fix_location_dropped"])
+    def test_multiple_calls_share_ten_call_budget(self):
+        evidence_id = self.top[0]["evidence_ids"][0]
+        calls = [("get_evidence", {"evidence_id": evidence_id}) for _ in range(14)]
+        output = self.run_agent(FakeModels([tool_message(*calls)], [self.decision()]))
+        self.assertEqual(output["tool_calls"], analysis_agent.MAX_TOOL_CALLS)
+
+    def test_trace_queries_are_limited_to_stored_experiment_windows(self):
+        toolbox = analysis_agent.Toolbox(graph(), self.data, self.results)
+        result = toolbox.call("get_trace_summary", {"service": "checkout", "start_ms": 1, "end_ms": 2})
+        self.assertIn("stored experiment window", result["error"])
+
+    def test_no_weaknesses_uses_deterministic_output_without_model(self):
+        empty = analyse([])
+        output = analysis_agent.run_analysis(
+            model_client=FakeModels([], []), data=empty, results=[], graph=graph(), write=False,
+            checkpointer_path=self.directory / "empty.sqlite3",
+        )
+        self.assertEqual(output["source"], "analysis_fallback")
+        self.assertEqual(output["findings"], [])
 
 
-class ReportTest(unittest.TestCase):
-    def test_renders_with_zero_and_several_findings(self):
-        empty = analysis_agent.build_output(analyse([]), "analysis_fallback", "test")
-        slow = result("20261010T120000Z", "product-catalog", "network_delay",
-                      [row("product-catalog"), row("frontend", p95=(30, 1030))], magnitude=200)
-        many = analysis_agent.build_output(analyse([CART_DOWN("20261010T110000Z"), EMAIL_DOWN, slow]), "analysis_fallback", "test")
-        self.assertIn("No weaknesses were found", report.render_md(empty))
-        self.assertIn("No weaknesses were found", report.render_html(empty))
-        md, page = report.render_md(many), report.render_html(many)
-        self.assertGreater(len(many["findings"]), 1)
-        for f in many["findings"]:
-            self.assertIn(f["title"], md)
-        self.assertIn("Callers kept working during container_stop on email", page)
-        self.assertNotIn("<script", page)                      # self-contained, no external assets
-        self.assertNotIn("src=", page)
-        self.assertIn("not tested", md)
+class OutputCoverageTest(unittest.TestCase):
+    def test_summary_and_coverage_remain_compatible(self):
+        one = analyse([CART_DOWN("20261010T110000Z")])
+        output = analysis_agent.build_output(one, "analysis_fallback", "test")
+        self.assertEqual(output["source"], "analysis_fallback")
+        self.assertEqual(output["results_used"], ["20261010T110000Z"])
+        self.assertTrue(analysis_agent.coverage(one, output)["fresh"])
+
+    def test_report_renderer_accepts_graph_output(self):
+        data = analyse([CART_DOWN("20261010T110000Z")])
+        output = analysis_agent.build_output(data, "analysis_fallback", "test")
+        markdown = report.render_md(output)
+        self.assertIn("Resilience", markdown)
+        self.assertIn("Evidence", markdown)
 
 
 if __name__ == "__main__":

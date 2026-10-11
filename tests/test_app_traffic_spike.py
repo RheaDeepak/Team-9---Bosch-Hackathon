@@ -17,6 +17,20 @@ READY = {
 
 
 class TrafficSpikeFrontendApiTests(unittest.TestCase):
+    def test_unavailable_capacity_proposal_returns_conflict(self):
+        with app.LOCK:
+            previous = dict(app.STATE)
+        try:
+            with patch.object(app.exp, "propose", side_effect=app.CapabilityUnavailable("traffic spike not ready")), \
+                    self.assertRaises(HTTPException) as raised:
+                app.api_propose({"goal": app.planner.TRAFFIC_SPIKE_GOAL})
+            self.assertEqual(raised.exception.status_code, 409)
+            self.assertIn("not ready", raised.exception.detail)
+        finally:
+            with app.LOCK:
+                app.STATE.clear()
+                app.STATE.update(previous)
+
     def test_capacity_goal_is_exposed_only_when_the_capability_is_selectable(self):
         with patch.object(app.traffic_spike, "capability", return_value=dict(READY)):
             self.assertIn(app.planner.TRAFFIC_SPIKE_GOAL, app.api_goals())

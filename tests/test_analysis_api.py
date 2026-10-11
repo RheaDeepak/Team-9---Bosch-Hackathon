@@ -52,12 +52,14 @@ class ModeFilterTest(unittest.TestCase):
         self.assertEqual([r["run_id"] for r in rows("?mode=planning")], ["cccc0003"])
         self.assertEqual({r["mode"] for r in rows("")}, {"planning", "analysis"})
 
-    def test_newest_saved_session_is_used_after_a_restart(self):
+    def test_restart_leaves_live_feed_empty_but_saved_session_replays_explicitly(self):
         rec = activity.Recorder("eeee0005", self.dir, mode="analysis")
         rec.emit("decision", "done", fallback=False)
-        with mock.patch.object(activity, "_events", []):        # a new server process: nothing in memory
+        with mock.patch.object(activity._sqlite, "_events", []):
             body = self.client.get("/api/agent-events?mode=analysis").json()
-        self.assertEqual((body["run_id"], [e["type"] for e in body["events"]]), ("eeee0005", ["decision"]))
+            replay = self.client.get("/api/agent-events?run=eeee0005&mode=analysis").json()
+        self.assertEqual((body["run_id"], body["events"]), (None, []))
+        self.assertEqual((replay["run_id"], [e["type"] for e in replay["events"]]), ("eeee0005", ["decision"]))
 
 
 class LatestAnalysisTest(unittest.TestCase):

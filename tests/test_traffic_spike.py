@@ -6,7 +6,8 @@ import networkx as nx
 from pydantic import ValidationError
 
 from policy import validate
-from planner import SYSTEM_PROMPT, propose_experiment
+from agents.planning import CapabilityUnavailable
+from planner import propose_experiment
 from traffic_spike import (
     EXPECTED_USER_WEIGHTS,
     TrafficSpikeExecutor,
@@ -130,7 +131,6 @@ class TrafficSpikeTests(unittest.TestCase):
         self.assertTrue(executor.verify_recovered(handle)["verified"])
 
     def test_candidate_is_deterministic_and_requires_ready_capability(self):
-        self.assertNotIn("traffic_spike", SYSTEM_PROMPT)
         ready = {
             "ready": True,
             "executor_ready": True,
@@ -140,16 +140,21 @@ class TrafficSpikeTests(unittest.TestCase):
             "capability_version": "traffic-spike-v1",
             "current_state": {"user_count": 5},
         }
-        with patch("planner.traffic_spike_capability", return_value=ready):
+        graph_output = {
+            "plan": plan(), "source": "rank_agent", "note": "model fake", "model": "fake",
+            "run_id": "abcd1234", "tool_calls": 0, "chosen": "frontend:traffic_spike:8",
+            "predictions": [], "top_k": [],
+        }
+        with patch("planner.traffic_spike_capability", return_value=ready), \
+                patch("planner.run_agent", return_value=graph_output):
             candidate, source, _ = propose_experiment("capacity")
-        self.assertEqual(source, "deterministic-capability")
+        self.assertEqual(source, "rank_agent")
         self.assertEqual(candidate["fault"], "traffic_spike")
         self.assertEqual(candidate["parameters"]["baseline_users"], 5)
-        with patch("planner.traffic_spike_capability", return_value={"ready": False, "detail": "not tested"}):
-            fallback, source, note = propose_experiment("capacity")
-        self.assertEqual(source, "fallback")
-        self.assertNotEqual(fallback["fault"], "traffic_spike")
-        self.assertIn("not ready", note)
+        with patch("planner.traffic_spike_capability", return_value={"ready": False, "detail": "not tested"}), \
+                patch("planner.run_agent", side_effect=CapabilityUnavailable("not ready")):
+            with self.assertRaisesRegex(CapabilityUnavailable, "not ready"):
+                propose_experiment("capacity")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@ import json
 import unittest
 from unittest.mock import patch
 
-import llm
 import planner
 import run_experiment as exp
 
@@ -68,12 +67,23 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(short["confidence"], "Medium confidence")
 
 
-PLAN_JSON = json.dumps({"target": "cart", "fault": "container_stop", "magnitude": 0, "duration_s": 60, "hypothesis": "h", "reasoning": "r"})
+PLAN_JSON = json.dumps({"target": "cart", "fault": "container_stop", "magnitude": 0, "duration_s": 60,
+                        "hypothesis": "h", "reasoning": "r"})
+
+
+class VerdictModel:
+    def __init__(self, value):
+        self.value = value
+
+    def invoke_structured(self, system, messages, schema):
+        if isinstance(self.value, Exception):
+            raise self.value
+        return schema.model_validate(self.value), "fake-model"
 
 
 class PlannerTests(unittest.TestCase):
     def test_parse_plan_strips_code_fences_and_surrounding_prose(self):
-        self.assertEqual(planner.parse_plan("```json\n" + PLAN_JSON + "\n```")["target"], "cart")
+        self.assertEqual(planner.parse_plan("~~~".replace("~", chr(96)) + "json\n" + PLAN_JSON + "\n~~~".replace("~", chr(96)))["target"], "cart")
         self.assertEqual(planner.parse_plan("Here you go: " + PLAN_JSON + " thanks")["fault"], "container_stop")
 
     def test_parse_plan_rejects_incomplete_or_non_json_replies(self):
@@ -81,55 +91,65 @@ class PlannerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 planner.parse_plan(bad)
 
-    def propose(self, goal):
-        seen = {}
+    def graph_output(self):
+        plan = json.loads(PLAN_JSON)
+        return {
+            "plan": plan,
+            "source": "rank_agent",
+            "note": "model fake-model, 0 tool calls",
+            "model": "fake-model",
+            "run_id": "abcd1234",
+            "tool_calls": 0,
+            "chosen": "cart:container_stop:0",
+            "predictions": [{"svc": "cart", "metric": "error_rate", "direction": "up", "min_factor": 2}],
+            "top_k": [],
+        }
 
-        def fake_llm(key, context, system=planner.SYSTEM_PROMPT):
-            seen["context"] = context
-            return PLAN_JSON, "fake-model", []
+    def test_every_known_learning_goal_reaches_the_planning_graph(self):
+        for goal, (_, hint) in planner.GOALS.items():
+            with patch.object(planner, "run_agent", return_value=self.graph_output()) as run:
+                plan, source, _ = planner.propose_experiment(goal)
+            self.assertEqual(source, "rank_agent")
+            self.assertEqual(plan["ranking"]["run_id"], "abcd1234")
+            self.assertEqual(run.call_args.kwargs["goal"], hint)
 
-        with patch.dict("os.environ", {"LLM_API_KEY": "k"}), patch.object(llm, "load_dotenv"), \
-                patch.object(planner, "load_graph", return_value=(None, None)), patch.object(planner, "load_baseline", return_value={}), \
-                patch.object(planner, "load_flows", return_value={}), patch.object(planner, "build_context", return_value={"candidate_targets": ["cart"]}), \
-                patch.object(planner, "_call_llm", side_effect=fake_llm):
-            plan, source, note = planner.propose_experiment(goal)
-        return plan, source, note, seen["context"]
+    def test_unknown_goal_is_not_injected_into_the_prompt(self):
+        with patch.object(planner, "run_agent", return_value=self.graph_output()) as run:
+            planner.propose_experiment("rm -rf /")
+        self.assertIsNone(run.call_args.kwargs["goal"])
 
-    def test_goal_is_passed_to_the_model_as_a_hint_only_when_valid(self):
-        _, source, _, ctx = self.propose("timeout_behavior")
-        self.assertEqual(source, "llm")
-        self.assertIn("timeout and retry", ctx["optional_operator_goal"])
-        self.assertNotIn("optional_operator_goal", self.propose(None)[3])
-        self.assertNotIn("optional_operator_goal", self.propose("rm -rf /")[3])
+    def test_capacity_goal_remains_a_hard_constraint(self):
+        with patch.object(planner, "run_agent", return_value=self.graph_output()) as run:
+            planner.propose_experiment(planner.TRAFFIC_SPIKE_GOAL)
+        self.assertEqual(run.call_args.kwargs["goal"], "capacity")
 
-    def test_no_key_falls_back_and_says_so(self):
-        with patch.dict("os.environ", {"LLM_API_KEY": ""}), patch.object(llm, "load_dotenv"):
+    def test_early_planning_failure_uses_compatible_fallback_source(self):
+        with patch.object(planner, "run_agent", side_effect=RuntimeError("ranker unavailable")):
             plan, source, note = planner.propose_experiment()
-        self.assertEqual((source, plan["target"]), ("fallback", "cart"))
-        self.assertIn("not set", note)
+        self.assertEqual((source, plan["target"]), ("ranker_fallback", "cart"))
+        self.assertIn("ranker unavailable", note)
 
-    def judge(self, reply):
-        plan = {"target": "cart", "fault": "network_delay", "magnitude": 250, "duration_s": 60, "hypothesis": "h", "reasoning": "r"}
-        with patch.dict("os.environ", {"LLM_API_KEY": "k"}), patch.object(llm, "load_dotenv"), \
-                patch.object(planner, "_call_llm", return_value=(reply, "fake-model", ["m1: HTTP 429 RESOURCE_EXHAUSTED"])):
-            return planner.judge_hypothesis(plan, {"aborted": True})
+    def test_typed_verdict_keeps_claims_and_recommendation(self):
+        model = VerdictModel({
+            "verdict": "partially held",
+            "explanation": "Measured evidence was mixed.",
+            "recommendation": "Add a timeout on cart calls.",
+            "claims": [
+                {"claim": "latency rises", "status": "supported", "evidence": "p95 increased"},
+                {"claim": "errors stay flat", "status": "contradicted", "evidence": "errors increased"},
+            ],
+        })
+        plan = json.loads(PLAN_JSON)
+        verdict = planner.judge_hypothesis(plan, {"aborted": True}, model_client=model)
+        self.assertEqual(verdict["verdict"], "partially held")
+        self.assertEqual(verdict["model"], "fake-model")
+        self.assertEqual(verdict["recommendation"], "Add a timeout on cart calls.")
 
-    def test_verdict_keeps_claims_and_the_recommendation(self):
-        v = self.judge(json.dumps({"verdict": "partially held", "explanation": "e", "recommendation": "Add a timeout on cart calls.",
-                                   "claims": [{"claim": "c1", "status": "supported", "evidence": "x"}, {"claim": "c2", "status": "bogus", "evidence": "y"}]}))
-        self.assertEqual(v["verdict"], "partially held")
-        self.assertEqual([c["status"] for c in v["claims"]], ["supported", "no data"])   # unknown status is not trusted
-        self.assertEqual(v["recommendation"], "Add a timeout on cart calls.")
-        self.assertEqual(v["skipped_models"], ["m1: HTTP 429 RESOURCE_EXHAUSTED"])
-
-    def test_bad_verdict_degrades_to_inconclusive_with_a_template_recommendation(self):
-        v = self.judge(json.dumps({"verdict": "totally fine", "explanation": "e"}))
-        self.assertEqual(v["verdict"], "inconclusive")
-        self.assertIn("timeout", v["recommendation"])
-
-    def test_missing_recommendation_falls_back_to_the_template(self):
-        v = self.judge(json.dumps({"verdict": "held", "explanation": "e", "claims": []}))
-        self.assertIn("circuit breaker", v["recommendation"])
+    def test_bad_verdict_degrades_to_inconclusive(self):
+        plan = json.loads(PLAN_JSON)
+        verdict = planner.judge_hypothesis(plan, {}, model_client=VerdictModel(ValueError("bad schema")))
+        self.assertEqual(verdict["verdict"], "inconclusive")
+        self.assertIn("fallback", verdict["recommendation"].lower())
 
 
 if __name__ == "__main__":
