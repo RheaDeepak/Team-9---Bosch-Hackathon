@@ -85,3 +85,9 @@ test("renders every bounded traffic-spike parameter for operator review", () => 
     ["Rollback", "Restore original Locust state"],
   ]);
 });
+
+test("a baseline metric the backend did not report stays null instead of becoming zero", () => {
+  assert.deepEqual(normalizeBaseline({ summary: { error_rate: 0 } }), { availability: null, errorRate: 0, p95LatencyMs: null, throughputRps: null });
+  assert.deepEqual(normalizeBaseline({}), { availability: null, errorRate: null, p95LatencyMs: null, throughputRps: null });
+  assert.equal(normalizeBaseline({ p95: "n/a" }).p95LatencyMs, null);
+});

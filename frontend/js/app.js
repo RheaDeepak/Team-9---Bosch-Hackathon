@@ -10,17 +10,33 @@ import {
   mockTrafficSpikeProposal,
   mockTopology,
 } from "./mock-data.js";
+import { ACTIVE_PHASES, agentModel, lifecycleModel } from "./workflow.js";
+import { layeredLayout } from "./graph-layout.js";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const svgNs = "http://www.w3.org/2000/svg";
 const api = createApiClient({ baseUrl: resolveApiBaseUrl() });
+const demo = new URLSearchParams(globalThis.location?.search || "").get("demo") === "1";      // the offline demo is explicit: ?demo=1
+const UI = globalThis.ChaosUI;
+const EMPTY_BASELINE = { availability: null, errorRate: null, p95LatencyMs: null, throughputRps: null };
+const SPARK_KEYS = { availability: "availabilitySpark", errorRate: "errorSpark", p95LatencyMs: "latencySpark", throughputRps: "throughputSpark" };
+const STOPPABLE = new Set(["approved", "baseline", "injecting", "observing"]);       // control_plane refuses an abort once the fault is already removed
 
 const state = {
   mode: "connecting",
-  readiness: mockReadiness,
-  topology: mockTopology,
-  baseline: mockBaseline,
+  readiness: { status: "pending", checks: [] },
+  topology: { nodes: [], edges: [] },
+  topologyState: { state: "loading" },
+  baseline: EMPTY_BASELINE,
+  events: [],
+  history: { availability: [], errorRate: [], p95LatencyMs: [], throughputRps: [] },
+  lastActive: null,
+  error: "",
+  report: null,
+  proposing: false,
+  stopRequested: false,
+  compMeta: null,
   faultCapabilities: [],
   proposal: null,
   policy: null,
@@ -34,7 +50,14 @@ const state = {
 };
 
 const elements = {
-  environmentBadge: $("#environmentBadge"),
+  connChip: $("#connChip"),
+  experimentChip: $("#experimentChip"),
+  banner: $("#banner"),
+  readinessBlock: $("#readinessBlock"),
+  wfSteps: $("#wfSteps"),
+  wfHeadline: $("#wfHeadline"),
+  wfAgents: $("#wfAgents"),
+  wfElapsed: $("#wfElapsed"),
   connectionDetail: $("#connectionDetail"),
   refreshButton: $("#refreshButton"),
   readinessPulse: $("#readinessPulse"),
@@ -91,17 +114,19 @@ const elements = {
 
 function setMode(mode) {
   state.mode = mode;
-  elements.environmentBadge.className = `environment-badge ${mode}`;
-  if (mode === "live") {
-    elements.environmentBadge.textContent = "Live sandbox";
-    elements.connectionDetail.textContent = `API connected · ${api.baseUrl || window.location.origin}`;
-  } else if (mode === "demo") {
-    elements.environmentBadge.textContent = "Demo data";
-    elements.connectionDetail.textContent = "API offline · demo mode";
-  } else {
-    elements.environmentBadge.textContent = "Connecting";
-    elements.connectionDetail.textContent = "API connecting";
-  }
+  const [kind, label, icon] = mode === "live" ? ["ok", "API connected", "check"] : mode === "demo" ? ["warn", "Demo data (offline)", "alert"]
+    : mode === "offline" ? ["bad", "API unreachable", "plug"] : ["", "Connecting", "spinner"];
+  elements.connChip.className = `cc-chip ${kind}`;
+  elements.connChip.innerHTML = UI.icon(icon, icon === "spinner" ? "cc-spin" : "") + label;
+  elements.connectionDetail.textContent = mode === "live" ? `API connected · ${api.baseUrl || window.location.origin}`
+    : mode === "demo" ? "Demo mode · no backend calls are made" : mode === "offline" ? "API unreachable" : "API connecting";
+  elements.banner.classList.toggle("is-hidden", mode !== "offline" && mode !== "demo");
+  elements.banner.textContent = mode === "offline"
+    ? "The API is unreachable, so nothing below is live. Start it with python -m uvicorn api:app --host 127.0.0.1 --port 8000, then refresh. Add ?demo=1 to the address for the offline demo."
+    : mode === "demo" ? "Demo mode: every number, event and result on this page is sample data, not your system." : "";
+  elements.banner.className = `banner${mode === "demo" ? " demo" : ""}${mode === "offline" || mode === "demo" ? "" : " is-hidden"}`;
+  elements.proposeButton.disabled = mode === "offline" || mode === "connecting";
+  renderWorkflow();
 }
 
 function createElement(tag, className, text) {
@@ -131,47 +156,71 @@ function setBusy(button, busy, busyText) {
 
 function renderReadiness() {
   elements.readinessChecks.replaceChildren();
-  const ready = state.readiness.checks.filter((check) => check.ready).length;
-  state.readiness.checks.forEach((check) => {
+  const checks = state.mode === "offline"
+    ? [{ id: "api", label: "Backend API", detail: "Unreachable: start api.py", ready: false }] : state.readiness.checks;
+  const ready = checks.filter((check) => check.ready).length, down = checks.filter((check) => !check.ready);
+  if (state.mode === "connecting") elements.readinessChecks.append(createElement("p", "muted", "Checking the system…"));
+  checks.forEach((check) => {
     const item = createElement("div", `readiness-check${check.ready ? "" : " failed"}`);
-    item.append(createElement("strong", "", check.label), createElement("small", "", check.detail));
+    const body = createElement("div");
+    body.append(createElement("strong", "", check.label), createElement("small", "", check.detail));
+    item.insertAdjacentHTML("beforeend", UI.icon(check.ready ? "check" : "x"));
+    item.append(body, createElement("span", "sr", check.ready ? "passed" : "failed"));
     elements.readinessChecks.append(item);
   });
-  elements.readyCount.textContent = `${ready}/${state.readiness.checks.length}`;
-  elements.readinessPulse.classList.toggle("blocked", ready !== state.readiness.checks.length);
+  elements.readyCount.textContent = checks.length ? `${ready}/${checks.length} ready` : "—";
+  elements.readyCount.className = `cc-chip ${!checks.length ? "" : down.length ? "bad" : "ok"}`;
+  elements.readinessPulse.className = `pulse-dot${state.mode === "connecting" ? " pending" : down.length ? " blocked" : ""}`;
+  elements.readinessBlock.classList.toggle("is-hidden", !down.length || state.mode === "connecting");
+  elements.readinessBlock.textContent = down.length ? `Experiments cannot safely proceed: ${down.map((check) => `${check.label} (${check.detail})`).join("; ")}.` : "";
 }
 
-function graphLayout(nodes) {
-  if (nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y))) return nodes;
-  return nodes.map((node, index) => ({ ...node, x: 90 + (index % 4) * 190, y: 70 + Math.floor(index / 4) * 105 }));
+const nodeWidth = (label) => Math.max(90, Math.min(138, label.length * 6.3 + 31));
+
+// Coordinates from the backend win; without them the graph is laid out left to right by call depth.
+function graphLayout(nodes, edges) {
+  if (nodes.length && nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y))) {
+    return { nodes, width: 760, height: Math.max(410, ...nodes.map((node) => node.y + 70)) };
+  }
+  const { positions, width, height } = layeredLayout(nodes, edges);
+  return { nodes: nodes.map((node) => ({ ...node, ...positions.get(node.id) })), width, height: Math.max(300, height) };
 }
 
 function renderTopology() {
   const graph = elements.topologyGraph;
   graph.replaceChildren();
-  const nodes = graphLayout(state.topology.nodes.slice(0, 20));
+  const laid = graphLayout(state.topology.nodes, state.topology.edges);
+  const nodes = laid.nodes;
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-  const maxY = Math.max(410, ...nodes.map((node) => node.y + 70));
-  graph.setAttribute("viewBox", `0 0 760 ${maxY}`);
+  graph.setAttribute("viewBox", `0 0 ${laid.width} ${laid.height}`);
+
+  const defs = createSvg("defs");                                   // edges end in an arrow: the caller is where the line starts
+  const marker = createSvg("marker", { id: "edgeArrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" });
+  marker.append(createSvg("path", { d: "M 0 0 L 10 5 L 0 10 z", class: "edge-arrow" }));
+  defs.append(marker);
+  graph.append(defs);
 
   const edgeGroup = createSvg("g", { "aria-hidden": "true" });
   state.topology.edges.forEach(([sourceId, targetId]) => {
     const source = nodeMap.get(sourceId);
     const target = nodeMap.get(targetId);
     if (!source || !target) return;
-    const path = createSvg("path", {
+    const forward = target.x > source.x + 20;
+    const x1 = forward ? source.x + nodeWidth(source.label) / 2 : source.x, x2 = forward ? target.x - nodeWidth(target.label) / 2 - 3 : target.x;
+    const mid = (x1 + x2) / 2;
+    edgeGroup.append(createSvg("path", {
       class: "graph-edge",
-      d: `M ${source.x} ${source.y} C ${(source.x + target.x) / 2} ${source.y}, ${(source.x + target.x) / 2} ${target.y}, ${target.x} ${target.y}`,
+      d: `M ${x1} ${source.y} C ${mid} ${source.y}, ${mid} ${target.y}, ${x2} ${target.y}`,
+      "marker-end": "url(#edgeArrow)",
       "data-source": sourceId,
       "data-target": targetId,
-    });
-    edgeGroup.append(path);
+    }));
   });
   graph.append(edgeGroup);
 
   const nodeGroup = createSvg("g");
   nodes.forEach((node) => {
-    const width = Math.max(90, Math.min(138, node.label.length * 6.3 + 31));
+    const width = nodeWidth(node.label);
     const group = createSvg("g", {
       class: `graph-node${node.protected ? " protected" : ""}`,
       transform: `translate(${node.x - width / 2}, ${node.y - 19})`,
@@ -191,8 +240,15 @@ function renderTopology() {
     nodeGroup.append(group);
   });
   graph.append(nodeGroup);
-  elements.serviceCount.textContent = state.topology.nodes.length;
-  elements.edgeCount.textContent = state.topology.edges.length;
+  if (!nodes.length) {
+    const note = createSvg("text", { x: 380, y: 205, class: "graph-empty" });
+    note.setAttribute("text-anchor", "middle");
+    note.setAttribute("fill", "#8896A8");
+    note.textContent = state.topologyState.state === "error" ? `Topology unavailable: ${state.topologyState.error}` : state.topologyState.state === "loading" ? "Loading topology…" : "No services reported";
+    graph.append(note);
+  }
+  elements.serviceCount.textContent = nodes.length ? state.topology.nodes.length : "—";
+  elements.edgeCount.textContent = nodes.length ? state.topology.edges.length : "—";
 }
 
 function selectService(node, group) {
@@ -213,7 +269,6 @@ function renderBaseline() {
   elements.baselineErrors.textContent = formatMetric("errorRate", metric.errorRate);
   elements.baselineLatency.textContent = formatMetric("p95LatencyMs", metric.p95LatencyMs);
   elements.baselineThroughput.textContent = formatMetric("throughputRps", metric.throughputRps);
-  renderSparklines("baseline");
 }
 
 function renderFaultCapabilities() {
@@ -260,6 +315,7 @@ function renderProposal() {
   elements.proposalFailure.textContent = proposal.failure_type.replaceAll("_", " ");
   elements.proposalName.textContent = proposal.title;
   elements.proposalHypothesis.textContent = proposal.hypothesis;
+  elements.proposalHypothesis.title = proposal.reasoning_summary || "";
   elements.proposalParameters.replaceChildren(...proposalParameterRows(proposal).map(([label, value]) => {
     const item = document.createElement("div");
     item.append(createElement("dt", "", label), createElement("dd", "", value));
@@ -272,6 +328,7 @@ function renderPolicy() {
   if (!state.policy) {
     elements.policyChecks.append(createElement("div", "policy-placeholder", "Policy results will appear here."));
     elements.policySection.classList.add("is-muted");
+    renderWorkflow();
     return;
   }
 
@@ -306,52 +363,59 @@ function renderLiveMetrics(metrics) {
   elements.liveErrors.textContent = formatMetric("errorRate", metrics?.errorRate);
   elements.liveLatency.textContent = formatMetric("p95LatencyMs", metrics?.p95LatencyMs);
   elements.liveThroughput.textContent = formatMetric("throughputRps", metrics?.throughputRps);
-  renderSparklines(state.phase);
+  const phaseClass = { baseline: "baseline", approved: "baseline", injecting: "fault", observing: "fault", rolling_back: "rollback", recovering: "recovery" }[state.phase];
+  if (metrics && phaseClass) Object.keys(SPARK_KEYS).forEach((key) => {
+    if (metrics[key] !== null && metrics[key] !== undefined && Number.isFinite(Number(metrics[key]))) state.history[key].push({ value: Number(metrics[key]), phase: phaseClass });
+  });
+  renderSparklines();
 }
 
-function renderSparklines(phase) {
-  const shapes = {
-    baseline: [45, 50, 48, 53, 50, 52, 49, 51, 50, 52],
-    injecting: [45, 50, 48, 53, 61, 67, 74, 69, 78, 72],
-    observing: [44, 51, 49, 56, 73, 85, 62, 91, 78, 88],
-    rolling_back: [78, 82, 69, 61, 55, 50, 49, 52, 50, 48],
-    recovering: [72, 64, 57, 53, 49, 51, 48, 50, 49, 50],
-    completed: [50, 49, 52, 48, 50, 51, 49, 52, 50, 49],
-    idle: [22, 24, 23, 25, 22, 24, 23, 24, 22, 23],
-  };
-  const base = shapes[phase] || shapes.idle;
-  const variants = [base.map((n) => 100 - n / 3), base, base.map((n) => n * 0.88), base.map((n) => 65 - n / 5)];
-  ["availabilitySpark", "errorSpark", "latencySpark", "throughputSpark"].forEach((id, index) => {
-    const container = $(`#${id}`);
-    container.replaceChildren(...variants[index].map((height) => {
+function renderSparklines() {
+  Object.entries(SPARK_KEYS).forEach(([metric, id]) => {
+    const points = state.history[metric].slice(-24), values = points.map((point) => point.value);
+    const low = Math.min(...values), high = Math.max(...values), span = high - low;
+    $(`#${id}`).replaceChildren(...points.map((point) => {
       const bar = document.createElement("i");
-      bar.style.height = `${Math.max(10, Math.min(100, height))}%`;
+      bar.className = `ph-${point.phase}`;
+      bar.style.height = `${span > 0 ? 18 + ((point.value - low) / span) * 82 : 55}%`;       // scaled to the values seen so far, nothing invented
+      bar.title = `${point.value}`;
       return bar;
     }));
   });
 }
 
-const phaseOrder = ["baseline", "injecting", "observing", "rolling_back", "recovering"];
-const activePhases = new Set(["baseline", "injecting", "observing", "rolling_back", "recovering"]);
 
-function updatePhase(phase, message, metrics) {
+function updatePhase(phase, message, metrics, event) {
   state.phase = phase.toLowerCase().replaceAll(" ", "_");
-  const active = activePhases.has(state.phase);
-  elements.phaseBadge.textContent = state.phase.replaceAll("_", " ").toUpperCase();
-  elements.phaseBadge.classList.toggle("active", active);
-  elements.stopButton.disabled = !active;
+  const active = ACTIVE_PHASES.has(state.phase);
+  if (active) state.lastActive = state.phase;
+  if (!active) state.stopRequested = false;
+  const label = state.stopRequested ? "STOP REQUESTED" : state.phase.replaceAll("_", " ").toUpperCase();
+  const kind = state.stopRequested ? "warn" : active ? "info" : state.phase === "completed" ? "ok" : state.phase === "aborted" ? "warn" : state.phase === "failed" ? "bad" : "";
+  const icon = state.stopRequested ? "stop" : active ? "spinner" : state.phase === "completed" ? "check" : state.phase === "failed" ? "x" : state.phase === "aborted" ? "stop" : "idle";
+  elements.phaseBadge.className = `cc-chip ${kind}`;
+  elements.phaseBadge.innerHTML = UI.icon(icon, icon === "spinner" ? "cc-spin" : "") + label;
+  elements.experimentChip.className = `cc-chip ${kind}`;
+  elements.experimentChip.innerHTML = UI.icon(icon, icon === "spinner" ? "cc-spin" : "") + (state.phase === "idle" ? "No experiment" : label);
+  renderStopButton();
   elements.activeFault.textContent = ["injecting", "observing"].includes(state.phase)
     ? `${state.proposal?.failure_type?.replaceAll("_", " ") || "Fault"} · ${state.proposal?.target_service || "target"}`
     : "None";
-  const currentIndex = phaseOrder.indexOf(state.phase);
-  $$("#experimentTimeline li").forEach((item, index) => {
-    item.classList.toggle("active", index === currentIndex);
-    item.classList.toggle("done", currentIndex > index || state.phase === "completed");
-  });
-  updateEvent(message || phaseMessage(state.phase));
+  if (event) pushEvent(event);
+  else if (message) pushEvent({ message, state: state.phase, timestamp: new Date().toISOString(), type: "update" });
   if (metrics) renderLiveMetrics(metrics);
+  renderWorkflow();
 }
 
+function renderStopButton() {
+  const stoppable = STOPPABLE.has(state.phase);
+  elements.stopButton.disabled = !stoppable || state.stopRequested;
+  elements.stopButton.classList.toggle("pending", state.stopRequested);
+  elements.stopButton.setAttribute("aria-busy", String(state.stopRequested));
+  elements.stopButton.lastChild.textContent = state.stopRequested ? " Stop requested: rolling back…" : " Emergency stop";
+}
+
+// Demo mode only: the backend sends its own messages in live mode.
 function phaseMessage(phase) {
   const messages = {
     baseline: "Collecting healthy behavior under repeatable load.",
@@ -362,16 +426,25 @@ function phaseMessage(phase) {
     analyzing: "Recovery verified. Calculating impact and resilience score.",
     completed: "Experiment complete. Evidence and report are ready.",
     aborted: "Experiment stopped by operator. Recovery was verified.",
-    idle: "Waiting for an approved experiment.",
   };
   return messages[phase] || `Experiment state changed to ${phase}.`;
 }
 
-function updateEvent(message) {
-  elements.eventFeed.replaceChildren(
-    createElement("span", "event-time", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })),
-    createElement("p", "", message),
-  );
+function pushEvent(event) {
+  const key = event.sequence ?? `${event.timestamp}|${event.message}`;
+  if (state.events.some((item) => (item.sequence ?? `${item.timestamp}|${item.message}`) === key)) return;
+  state.events.push(event);
+  state.events = state.events.slice(-60);
+  const log = elements.eventFeed;
+  if (log.querySelector(".muted")) log.replaceChildren();
+  const time = new Date(event.timestamp || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const item = document.createElement("li");
+  item.append(createElement("span", "event-time", time));
+  const text = createElement("span");
+  text.append(createElement("b", "", String(event.type || "update").replaceAll("_", " ")), document.createTextNode(` ${event.message || ""}`));
+  item.append(text);
+  log.append(item);
+  log.scrollTop = log.scrollHeight;
 }
 
 function startTimer() {
@@ -380,12 +453,20 @@ function startTimer() {
   state.timer = setInterval(() => {
     const seconds = Math.floor((Date.now() - state.startedAt) / 1000);
     elements.elapsedTimer.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+    renderElapsed();
   }, 250);
 }
 
 function stopTimer() {
   clearInterval(state.timer);
   state.timer = null;
+  renderElapsed();
+}
+
+function renderElapsed() {                       // the page's own timer, started at approval: shown only once a run has started
+  const show = Boolean(state.startedAt);
+  elements.wfElapsed.classList.toggle("is-hidden", !show);
+  if (show) elements.wfElapsed.textContent = `${state.timer ? "Elapsed" : "Ran"} ${elements.elapsedTimer.textContent}`;
 }
 
 function clearLiveConnections() {
@@ -403,6 +484,8 @@ function extractExperiment(payload = {}) {
   return {
     phase: experiment.phase || experiment.state || "idle",
     message: experiment.message || experiment.latest_event,
+    event: payload.event || null,
+    error: experiment.error || "",
     metrics: rawMetrics ? normalizeBaseline(rawMetrics) : null,
   };
 }
@@ -412,7 +495,7 @@ function connectLiveExperiment() {
   if (typeof EventSource !== "undefined") {
     state.eventSource = new EventSource(api.eventsUrl(id));
     state.eventSource.onmessage = (event) => {
-      try { applyExperimentUpdate(JSON.parse(event.data)); } catch { updateEvent(event.data); }
+      try { applyExperimentUpdate(JSON.parse(event.data)); } catch { pushEvent({ message: String(event.data), state: state.phase, timestamp: new Date().toISOString(), type: "update" }); }
     };
     state.eventSource.onerror = () => state.eventSource?.close();
   }
@@ -423,7 +506,8 @@ function connectLiveExperiment() {
 
 function applyExperimentUpdate(payload) {
   const update = extractExperiment(payload);
-  updatePhase(update.phase, update.message, update.metrics);
+  if (update.error) state.error = update.error;
+  updatePhase(update.phase, update.event ? null : update.message, update.metrics, update.event);
   const terminal = update.phase.toLowerCase();
   if (["completed", "aborted", "failed"].includes(terminal)) finishLiveExperiment(terminal);
 }
@@ -488,6 +572,7 @@ function normalizeResult(payload = {}) {
 
 function renderResult(payload) {
   const result = normalizeResult(payload);
+  state.report = result;
   elements.resultEmpty.classList.add("is-hidden");
   elements.resultContent.classList.remove("is-hidden");
   elements.resilienceScore.textContent = Math.round(result.resilience_score);
@@ -495,6 +580,7 @@ function renderResult(payload) {
   elements.resultSeverity.textContent = `${result.severity} impact`;
   elements.resultSummary.textContent = result.summary;
   elements.confidenceBadge.textContent = result.confidence;
+  elements.confidenceBadge.className = `cc-chip ${/^high/i.test(result.confidence) ? "ok" : /^low/i.test(result.confidence) ? "bad" : "warn"}`;
   elements.remediationText.textContent = result.remediation;
   elements.evidenceList.replaceChildren(...result.evidence.map((item) => {
     const row = createElement("div", "evidence-item");
@@ -502,6 +588,7 @@ function renderResult(payload) {
     return row;
   }));
   elements.reportBody.replaceChildren(buildReportTable(result));
+  renderWorkflow();
 }
 
 function buildReportTable(result) {
@@ -514,7 +601,7 @@ function buildReportTable(result) {
     ["Impact score", `${Math.round(result.impact_score)}/100`],
     ["Resilience score", `${Math.round(result.resilience_score)}/100`],
     ["Recovery", result.recovery_seconds != null ? `${result.recovery_seconds} seconds` : "No data"],
-    ["Rollback", "Verified"],
+    ["Rollback", state.phase === "failed" ? "Not verified" : "Verified by the backend"],
   ];
   rows.forEach(([label, value]) => {
     const row = document.createElement("tr");
@@ -524,32 +611,70 @@ function buildReportTable(result) {
   return table;
 }
 
+
+async function loadComponentMeta() {
+  try {
+    const response = await fetch("./component-meta.json");
+    if (!response.ok) throw new Error(String(response.status));
+    state.compMeta = (await response.json()).components || [];
+  } catch { state.compMeta = []; }
+  renderWorkflow();
+}
+
+let lastWorkflowSignature = "";
+function renderWorkflow() {
+  const life = lifecycleModel({ phase: state.phase, hasProposal: Boolean(state.proposal), policy: state.policy, lastActive: state.lastActive,
+    error: state.error, reportStatus: state.report?.status }, UI);
+  const rows = agentModel({ meta: state.compMeta || [], mode: state.mode === "offline" ? "offline" : state.mode, phase: state.phase, proposal: state.proposal,
+    proposing: state.proposing, policy: state.policy, topology: { ...state.topologyState, nodes: state.topology.nodes.length, edges: state.topology.edges.length,
+      protected: state.topology.nodes.filter((node) => node.protected).length }, events: state.events, report: state.report });
+  const signature = JSON.stringify([life, rows, state.compMeta === null]);
+  if (signature === lastWorkflowSignature) return;
+  lastWorkflowSignature = signature;
+  elements.wfSteps.innerHTML = UI.stepperHtml(life);
+  elements.wfHeadline.textContent = life.headline;
+  elements.wfAgents.innerHTML = UI.agentsHtml(rows);
+}
+
 async function loadData({ announce = false } = {}) {
   elements.refreshButton.classList.add("is-spinning");
   setMode("connecting");
   try {
+    if (demo) throw new Error("demo");
     await api.health();
     const [readinessPayload, topologyPayload, baselinePayload, capabilityPayload] = await Promise.all([
       api.readiness(), api.topology(), api.latestBaseline().catch(() => null), api.faultCapabilities().catch(() => ({ capabilities: [] })),
     ]);
     state.readiness = normalizeReadiness(readinessPayload);
     state.topology = normalizeTopology(topologyPayload);
-    state.baseline = baselinePayload ? normalizeBaseline(baselinePayload) : mockBaseline;
+    state.topologyState = { state: "ok" };
+    state.baseline = baselinePayload ? normalizeBaseline(baselinePayload) : EMPTY_BASELINE;       // no baseline reported: "No data", never a sample value
     state.faultCapabilities = normalizeFaultCapabilities(capabilityPayload);
     setMode("live");
     if (announce) toast("Live system data refreshed.", "success");
-  } catch {
-    state.readiness = mockReadiness;
-    state.topology = mockTopology;
-    state.baseline = mockBaseline;
-    state.faultCapabilities = mockFaultCapabilities;
-    setMode("demo");
-    if (announce) toast("Backend unavailable. Showing safe demo data.", "warn");
+  } catch (error) {
+    if (demo) {
+      state.readiness = mockReadiness;
+      state.topology = mockTopology;
+      state.topologyState = { state: "ok" };
+      state.baseline = mockBaseline;
+      state.faultCapabilities = mockFaultCapabilities;
+      setMode("demo");
+    } else {
+      state.readiness = { status: "blocked", checks: [] };
+      state.topology = { nodes: [], edges: [] };
+      state.topologyState = { state: "error", error: error.message || "API unreachable" };
+      state.baseline = EMPTY_BASELINE;
+      state.faultCapabilities = [];
+      setMode("offline");
+      if (announce) toast("The API is still unreachable.", "warn");
+    }
   } finally {
     renderReadiness();
     renderTopology();
     renderBaseline();
     renderFaultCapabilities();
+    renderWorkflow();
     elements.refreshButton.classList.remove("is-spinning");
   }
 }
@@ -558,19 +683,26 @@ elements.proposalForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setBusy(elements.proposeButton, true, "Designing experiment…");
   state.policy = null;
+  state.proposing = true;
   renderPolicy();
+  renderWorkflow();
   try {
     const payload = state.mode === "live"
       ? await api.propose(elements.goalSelect.value)
       : elements.goalSelect.value === "capacity" ? mockTrafficSpikeProposal : mockProposal;
     state.proposal = normalizeProposal(payload);
     state.experimentId = state.proposal.id;
+    state.events = [];
+    elements.eventFeed.replaceChildren(createElement("li", "muted", "Waiting for an approved experiment."));
     renderProposal();
     toast("One bounded experiment proposed.", "success");
   } catch (error) {
     toast(`Proposal failed: ${error.message}`, "warn");
   } finally {
+    state.proposing = false;
     setBusy(elements.proposeButton, false);
+    elements.proposeButton.disabled = state.mode === "offline";
+    renderWorkflow();
   }
 });
 
@@ -581,6 +713,7 @@ elements.validateButton.addEventListener("click", async () => {
     const payload = state.mode === "live" ? await api.validate(state.experimentId) : mockPolicy;
     state.policy = normalizePolicy(payload);
     renderPolicy();
+    renderWorkflow();
     toast(state.policy.allowed ? "Safety policy passed." : "Safety policy blocked this plan.", state.policy.allowed ? "success" : "warn");
     elements.policySection.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
@@ -599,8 +732,12 @@ elements.approveButton.addEventListener("click", async () => {
   setBusy(elements.approveButton, true, "Starting safely…");
   try {
     if (state.mode === "live") await api.approve(state.experimentId);
+    state.history = { availability: [], errorRate: [], p95LatencyMs: [], throughputRps: [] };
+    state.stopRequested = false;
+    state.error = "";
+    state.report = null;
     startTimer();
-    updatePhase("baseline", null, state.baseline);
+    updatePhase(state.mode === "live" ? "approved" : "baseline", null, state.mode === "live" ? null : state.baseline);
     $("#liveSection").scrollIntoView({ behavior: "smooth", block: "start" });
     if (state.mode === "live") connectLiveExperiment(); else simulateExperiment();
     toast("Experiment approved. Automatic rollback is armed.", "success");
@@ -613,16 +750,18 @@ elements.approveButton.addEventListener("click", async () => {
 });
 
 elements.stopButton.addEventListener("click", async () => {
-  if (!activePhases.has(state.phase)) return;
-  elements.stopButton.disabled = true;
+  if (!STOPPABLE.has(state.phase)) return;
+  state.stopRequested = true;                                      // pending until the backend reports rollback; nothing is assumed recovered
+  renderStopButton();
   try {
     if (state.mode === "live") {
       await api.abort(state.experimentId);
-      updatePhase("rolling_back", "Emergency stop accepted. Waiting for verified backend rollback.", null);
+      updatePhase(state.phase, null, null);
       return;
     }
     clearLiveConnections();
-    updatePhase("rolling_back", "Emergency stop accepted. Rollback is running.", mockPhaseMetrics.rolling_back);
+    state.stopRequested = false;
+    updatePhase("rolling_back", "Demo: emergency stop accepted. Rollback is running.", mockPhaseMetrics.rolling_back);
     const recoveryTimer = setTimeout(() => {
       updatePhase("recovering", "Rollback completed. Verifying target recovery.", mockPhaseMetrics.recovering);
       const finishTimer = setTimeout(() => {
@@ -634,7 +773,8 @@ elements.stopButton.addEventListener("click", async () => {
     }, 1800);
     state.demoTimers.push(recoveryTimer);
   } catch (error) {
-    elements.stopButton.disabled = false;
+    state.stopRequested = false;
+    renderStopButton();
     toast(`STOP request failed: ${error.message}. Check manual recovery now.`, "warn");
   }
 });
@@ -646,4 +786,6 @@ elements.reportDialog.addEventListener("click", (event) => { if (event.target ==
 
 renderPolicy();
 updatePhase("idle", null, null);
+renderSparklines();
+loadComponentMeta();
 loadData();

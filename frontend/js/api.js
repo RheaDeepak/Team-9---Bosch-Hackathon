@@ -125,8 +125,8 @@ export function normalizeTopology(payload = {}) {
     health: node.health || node.status || "unknown",
     criticality: Number(node.criticality ?? node.criticality_score ?? 0.5),
     protected: Boolean(node.protected ?? node.is_protected),
-    x: node.x ?? 90 + (index % 4) * 190,
-    y: node.y ?? 70 + Math.floor(index / 4) * 105,
+    x: node.x ?? null,       // no coordinates from the backend: the page lays the graph out itself (graph-layout.js)
+    y: node.y ?? null,
   })).filter((node) => node.id);
   const edges = (graph.edges || graph.dependencies || []).map((edge) => Array.isArray(edge)
     ? edge
@@ -134,13 +134,20 @@ export function normalizeTopology(payload = {}) {
   return { nodes, edges: edges.filter(([source, target]) => source && target) };
 }
 
+// A metric the backend did not report stays null ("No data" in the UI); it is never turned into a zero.
+const metricOrNull = (...values) => {
+  const found = values.find((value) => value !== null && value !== undefined && value !== "");
+  const number = found === undefined ? NaN : Number(found);
+  return Number.isFinite(number) ? number : null;
+};
+
 export function normalizeBaseline(payload = {}) {
   const source = payload.metrics || payload.summary || payload;
   return {
-    availability: Number(source.availability ?? source.success_rate ?? 0),
-    errorRate: Number(source.errorRate ?? source.error_rate ?? 0),
-    p95LatencyMs: Number(source.p95LatencyMs ?? source.p95_latency_ms ?? source.p95 ?? 0),
-    throughputRps: Number(source.throughputRps ?? source.throughput_rps ?? source.throughput ?? 0),
+    availability: metricOrNull(source.availability, source.success_rate),
+    errorRate: metricOrNull(source.errorRate, source.error_rate),
+    p95LatencyMs: metricOrNull(source.p95LatencyMs, source.p95_latency_ms, source.p95),
+    throughputRps: metricOrNull(source.throughputRps, source.throughput_rps, source.throughput),
   };
 }
 
