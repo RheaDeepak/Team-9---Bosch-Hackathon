@@ -209,6 +209,8 @@ Recreating the container resets Grafana's own database (provisioned dashboards r
 files). Without the override the experiment UI still works; the Grafana panels stay blank and
 the readiness panel says so.
 
+If `product-catalog` turns unhealthy and pins its 20 MiB limit (product pages time out), add a `compose.chaos-override.yaml` in the demo checkout that raises its memory to 64M (`GOMEMLIMIT=52MiB`), and pass it with `-f` like the override above.
+
 ### 2. Create a Python environment
 
 PowerShell:

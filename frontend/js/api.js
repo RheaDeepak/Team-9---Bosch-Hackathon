@@ -51,6 +51,7 @@ export function createApiClient({ baseUrl = "", timeoutMs = DEFAULT_TIMEOUT_MS }
     eventsUrl: (id) => endpoint(`/api/experiments/${encodeURIComponent(id)}/events`),
     health: () => request("/api/health"),
     readiness: () => request("/api/readiness"),
+    faultCapabilities: () => request("/api/fault-capabilities"),
     topology: () => request("/api/topology"),
     latestBaseline: () => request("/api/baselines/latest"),
     propose: (goal) => mutate("/api/experiments/propose", { goal }),
@@ -61,6 +62,43 @@ export function createApiClient({ baseUrl = "", timeoutMs = DEFAULT_TIMEOUT_MS }
     report: (id) => request(`/api/reports/${encodeURIComponent(id)}`),
     findings: () => request("/api/findings"),
   };
+}
+
+export function normalizeFaultCapabilities(payload = {}) {
+  const capabilities = Array.isArray(payload.capabilities) ? payload.capabilities : [];
+  return capabilities.map((capability) => ({
+    failureType: String(capability.failure_type || "").toLowerCase(),
+    version: capability.capability_version || "unknown",
+    targetServices: Array.isArray(capability.supported_targets) ? capability.supported_targets : [],
+    controllerService: capability.controller_service || "unknown",
+    detail: capability.detail || "Capability status unavailable",
+    limits: capability.limits || {},
+    ready: Boolean(capability.ready),
+    selectable: Boolean(
+      capability.ready
+      && capability.executor_ready
+      && capability.rollback_ready
+      && capability.integration_test_evidence,
+    ),
+    integrationTestEvidence: capability.integration_test_evidence || null,
+  })).filter((capability) => capability.failureType);
+}
+
+export function proposalParameterRows(proposal = {}) {
+  const parameters = proposal.parameters || {};
+  const rows = [["Duration", parameters.duration_seconds ? `${parameters.duration_seconds} sec` : "Bounded"]];
+  if (String(proposal.failure_type || "").toLowerCase() === "traffic_spike") {
+    rows.push(
+      ["Original load", `${parameters.baseline_users} users`],
+      ["Peak load", `${parameters.peak_users} users`],
+      ["Spawn rate", `${parameters.spawn_rate_per_second} users/sec`],
+      ["Journey", String(parameters.journey_profile || "Fixed profile").replaceAll("-", " ")],
+    );
+  } else if (parameters.delay_ms != null) {
+    rows.push(["Network delay", `${parameters.delay_ms} ms`]);
+  }
+  rows.push(["Blast radius", proposal.blast_radius || "Unknown"], ["Rollback", proposal.rollback || "Executor rollback"]);
+  return rows;
 }
 
 export function normalizeReadiness(payload = {}) {

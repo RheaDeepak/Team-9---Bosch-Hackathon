@@ -73,8 +73,9 @@ Method:
                   "min_factor": number}}]}}
 Rules: one ranking entry per candidate; chosen must be one of the candidate ids. predictions name the target or
 services in its blast radius; min_factor is the expected peak/baseline ratio (>= 1 when direction is up).
-network_delay slows calls (p95 up; errors only where a caller times out); container_stop makes calls fail
-(error_rate up) until the container is back."""
+    network_delay slows calls (p95 up; errors only where a caller times out); container_stop makes calls fail
+    (error_rate up) until the container is back; traffic_spike increases the existing fixed Locust journey load
+    on frontend and must preserve its typed user-count, spawn-rate, duration, and journey parameters."""
 
 TOOL_DECLS = [
     {"name": "get_candidate", "description": "Ranker features, scores and why-line of one candidate.",
@@ -470,16 +471,24 @@ def _default_story(c, g):
         hyp = (f"Stopping {t} for {d}s makes calls to it fail: the error rate of its callers ({who}) rises, "
                f"and everything returns to baseline once {t} restarts.")
         preds = [{"svc": s, "metric": "error_rate", "direction": "up", "min_factor": 2} for s in callers]
-    else:
+    elif c["fault"] == "network_delay":
         hyp = (f"Adding {c['magnitude']}ms network delay to {t} for {d}s raises p95 latency of {t}'s callers ({who}) "
                f"without a large error increase, and latency returns to baseline after rollback.")
         preds = [{"svc": s, "metric": "p95_ms", "direction": "up", "min_factor": 1.5} for s in callers]
+    else:
+        users = c["parameters"]
+        hyp = (f"Increasing the fixed frontend journey load from {users['baseline_users']} to {users['peak_users']} "
+               f"users for {d}s reveals saturation through higher frontend latency or errors, then the original "
+               "Locust state is restored.")
+        preds = [{"svc": t, "metric": "p95_ms", "direction": "up", "min_factor": 1.2}]
     return hyp, preds or [{"svc": t, "metric": "error_rate", "direction": "flat", "min_factor": 1}]
 
 
 def _plan(c, hypothesis, reasoning):
-    return {"target": c["target"], "fault": c["fault"], "magnitude": c["magnitude"], "duration_s": c["duration_s"],
+    plan = {"target": c["target"], "fault": c["fault"], "magnitude": c["magnitude"], "duration_s": c["duration_s"],
             "hypothesis": hypothesis, "reasoning": reasoning}
+    plan.update({k: c[k] for k in ("parameters", "candidate_id", "capability_version") if k in c})
+    return plan
 
 
 def _top_k_rows(top, answer=None):
@@ -509,13 +518,16 @@ def top_k(ranking, k):
         if len(out) < 2 or any(c["fault"] == fault for c in out):
             continue
         extra = next((c for c in ranking if c["fault"] == fault and c["target"] not in {x["target"] for x in out}), None)
+        extra = extra or next((c for c in ranking if c["fault"] == fault and c not in out), None)
         if extra:
-            out[-1] = extra
+            counts = Counter(c["fault"] for c in out)
+            replace = next((i for i in range(len(out) - 1, -1, -1) if counts[out[i]["fault"]] > 1), len(out) - 1)
+            out[replace] = extra
     return out
 
 
 def run_agent(k=TOP_K, api_key=None, post=None, graph=None, baseline=None, flows=None, history=None,
-              log_path=AGENT_LOG, goal=None):
+              log_path=AGENT_LOG, goal=None, traffic_capability=None):
     """Rank, investigate the top-k, choose one. Raises only if ranking itself is impossible
     (no dependency map / baseline); every LLM problem falls back to the ranker's #1."""
     if graph is None:
@@ -523,7 +535,7 @@ def run_agent(k=TOP_K, api_key=None, post=None, graph=None, baseline=None, flows
     baseline = load_baseline() if baseline is None else baseline
     flows = load_flows() if flows is None else flows
     history = ranker.load_history() if history is None else history
-    ranking = ranker.rank(graph, baseline, flows, history)
+    ranking = ranker.rank(graph, baseline, flows, history, traffic_capability=traffic_capability)
     if not ranking:
         raise ValueError("ranker produced no valid candidates")
     top = top_k(ranking, k)
@@ -571,6 +583,6 @@ def run_agent(k=TOP_K, api_key=None, post=None, graph=None, baseline=None, flows
 
 
 if __name__ == "__main__":
-    out = run_agent()
+    out = run_agent(traffic_capability=ranker.traffic_spike_capability())
     print(json.dumps({k: out[k] for k in ("source", "note", "chosen", "plan", "predictions", "top_k")}, indent=2))
     sys.exit(0)

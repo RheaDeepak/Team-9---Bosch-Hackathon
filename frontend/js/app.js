@@ -1,11 +1,13 @@
-import { createApiClient, normalizeBaseline, normalizePolicy, normalizeReadiness, normalizeTopology, resolveApiBaseUrl } from "./api.js";
+import { createApiClient, normalizeBaseline, normalizeFaultCapabilities, normalizePolicy, normalizeReadiness, normalizeTopology, proposalParameterRows, resolveApiBaseUrl } from "./api.js";
 import {
   mockBaseline,
+  mockFaultCapabilities,
   mockPhaseMetrics,
   mockPolicy,
   mockProposal,
   mockReadiness,
   mockResult,
+  mockTrafficSpikeProposal,
   mockTopology,
 } from "./mock-data.js";
 
@@ -19,6 +21,7 @@ const state = {
   readiness: mockReadiness,
   topology: mockTopology,
   baseline: mockBaseline,
+  faultCapabilities: [],
   proposal: null,
   policy: null,
   experimentId: null,
@@ -43,6 +46,7 @@ const elements = {
   selectedService: $("#selectedService"),
   proposalForm: $("#proposalForm"),
   goalSelect: $("#goalSelect"),
+  trafficSpikeCapability: $("#trafficSpikeCapability"),
   proposeButton: $("#proposeButton"),
   proposalEmpty: $("#proposalEmpty"),
   proposalCard: $("#proposalCard"),
@@ -50,9 +54,7 @@ const elements = {
   proposalFailure: $("#proposalFailure"),
   proposalName: $("#proposalName"),
   proposalHypothesis: $("#proposalHypothesis"),
-  proposalDuration: $("#proposalDuration"),
-  proposalRadius: $("#proposalRadius"),
-  proposalRollback: $("#proposalRollback"),
+  proposalParameters: $("#proposalParameters"),
   validateButton: $("#validateButton"),
   policySection: $("#policySection"),
   policySummary: $("#policySummary"),
@@ -214,6 +216,26 @@ function renderBaseline() {
   renderSparklines("baseline");
 }
 
+function renderFaultCapabilities() {
+  elements.goalSelect.querySelector('option[value="capacity"]')?.remove();
+  const traffic = state.faultCapabilities.find((capability) => capability.failureType === "traffic_spike");
+
+  elements.trafficSpikeCapability.className = "capability-note";
+  if (!traffic?.selectable) {
+    elements.trafficSpikeCapability.classList.add("unavailable");
+    elements.trafficSpikeCapability.textContent = `Traffic spike unavailable · ${traffic?.detail || "executor and rollback readiness not confirmed"}`;
+    return;
+  }
+
+  const option = document.createElement("option");
+  option.value = "capacity";
+  option.textContent = "Test bounded traffic capacity";
+  elements.goalSelect.append(option);
+  const limits = traffic.limits;
+  elements.trafficSpikeCapability.classList.add("ready");
+  elements.trafficSpikeCapability.textContent = `Traffic spike ready · ${traffic.detail} · max ${limits.peak_users} users for ${limits.duration_seconds}s`;
+}
+
 function normalizeProposal(payload = {}) {
   const proposal = payload.proposal || payload.experiment || payload;
   return {
@@ -238,9 +260,11 @@ function renderProposal() {
   elements.proposalFailure.textContent = proposal.failure_type.replaceAll("_", " ");
   elements.proposalName.textContent = proposal.title;
   elements.proposalHypothesis.textContent = proposal.hypothesis;
-  elements.proposalDuration.textContent = proposal.parameters.duration_seconds ? `${proposal.parameters.duration_seconds} sec` : "Bounded";
-  elements.proposalRadius.textContent = proposal.blast_radius;
-  elements.proposalRollback.textContent = proposal.rollback;
+  elements.proposalParameters.replaceChildren(...proposalParameterRows(proposal).map(([label, value]) => {
+    const item = document.createElement("div");
+    item.append(createElement("dt", "", label), createElement("dd", "", value));
+    return item;
+  }));
 }
 
 function renderPolicy() {
@@ -505,24 +529,27 @@ async function loadData({ announce = false } = {}) {
   setMode("connecting");
   try {
     await api.health();
-    const [readinessPayload, topologyPayload, baselinePayload] = await Promise.all([
-      api.readiness(), api.topology(), api.latestBaseline().catch(() => null),
+    const [readinessPayload, topologyPayload, baselinePayload, capabilityPayload] = await Promise.all([
+      api.readiness(), api.topology(), api.latestBaseline().catch(() => null), api.faultCapabilities().catch(() => ({ capabilities: [] })),
     ]);
     state.readiness = normalizeReadiness(readinessPayload);
     state.topology = normalizeTopology(topologyPayload);
     state.baseline = baselinePayload ? normalizeBaseline(baselinePayload) : mockBaseline;
+    state.faultCapabilities = normalizeFaultCapabilities(capabilityPayload);
     setMode("live");
     if (announce) toast("Live system data refreshed.", "success");
   } catch {
     state.readiness = mockReadiness;
     state.topology = mockTopology;
     state.baseline = mockBaseline;
+    state.faultCapabilities = mockFaultCapabilities;
     setMode("demo");
     if (announce) toast("Backend unavailable. Showing safe demo data.", "warn");
   } finally {
     renderReadiness();
     renderTopology();
     renderBaseline();
+    renderFaultCapabilities();
     elements.refreshButton.classList.remove("is-spinning");
   }
 }
@@ -533,7 +560,9 @@ elements.proposalForm.addEventListener("submit", async (event) => {
   state.policy = null;
   renderPolicy();
   try {
-    const payload = state.mode === "live" ? await api.propose(elements.goalSelect.value) : mockProposal;
+    const payload = state.mode === "live"
+      ? await api.propose(elements.goalSelect.value)
+      : elements.goalSelect.value === "capacity" ? mockTrafficSpikeProposal : mockProposal;
     state.proposal = normalizeProposal(payload);
     state.experimentId = state.proposal.id;
     renderProposal();

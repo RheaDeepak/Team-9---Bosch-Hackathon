@@ -1,0 +1,358 @@
+{
+  "id": "20261010T210938Z",
+  "plan": {
+    "target": "currency",
+    "fault": "network_delay",
+    "magnitude": 250,
+    "duration_s": 30,
+    "hypothesis": "Adding a 250ms network delay to the currency service will increase the p95 latency of the checkout service since checkout synchronously calls currency during transaction processing.",
+    "reasoning": "The checkout service has a direct sync-grpc edge to currency and relies on it during the checkout path. Introducing network latency on currency will directly propagate downstream and increase the overall latency (p95_ms) of checkout."
+  },
+  "plan_source": "llm",
+  "ranking": null,
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ],
+    "checks": [
+      {
+        "name": "Plan is complete",
+        "passed": true,
+        "detail": "all fields present"
+      },
+      {
+        "name": "Fault type is allowed",
+        "passed": true,
+        "detail": "network_delay is on the allowlist"
+      },
+      {
+        "name": "Magnitude within cap",
+        "passed": true,
+        "detail": "250 ms delay (cap 1000 ms)"
+      },
+      {
+        "name": "Duration within cap",
+        "passed": true,
+        "detail": "30 s (cap 60 s)"
+      },
+      {
+        "name": "Target exists in the dependency map",
+        "passed": true,
+        "detail": "currency is a discovered service"
+      },
+      {
+        "name": "Target is not protected",
+        "passed": true,
+        "detail": "currency is not on the protected list"
+      }
+    ]
+  },
+  "started_at": "2026-10-10T21:09:38+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: frontend p95_ms (1024.9ms > 133.6ms); frontend-proxy p95_ms (1159.2ms > 132.7ms); checkout restarts (restarted (1))",
+    "elapsed_s": 16.7,
+    "peaks": {
+      "currency": {
+        "error_rate": 0.0,
+        "p95_ms": 0.213854
+      },
+      "checkout": {
+        "error_rate": null,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 1024.891429
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 1324.017
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 10.54883487007544,
+        "memory_mb": 68.05078125
+      },
+      "frontend": {
+        "cpu_percent": 41.311639586410635,
+        "memory_mb": 226.4296875
+      },
+      "checkout": {
+        "cpu_percent": 109.00235814296242,
+        "memory_mb": 19.8984375
+      },
+      "currency": {
+        "cpu_percent": 0.5659113300492611,
+        "memory_mb": 9.81640625
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "currency": {
+            "n": 13,
+            "errors": 0,
+            "request_rate": 0.43333333333333335,
+            "error_rate": 0.0,
+            "p95_ms": 0.213854
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "request_rate": 0.0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 102,
+            "errors": 0,
+            "request_rate": 3.4,
+            "error_rate": 0.0,
+            "p95_ms": 642.24876
+          },
+          "frontend-proxy": {
+            "n": 103,
+            "errors": 0,
+            "request_rate": 3.433333333333333,
+            "error_rate": 0.0,
+            "p95_ms": 1324.017
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "642.2ms > 133.6ms",
+          "frontend-proxy p95_ms": "1324.0ms > 132.7ms",
+          "checkout restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 11.0,
+        "metrics": {
+          "currency": {
+            "n": 9,
+            "errors": 0,
+            "request_rate": 0.3,
+            "error_rate": 0.0,
+            "p95_ms": 0.129218
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "request_rate": 0.0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 100,
+            "errors": 0,
+            "request_rate": 3.3333333333333335,
+            "error_rate": 0.0,
+            "p95_ms": 1024.891429
+          },
+          "frontend-proxy": {
+            "n": 102,
+            "errors": 0,
+            "request_rate": 3.4,
+            "error_rate": 0.0,
+            "p95_ms": 1159.167
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "1024.9ms > 133.6ms",
+          "frontend-proxy p95_ms": "1159.2ms > 132.7ms",
+          "checkout restarts": "restarted (1)"
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "recovery": {
+    "recovered": false,
+    "seconds": null,
+    "elapsed_seconds": 180,
+    "healthy_samples": 0,
+    "required_samples": 2,
+    "note": "not within thresholds after 180s (frontend p95_ms: 283.6ms > 133.6ms; checkout restarts: restarted (1))",
+    "metrics_confirmed": null,
+    "metrics_seconds": null,
+    "samples": []
+  },
+  "impact": [
+    {
+      "service": "currency",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 1.9,
+        "peak": 0.213854,
+        "change": -1.686146
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": null,
+        "change": null
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 1024.891429,
+        "change": 991.2640863426574
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 1324.017,
+        "change": 1291.331393939394
+      }
+    }
+  ],
+  "amplification": [
+    {
+      "service": "currency",
+      "role": "target",
+      "increase_ms": -1.7,
+      "delay_ms": 250,
+      "ratio": 0.0,
+      "amplified": false
+    },
+    {
+      "service": "frontend",
+      "role": "caller",
+      "increase_ms": 991.3,
+      "delay_ms": 250,
+      "ratio": 4.0,
+      "amplified": true
+    },
+    {
+      "service": "frontend-proxy",
+      "role": "caller",
+      "increase_ms": 1291.3,
+      "delay_ms": 250,
+      "ratio": 5.2,
+      "amplified": true
+    }
+  ],
+  "score": {
+    "impact_score": 45.0,
+    "resilience_score": 55,
+    "severity": "High",
+    "confidence": "Medium confidence",
+    "availability_pct": null,
+    "components": {
+      "error_impact": 0.0,
+      "latency_impact": 1.0,
+      "availability_loss": 0.0,
+      "recovery_impact": 1.0
+    },
+    "limitations": [
+      "No data for: checkout"
+    ]
+  },
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 10.54883487007544
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 68.05078125
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 41.311639586410635
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 226.4296875
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 109.00235814296242
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 19.8984375
+      }
+    },
+    {
+      "container": "currency",
+      "cpu_percent": {
+        "baseline": 0.2575572457451154,
+        "peak": 0.5659113300492611
+      },
+      "memory_mb": {
+        "baseline": 3.5849609375,
+        "peak": 9.81640625
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "partially held",
+    "explanation": "The experiment was aborted early due to threshold breaches on frontend p95 and checkout restarts. While checkout metrics were null (no data), downstream callers like frontend and frontend-proxy experienced massive p95 latency increases (frontend p95 rose from 33.63ms to 1024.89ms), confirming that network delays in currency propagate upstream. However, the system failed to recover within the observation window.",
+    "claims": [
+      {
+        "claim": "Adding a 250ms network delay to the currency service will increase the p95 latency of the checkout service",
+        "evidence": "Checkout service p95_ms peak and change are null due to lack of captured metrics during the short run before abort.",
+        "status": "no data"
+      },
+      {
+        "claim": "The system recovers after the fault",
+        "evidence": "Recovery data shows recovered: false, noting 'not within thresholds after 180s (frontend p95_ms: 283.6ms > 133.6ms; checkout restarts: restarted (1))'.",
+        "status": "contradicted"
+      }
+    ],
+    "recommendation": "Implement a bounded timeout and a fallback mechanism with cached currency rates in the checkout and frontend services to prevent synchronous dependency delays from causing upstream latency amplification and container restarts.",
+    "model": "gemini-3.5-flash-lite",
+    "skipped_models": []
+  },
+  "grafana_window_ms": [
+    1791666465200,
+    1791666832620
+  ]
+}

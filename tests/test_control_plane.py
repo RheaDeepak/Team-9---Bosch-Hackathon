@@ -111,8 +111,8 @@ class ControlPlaneTests(unittest.TestCase):
         plan = {**PLAN, "duration_s": 2}
         actions = []
 
-        def wait_for_abort(candidate, measured, services, *, stop_event, on_sample):
-            stop_event.wait(1)
+        def wait_for_abort(candidate, measured, services, *, stop, on_sample):
+            stop.wait(1)
             return guarded_result(aborted=True, reason="operator requested emergency stop")
 
         manager = ExperimentManager(

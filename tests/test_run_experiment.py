@@ -29,7 +29,7 @@ BASELINE = {
 
 
 class ExecuteContractTests(unittest.TestCase):
-    def test_execute_adapts_legacy_dashboard_callback_to_guard_api(self):
+    def test_execute_forwards_guard_samples_to_the_dashboard_callback(self):
         samples = []
         monitored = {"aborted": False, "reason": "duration elapsed", "elapsed_s": 1,
                      "peaks": {"frontend": {"error_rate": 0.0, "p95_ms": 50.0}},
@@ -38,12 +38,13 @@ class ExecuteContractTests(unittest.TestCase):
         containers = {"cart": {"running": True, "cpu_percent": 1.0, "memory_mb": 20.0}}
 
         def watch(*args, **kwargs):
-            self.assertEqual(kwargs["stop_event"], stop)
-            kwargs["on_sample"](metrics, containers)
+            self.assertEqual(kwargs["stop"], stop)
+            kwargs["on_sample"]("monitoring", 0.5, metrics, containers, {})
             return monitored
 
         def recover(*args, **kwargs):
-            kwargs["on_sample"](metrics, containers)
+            self.assertEqual(kwargs["stop"], stop)
+            kwargs["on_sample"]("recovering", 1.0, metrics, containers, {})
             return {"recovered": True, "seconds": 1}
 
         stop = threading.Event()
@@ -56,8 +57,10 @@ class ExecuteContractTests(unittest.TestCase):
                 patch.object(run_experiment.guard, "wait_for_recovery", side_effect=recover), \
                 patch.object(run_experiment.guard, "impact_table", return_value=[]), \
                 patch.object(run_experiment.guard, "container_table", return_value=[]), \
-                patch.object(run_experiment.inject, "inject", return_value={"container_name": "cart", "rollback": "start"}), \
+                patch.object(run_experiment.inject, "inject", return_value={"fault": "container_stop", "target": "cart", "rollback": "start"}), \
+                patch.object(run_experiment.inject, "verify_active", return_value={"verified": True}), \
                 patch.object(run_experiment.inject, "rollback", return_value=True), \
+                patch.object(run_experiment.inject, "verify_recovered", return_value={"verified": True}), \
                 patch.object(run_experiment.grafana, "annotate", return_value=(True, "ok")), \
                 patch.object(run_experiment, "judge_hypothesis", return_value={"verdict": "held", "explanation": "recovered"}):
             result = run_experiment.execute(
@@ -68,6 +71,8 @@ class ExecuteContractTests(unittest.TestCase):
         self.assertEqual([sample[0] for sample in samples], ["monitoring", "recovering"])
         self.assertTrue(result["recovery"]["recovered"])
         self.assertIsNone(result["recovery"]["metrics_confirmed"])
+        self.assertTrue(result["fault_evidence"]["verified"])
+        self.assertTrue(result["fault_recovery"]["verified"])
 
 
 if __name__ == "__main__":

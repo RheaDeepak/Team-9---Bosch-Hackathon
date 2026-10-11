@@ -40,6 +40,18 @@ export const mockBaseline = {
   throughputRps: 42.1,
 };
 
+export const mockFaultCapabilities = [{
+  failureType: "traffic_spike",
+  version: "traffic-spike-v1",
+  targetServices: ["frontend"],
+  controllerService: "load-generator",
+  detail: "Demo Locust controller running with 5 users",
+  limits: { peak_users: 10, spawn_rate_per_second: 2, duration_seconds: 30 },
+  ready: true,
+  selectable: true,
+  integrationTestEvidence: "tests/test_traffic_spike_integration.py",
+}];
+
 export const mockProposal = {
   id: "exp-rec-042",
   title: "Recommendation service crash",
@@ -53,6 +65,25 @@ export const mockProposal = {
   expected_impact: ["Recommendation requests fail", "Catalog browsing remains available"],
   observe: ["frontend error rate", "frontend p95 latency", "recommendation span errors", "recovery time"],
   reasoning_summary: "Recommendation is user-visible but should not be required for the core catalog journey.",
+};
+
+export const mockTrafficSpikeProposal = {
+  id: "exp-traffic-042",
+  title: "Frontend traffic spike",
+  goal: "capacity",
+  hypothesis: "A bounded increase in existing journey traffic reveals frontend saturation behavior, then returns to the original load.",
+  target_service: "frontend",
+  failure_type: "TRAFFIC_SPIKE",
+  parameters: {
+    baseline_users: 5,
+    peak_users: 8,
+    spawn_rate_per_second: 2,
+    duration_seconds: 20,
+    journey_profile: "astronomy-shop-default",
+  },
+  blast_radius: "1 service",
+  rollback: "Restore the captured Locust user count and spawn rate",
+  reasoning_summary: "The existing load generator exercises the fixed Astronomy Shop journey mix through the frontend.",
 };
 
 export const mockPolicy = {

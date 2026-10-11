@@ -1,0 +1,369 @@
+{
+  "id": "20261010T212947Z",
+  "plan": {
+    "target": "currency",
+    "fault": "network_delay",
+    "magnitude": 250,
+    "duration_s": 30,
+    "hypothesis": "Adding a 250ms network delay to the currency service will increase the p95 latency of the checkout service while maintaining a zero error percentage, as checkout depends synchronously on currency for processing orders.",
+    "reasoning": "The checkout service has a synchronous gRPC dependency on the currency service as part of the checkout path. A network delay on currency will propagate upstream to checkout, increasing its response time without causing outright request failures since the service remains reachable."
+  },
+  "plan_source": "llm",
+  "ranking": null,
+  "validation": {
+    "valid": true,
+    "reasons": [],
+    "blast_radius": [
+      "checkout",
+      "frontend",
+      "frontend-proxy",
+      "frontend-web",
+      "load-generator"
+    ],
+    "checks": [
+      {
+        "name": "Plan is complete",
+        "passed": true,
+        "detail": "all fields present"
+      },
+      {
+        "name": "Fault type is allowed",
+        "passed": true,
+        "detail": "network_delay is on the allowlist"
+      },
+      {
+        "name": "Magnitude within cap",
+        "passed": true,
+        "detail": "250 ms delay (cap 1000 ms)"
+      },
+      {
+        "name": "Duration within cap",
+        "passed": true,
+        "detail": "30 s (cap 60 s)"
+      },
+      {
+        "name": "Target exists in the dependency map",
+        "passed": true,
+        "detail": "currency is a discovered service"
+      },
+      {
+        "name": "Target is not protected",
+        "passed": true,
+        "detail": "currency is not on the protected list"
+      }
+    ]
+  },
+  "started_at": "2026-10-10T21:29:47+00:00",
+  "baseline": {
+    "captured_at": "2026-10-10T09:46:01+00:00",
+    "flags_enabled": []
+  },
+  "forced_abort_test": false,
+  "guard": {
+    "aborted": true,
+    "reason": "threshold breached 2 samples in a row: frontend p95_ms (562.5ms > 133.6ms); frontend-proxy p95_ms (581.8ms > 132.7ms); checkout restarts (restarted (1))",
+    "elapsed_s": 10.7,
+    "peaks": {
+      "currency": {
+        "error_rate": 0.0,
+        "p95_ms": 0.165114
+      },
+      "checkout": {
+        "error_rate": null,
+        "p95_ms": null
+      },
+      "frontend": {
+        "error_rate": 0.0,
+        "p95_ms": 562.476813
+      },
+      "frontend-proxy": {
+        "error_rate": 0.0,
+        "p95_ms": 581.755
+      }
+    },
+    "container_peaks": {
+      "frontend-proxy": {
+        "cpu_percent": 34.42591304347826,
+        "memory_mb": 69.03515625
+      },
+      "frontend": {
+        "cpu_percent": 13.748088105726875,
+        "memory_mb": 227.4375
+      },
+      "checkout": {
+        "cpu_percent": 131.47280205655528,
+        "memory_mb": 13.8359375
+      },
+      "currency": {
+        "cpu_percent": 1.0723645743766121,
+        "memory_mb": 10.0625
+      }
+    },
+    "timeline": [
+      {
+        "t": 0.0,
+        "metrics": {
+          "currency": {
+            "n": 31,
+            "errors": 0,
+            "request_rate": 1.0333333333333334,
+            "error_rate": 0.0,
+            "p95_ms": 0.165114
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "request_rate": 0.0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 95,
+            "errors": 0,
+            "request_rate": 3.1666666666666665,
+            "error_rate": 0.0,
+            "p95_ms": 436.576481
+          },
+          "frontend-proxy": {
+            "n": 96,
+            "errors": 0,
+            "request_rate": 3.2,
+            "error_rate": 0.0,
+            "p95_ms": 571.457
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "436.6ms > 133.6ms",
+          "frontend-proxy p95_ms": "571.5ms > 132.7ms",
+          "checkout restarts": "restarted (1)"
+        }
+      },
+      {
+        "t": 5.0,
+        "metrics": {
+          "currency": {
+            "n": 26,
+            "errors": 0,
+            "request_rate": 0.8666666666666667,
+            "error_rate": 0.0,
+            "p95_ms": 0.165114
+          },
+          "checkout": {
+            "n": 0,
+            "errors": 0,
+            "request_rate": 0.0,
+            "error_rate": null,
+            "p95_ms": null
+          },
+          "frontend": {
+            "n": 100,
+            "errors": 0,
+            "request_rate": 3.3333333333333335,
+            "error_rate": 0.0,
+            "p95_ms": 562.476813
+          },
+          "frontend-proxy": {
+            "n": 102,
+            "errors": 0,
+            "request_rate": 3.4,
+            "error_rate": 0.0,
+            "p95_ms": 581.755
+          }
+        },
+        "breaches": {
+          "frontend p95_ms": "562.5ms > 133.6ms",
+          "frontend-proxy p95_ms": "581.8ms > 132.7ms",
+          "checkout restarts": "restarted (1)"
+        }
+      }
+    ]
+  },
+  "rollback_verified": true,
+  "fault_evidence": {
+    "verified": true,
+    "fault": "network_delay",
+    "target": "currency"
+  },
+  "fault_recovery": {
+    "verified": true,
+    "fault": "network_delay",
+    "target": "currency"
+  },
+  "recovery": {
+    "recovered": false,
+    "seconds": null,
+    "elapsed_seconds": 180,
+    "healthy_samples": 0,
+    "required_samples": 2,
+    "note": "not within thresholds after 180s (frontend p95_ms: 3155.6ms > 133.6ms; frontend-proxy p95_ms: 3221.2ms > 132.7ms; checkout restarts: restarted (1))",
+    "metrics_confirmed": null,
+    "metrics_seconds": null,
+    "samples": []
+  },
+  "impact": [
+    {
+      "service": "currency",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 1.9,
+        "peak": 0.165114,
+        "change": -1.734886
+      }
+    },
+    {
+      "service": "checkout",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": null,
+        "change": null
+      },
+      "p95_ms": {
+        "baseline": 62.8,
+        "peak": null,
+        "change": null
+      }
+    },
+    {
+      "service": "frontend",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 33.62734265734263,
+        "peak": 562.476813,
+        "change": 528.8494703426574
+      }
+    },
+    {
+      "service": "frontend-proxy",
+      "error_rate": {
+        "baseline": 0.0,
+        "peak": 0.0,
+        "change": 0.0
+      },
+      "p95_ms": {
+        "baseline": 32.68560606060606,
+        "peak": 581.755,
+        "change": 549.0693939393939
+      }
+    }
+  ],
+  "amplification": [
+    {
+      "service": "currency",
+      "role": "target",
+      "increase_ms": -1.7,
+      "delay_ms": 250,
+      "ratio": 0.0,
+      "amplified": false
+    },
+    {
+      "service": "frontend",
+      "role": "caller",
+      "increase_ms": 528.8,
+      "delay_ms": 250,
+      "ratio": 2.1,
+      "amplified": true
+    },
+    {
+      "service": "frontend-proxy",
+      "role": "caller",
+      "increase_ms": 549.1,
+      "delay_ms": 250,
+      "ratio": 2.2,
+      "amplified": true
+    }
+  ],
+  "score": {
+    "impact_score": 45.0,
+    "resilience_score": 55,
+    "severity": "High",
+    "confidence": "Medium confidence",
+    "availability_pct": null,
+    "components": {
+      "error_impact": 0.0,
+      "latency_impact": 1.0,
+      "availability_loss": 0.0,
+      "recovery_impact": 1.0
+    },
+    "limitations": [
+      "No data for: checkout",
+      "Stopped after 11s, so the evidence covers only the start of the fault"
+    ]
+  },
+  "container_resources": [
+    {
+      "container": "frontend-proxy",
+      "cpu_percent": {
+        "baseline": 0.6410851202454146,
+        "peak": 34.42591304347826
+      },
+      "memory_mb": {
+        "baseline": 34.3890625,
+        "peak": 69.03515625
+      }
+    },
+    {
+      "container": "frontend",
+      "cpu_percent": {
+        "baseline": 1.1725691139334657,
+        "peak": 13.748088105726875
+      },
+      "memory_mb": {
+        "baseline": 126.0853515625,
+        "peak": 227.4375
+      }
+    },
+    {
+      "container": "checkout",
+      "cpu_percent": {
+        "baseline": 0.5508730928984411,
+        "peak": 131.47280205655528
+      },
+      "memory_mb": {
+        "baseline": 11.8638671875,
+        "peak": 13.8359375
+      }
+    },
+    {
+      "container": "currency",
+      "cpu_percent": {
+        "baseline": 0.2575572457451154,
+        "peak": 1.0723645743766121
+      },
+      "memory_mb": {
+        "baseline": 3.5849609375,
+        "peak": 10.0625
+      }
+    }
+  ],
+  "verdict": {
+    "verdict": "partially held",
+    "explanation": "The experiment was aborted early due to safety thresholds being breached by frontend and frontend-proxy p95 latency spikes and a checkout container restart. While checkout metrics returned no data due to the early abort, upstream services experienced massive latency amplifications (frontend p95 increased by 528.85ms) and the system failed to recover within 180s.",
+    "claims": [
+      {
+        "claim": "Adding a 250ms network delay to the currency service will increase the p95 latency of the checkout service",
+        "evidence": "Checkout service p95_ms peak and change are null due to lack of captured metrics during the shortened run.",
+        "status": "no data"
+      },
+      {
+        "claim": "Adding a 250ms network delay to the currency service will maintain a zero error percentage for checkout",
+        "evidence": "Checkout service error_rate peak and change are null.",
+        "status": "no data"
+      }
+    ],
+    "recommendation": "Implement a bounded timeout and a fallback mechanism with cached currency rates in the checkout and frontend services to prevent cascading latency and container restarts when the currency service is delayed.",
+    "model": "gemini-3.5-flash-lite",
+    "skipped_models": []
+  },
+  "grafana_window_ms": [
+    1791667670765,
+    1791668032208
+  ]
+}
