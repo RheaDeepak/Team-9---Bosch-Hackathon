@@ -6,6 +6,7 @@ candidate gets a one-line "why". No LLM here; rank_agent.py investigates the top
 import argparse
 import json
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,7 +14,9 @@ from discovery import compute_stats, load_flows, load_graph
 from guard import RECOVERY_TIMEOUT_S
 from metrics import LATENCY_FLOOR_MS, load_baseline
 from policy import ALLOWED_FAULTS, MAX_NETWORK_DELAY_MS, PROTECTED, blast_radius, validate
-from traffic_spike import FAULT_TYPE as TRAFFIC_SPIKE, MAX_PEAK_USERS, candidate_plan as traffic_spike_candidate_plan, capability as traffic_spike_capability
+from traffic_spike import (FAULT_TYPE as TRAFFIC_SPIKE, LOCUST_URL, MAX_DURATION_SECONDS as MAX_SPIKE_DURATION_S,
+                           MAX_PEAK_USERS, TARGET_SERVICE as TRAFFIC_SPIKE_TARGET,
+                           candidate_plan as traffic_spike_candidate_plan, capability as traffic_spike_capability)
 
 RESULTS_DIR = Path("results")
 RANKINGS_DIR = Path("rankings")
@@ -28,12 +31,17 @@ WEIGHTS = {
     # risk: likely user impact if the service is weak
     "risk": {"fan_in": 0.15, "blast_radius": 0.20, "checkout_path": 0.20, "journeys": 0.15, "traffic": 0.20,
              "recovery": 0.10},
-    # informativeness: how much we would learn
-    "info": {"novelty": 0.40, "escalation": 0.15, "clarity": 0.15, "uncertainty": 0.20, "partial": 0.10},
+    # informativeness: how much we would learn. coverage favours fault types that have been run less often
+    # across the whole system, so after a string of delays the next experiment is not another delay.
+    "info": {"novelty": 0.35, "escalation": 0.15, "clarity": 0.10, "uncertainty": 0.15, "partial": 0.10,
+             "coverage": 0.15},
     # risk multipliers: an async-only (or uncalled) dependency keeps this share of its risk ...
     "async_floor": 0.3,
     # ... and the mildest fault keeps this share (container_stop / max delay = full severity)
     "severity_floor": 0.5,
+    # a container_stop's safety penalty keeps this share for a leaf (async-only callers, few journeys);
+    # entry points and services that most journeys call synchronously keep all of it
+    "stop_safety_floor": 0.4,
 }
 # How sure we are of the outcome given the last verdict on the same service x fault (high = worth testing).
 UNCERTAINTY = {None: 0.6, "inconclusive": 0.8, "not held": 0.5, "held": 0.2}
@@ -48,6 +56,10 @@ PENALTY_NOTE = 0.05     # penalties at least this large are named in the why lin
 # The guard's thresholds and abort rules are not touched.
 LOWEST_AFTER_ABORT_SHARE = 0.3
 GUARD_ABORT = "threshold breached"  # guard reasons that mean the system really degraded
+USER_FACING = {"frontend-proxy", "frontend"}     # what users' browsers talk to
+USER_CLIENTS = {"load-generator", "frontend-web"}  # traffic sources: a node they call is one users hit directly
+TRAFFIC_SPIKE_ENABLE = (f"start the load generator (Locust at {LOCUST_URL}) with 1-{MAX_PEAK_USERS - 1} users; "
+                        "it becomes a candidate once traffic_spike.capability() reports ready")
 
 
 def _mean(m, key):
@@ -94,10 +106,29 @@ def generate_candidates(g, baseline, duration_s=DEFAULT_DURATION_S, traffic_capa
                         "hypothesis": "(ranker candidate)", "reasoning": "(ranker candidate)"}
                 if validate(plan, g)["valid"]:
                     out.append(plan)
-    traffic = traffic_spike_candidate_plan(traffic_capability or {})
-    if traffic and traffic["target"] in g and validate(traffic, g)["valid"]:
-        out.append(traffic)
+    if traffic_capability is not None:
+        traffic = traffic_spike_candidate_plan(traffic_capability)
+        if traffic and traffic["target"] in g and validate(traffic, g)["valid"]:
+            out.append(traffic)
+        elif traffic is None and TRAFFIC_SPIKE_TARGET in g and TRAFFIC_SPIKE_TARGET not in PROTECTED:
+            out.append(_unavailable_spike(traffic_capability))
     return out
+
+
+def spike_unavailable_reason(cap):
+    """Why the traffic_spike capability cannot run right now, in one line."""
+    missing = [k.replace("_", " ") for k in ("runtime_ready", "executor_ready", "rollback_ready") if not cap.get(k)]
+    if not cap.get("integration_test_evidence"):
+        missing.append("integration test evidence")
+    return (cap.get("detail") or "capability not ready") + (f" (not ready: {', '.join(missing)})" if missing else "")
+
+
+def _unavailable_spike(cap):
+    """A traffic_spike placeholder: shown in the ranking, never runnable (no typed parameters, never validated)."""
+    users = int((cap.get("current_state") or {}).get("user_count") or 0)
+    return {"target": TRAFFIC_SPIKE_TARGET, "fault": TRAFFIC_SPIKE, "magnitude": min(MAX_PEAK_USERS, max(users + 1, 8)),
+            "duration_s": min(20, MAX_SPIKE_DURATION_S), "hypothesis": "(unavailable)", "reasoning": "(unavailable)",
+            "unavailable": True, "unavailable_reason": spike_unavailable_reason(cap)}
 
 
 def _target_features(g, stats, baseline, flows, history, t):
@@ -117,7 +148,9 @@ def _target_features(g, stats, baseline, flows, history, t):
     else:
         cv = (p95_std or 0) / max(p95 or 0, LATENCY_FLOOR_MS)  # +-2ms on a 3ms service is not noise
         noise = min(1.0, max(cv / NOISE_CV, (err_std or 0) / NOISE_ERR_PP))
-    entry = not callers or all(c in PROTECTED for c, _ in callers)  # only the edge proxy (or nobody) calls it: users hit it directly
+    # users call it directly: the storefront itself, or something a traffic source calls. Not "nobody calls it":
+    # Kafka consumers (accounting, fraud-detection) have no callers, yet no user ever reaches them.
+    entry = t in USER_FACING or any(c in USER_CLIENTS for c, _ in callers)
     journeys = sum(any(t in (s["from"], s["to"]) for s in f["steps"]) for f in flows.values())
     past = [r for r in history if r["target"] == t]
     recoveries = [r["recovery_s"] for r in past if r["recovery_s"] is not None]
@@ -163,11 +196,20 @@ def _outage(f, fault, sev, sync_share):
     """0..1: how close this fault is to taking the whole app down. A stopped entry point (frontend) is a total outage;
     a stopped service that most journeys call synchronously is almost one; a delay at the front door is half of one."""
     if fault == "container_stop":
-        spread = max(0.0, (f["journey_share"] - OUTAGE_JOURNEY_SHARE) / (1 - OUTAGE_JOURNEY_SHARE)) * (0.5 + 0.5 * sync_share)
+        # only synchronous callers break when it stops; async-only (Kafka-style) callers just queue: no outage
+        spread = max(0.0, (f["journey_share"] - OUTAGE_JOURNEY_SHARE) / (1 - OUTAGE_JOURNEY_SHARE)) * sync_share
         return 1.0 if f["entry_point"] else min(1.0, spread)
     if fault == TRAFFIC_SPIKE:
         return 0.25 * sev if f["entry_point"] else 0.0
     return 0.5 * sev if f["entry_point"] else 0.0
+
+
+def _stop_reach(f, sync_share):
+    """0..1: how much of the app a stopped service takes with it. An entry point takes everything; otherwise it is
+    limited by how synchronously it is called and by how many journeys use it (a Kafka consumer reaches little)."""
+    if f["entry_point"]:
+        return 1.0
+    return min(sync_share, min(1.0, f["journey_share"] / OUTAGE_JOURNEY_SHARE))
 
 
 def _partial(fault, sev, sync_share, outage):
@@ -197,10 +239,13 @@ def _labels(f, c):
         "escalation": f"escalate: {h['escalation']}{' users' if c['fault'] == TRAFFIC_SPIKE else 'ms'} held",
         "clarity": "no baseline metrics" if f["baseline_p95"] is None else f"clean baseline (noise {f['noise']:.2f})",
         "uncertainty": "no prior verdict" if h["last_verdict"] is None else f"last verdict {h['last_verdict']}",
-        "safety": f"blast {f['blast_radius']} at severity {c['severity']:.1f}",
+        "safety": f"blast {f['blast_radius']} at severity {c['severity']:.1f}"
+                  + (f", stop reach {c['stop_reach']:.1f}" if c["fault"] == "container_stop" else ""),
         "outage": ("entry point: users hit it directly" if f["entry_point"]
                    else f"stops {f['journeys']} user journeys (near-total outage)"),
         "partial": "likely partial degradation",
+        "coverage": (f"{c['fault']} never run yet" if not c["fault_runs"]
+                     else f"{c['fault']} run {c['fault_runs']}x system-wide"),
         "prior_abort": (f"guard aborted at {h['aborted_at']}{' users' if c['fault'] == TRAFFIC_SPIKE else 'ms'}"
                         + ("; lowest magnitude preferred so the run lasts" if c["magnitude"] == min(MAGNITUDES.get(c["fault"], (c["magnitude"],))) else "")
                         if c["fault"] in {"network_delay", TRAFFIC_SPIKE} and h["aborted_at"] is not None
@@ -217,6 +262,8 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
     plans = generate_candidates(g, baseline, duration_s, traffic_capability)
     per_target = {t: _target_features(g, stats, baseline, flows, history, t) for t in {p["target"] for p in plans}}
     peak = lambda k: max([f[k] or 0 for f in per_target.values()] + [1e-9])
+    fault_runs = Counter(r["fault"] for r in history)
+    most_runs = max([fault_runs[x] for x in ALLOWED_FAULTS] + [0])
     norm = {k: peak(k) for k in ("fan_in", "blast_radius", "journeys", "traffic", "baseline_p95")}
 
     out = []
@@ -228,6 +275,8 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
         coupling = weights["async_floor"] + (1 - weights["async_floor"]) * sync_share
         sev_factor = weights["severity_floor"] + (1 - weights["severity_floor"]) * sev
         outage = _outage(f, p["fault"], sev, sync_share)
+        reach = _stop_reach(f, sync_share) if p["fault"] == "container_stop" else 1.0
+        coverage = 1.0 - fault_runs[p["fault"]] / most_runs if most_runs else 1.0
         score = {
             "fan_in": f["fan_in"] / norm["fan_in"], "blast_radius": f["blast_radius"] / norm["blast_radius"],
             "checkout_path": float(f["checkout_path"]), "journeys": f["journeys"] / norm["journeys"],
@@ -236,10 +285,12 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
             "partial": _partial(p["fault"], sev, sync_share, outage),
             "novelty": NOVELTY[h["novelty"]], "escalation": 1.0 if h["escalation"] is not None else 0.0,
             "clarity": 1 - f["noise"], "uncertainty": UNCERTAINTY.get(h["last_verdict"], 0.6),
+            "coverage": coverage,
         }
         risk = sum(wr[k] * score[k] for k in wr) * coupling * sev_factor
         info = sum(wi[k] * score[k] for k in wi)
-        safety = score["blast_radius"] * sev
+        safety = score["blast_radius"] * sev * (weights.get("stop_safety_floor", 1.0)
+                                                 + (1 - weights.get("stop_safety_floor", 1.0)) * reach)
         ladder = MAGNITUDES.get(p["fault"], ())
         if h["aborted_at"] is None or len(ladder) < 2:
             prior_abort = 1.0 if h["prior_abort"] is not None else 0.0
@@ -257,15 +308,18 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
                     "outage": -wp.get("outage", 0.0) * outage}
         cand = {"id": f"{p['target']}:{p['fault']}:{p['magnitude']}",
                  **{k: p[k] for k in ("target", "fault", "magnitude", "duration_s")},
-                 "severity": round(sev, 2), "outage": round(outage, 3), "history": h}
-        cand.update({k: p[k] for k in ("parameters", "candidate_id", "capability_version") if k in p})
+                 "severity": round(sev, 2), "outage": round(outage, 3), "history": h,
+                 "fault_runs": fault_runs[p["fault"]], "stop_reach": round(reach, 3)}
+        cand.update({k: p[k] for k in ("parameters", "candidate_id", "capability_version", "unavailable",
+                                       "unavailable_reason") if k in p})
         labels = _labels(f, cand)
         top = sorted((k for k in contrib if contrib[k] > 1e-6), key=lambda k: -contrib[k])[:3]
         penalties = [labels[k] for k in ("safety", "prior_abort", "outage") if -contrib[k] >= PENALTY_NOTE]
         cand.update(
             risk=round(risk, 3), info=round(info, 3), priority=round(priority, 3),
             why="; ".join(labels[k] for k in top) + (f" | penalty: {', '.join(penalties)}" if penalties else "")
-                + (f" | {labels['novelty']}" if h["novelty"] == "exact_repeat" else ""),
+                + (f" | {labels['novelty']}" if h["novelty"] == "exact_repeat" else "")
+                + (f" | UNAVAILABLE: {p['unavailable_reason']}" if p.get("unavailable") else ""),
             factors=sorted(
                 ({"name": k, "kind": "risk" if k in wr else "info" if k in wi else "penalty",
                   "score": round(score.get(k, {"safety": safety, "prior_abort": prior_abort, "outage": outage}.get(k, 0)), 3),
@@ -296,12 +350,33 @@ def rank(g, baseline, flows, history, stats=None, weights=WEIGHTS, duration_s=DE
                 "entry_point": {"raw": f["entry_point"], "score": float(f["entry_point"])},
                 "outage": {"raw": round(outage, 3), "score": round(outage, 3)},
                 "partial": {"raw": round(score["partial"], 3), "score": round(score["partial"], 3)},
+                "coverage": {"raw": fault_runs[p["fault"]], "score": round(coverage, 3)},
+                "stop_reach": {"raw": round(reach, 3), "score": round(reach, 3)},
             })
         out.append(cand)
-    out.sort(key=lambda c: (-c["priority"], c["id"]))
-    for i, c in enumerate(out, 1):
+    return _group(out)
+
+
+def _group(cands):
+    """One row per (service, fault): the best magnitude leads its group and the others become its variants, so
+    three delay magnitudes cannot crowd a service's stop out of the top. Order: runnable group leaders by priority,
+    then unavailable candidates (shown, never chosen), then the remaining magnitudes."""
+    cands.sort(key=lambda c: (-c["priority"], c["id"]))
+    leaders, variants = {}, []
+    for c in cands:
+        key = (c["target"], c["fault"])
+        if key in leaders:
+            c["variant_of"] = leaders[key]["id"]
+            leaders[key]["variants"].append(c["id"])
+            variants.append(c)
+        else:
+            c["variants"] = []
+            leaders[key] = c
+    heads = list(leaders.values())
+    ordered = [c for c in heads if not c.get("unavailable")] + [c for c in heads if c.get("unavailable")] + variants
+    for i, c in enumerate(ordered, 1):
         c["rank"] = i
-    return out
+    return ordered
 
 
 def rank_from_files(weights=WEIGHTS):
@@ -337,8 +412,13 @@ def main(argv=None):
     except (OSError, ValueError, KeyError) as e:
         print(f"Cannot rank: {e}")
         return 1
-    print(f"{len(ranking)} candidates (protected and stopped services excluded, all pass policy)\n")
-    print_table(ranking, args.top)
+    rows = [c for c in ranking if "variant_of" not in c]
+    print(f"{len(ranking)} candidates in {len(rows)} (service, fault) rows; the other magnitudes are variants of their row "
+          f"(protected and stopped services excluded; every runnable candidate passes policy)\n")
+    print_table(rows, args.top)
+    for c in (c for c in ranking if c.get("unavailable")):
+        print(f"\n{c['fault']} on {c['target']} is listed but UNAVAILABLE: {c['unavailable_reason']}\n"
+              f"  To enable it: {TRAFFIC_SPIKE_ENABLE}.")
     if args.json:
         print(f"\nSaved {save_ranking(ranking)}")
     return 0

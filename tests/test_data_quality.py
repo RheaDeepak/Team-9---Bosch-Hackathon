@@ -190,6 +190,41 @@ class RankerAfterAbortTest(unittest.TestCase):
         self.assertEqual((guard.CONSECUTIVE_BREACHES, guard.MIN_FAILED_REQUESTS), (2, 3))
 
 
+class RankerBothBehavioursTest(unittest.TestCase):
+    """fault diversity (one row per service and fault, coverage, fair stop penalties, entry points, unavailable
+    traffic_spike) and the lowest-magnitude preference after a guard abort hold together."""
+
+    def test_rows_coverage_stop_penalties_and_lowest_after_abort_at_once(self):
+        history = [run("pay", "network_delay", 200, verdict="inconclusive", guard_aborted=True)] + \
+                  [run(t, "network_delay", 500) for t in ("checkout", "worker")]
+        g, base = rank_graph(), rank_baseline()
+        g.add_edge("load-generator", "frontend", mode="sync", type="sync-http")
+        g.add_edge("frontend", "checkout", mode="sync", type="sync-http")
+        base["services"]["frontend"] = dict(base["services"]["web"])
+        base["containers"]["frontend"] = {"running": {"mean": 1}}
+        cap = {"ready": False, "runtime_ready": False, "executor_ready": True, "rollback_ready": True,
+               "integration_test_evidence": "x", "detail": "Unavailable: ConnectionError"}
+        ranking = ranker.rank(g, base, rank_flows(), history, traffic_capability=cap)
+        rows = [c for c in ranking if "variant_of" not in c]
+        keys = [(c["target"], c["fault"]) for c in rows]
+        self.assertEqual(len(keys), len(set(keys)))                                       # one row per (service, fault)
+        pay = next(c for c in rows if (c["target"], c["fault"]) == ("pay", "network_delay"))
+        self.assertEqual(pay["magnitude"], 200)                                           # lowest after the abort leads ...
+        self.assertEqual(pay["features"]["prior_abort"]["score"], ranker.LOWEST_AFTER_ABORT_SHARE)
+        self.assertTrue(all(ranking[[c["id"] for c in ranking].index(v)]["features"]["prior_abort"]["score"] == 1.0
+                            for v in pay["variants"]))                                    # ... higher magnitudes keep the full penalty
+        self.assertIn("lowest magnitude preferred", pay["why"] + str([f["label"] for f in pay["factors"]]))
+        self.assertIn("container_stop", [c["fault"] for c in rows[:5]])                   # coverage: only delays were run
+        self.assertEqual(next(c for c in rows if c["fault"] == "container_stop")["features"]["coverage"]["score"], 1.0)
+        queue_stop = next(c for c in ranking if c["id"] == "queue:container_stop:0")
+        self.assertEqual((queue_stop["outage"], queue_stop["stop_reach"]), (0.0, 0.0))  # async-only leaf: no outage
+        entry = {c["target"] for c in ranking if c["features"]["entry_point"]["raw"]}
+        self.assertEqual(entry, {"web", "frontend"})                                      # called by the load generator
+        spike = next(c for c in ranking if c["fault"] == "traffic_spike")
+        self.assertTrue(spike["unavailable"])
+        self.assertEqual(rows[-1]["id"], spike["id"])                                     # listed last, never ahead of a runnable row
+
+
 class ResultFilesTest(unittest.TestCase):
     def test_excluded_json_is_not_a_run_anywhere(self):
         stems = [p.stem for p in analysis.result_files(ROOT / "results")]
